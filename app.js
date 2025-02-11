@@ -1,0 +1,60 @@
+const express = require('express')
+const bodyParser = require('body-parser');
+const cookieParser = require('cookie-parser');
+const appError = require('./utils/appError')
+const httpStatusText = require('./utils/httpStatusText');
+// const errorHandler = require('./Errors/errorHandling')
+const dotenv = require('dotenv')
+const limitReq = require('express-rate-limit')
+const mongoSanitize = require('express-mongo-sanitize')
+const xssClean = require('xss-clean')
+const hpp = require('hpp')
+const cors = require('cors')
+const medicineRoutes = require("./routes/medicine.route");
+const usersRoutes = require("./routes/users.route");
+
+
+dotenv.config({ path: './.env' });
+const app = express();
+
+app.use("/uploads", express.static("uploads"));
+
+app.use(express.json())
+app.use(bodyParser.json());
+
+app.use(cors());
+
+app.use(mongoSanitize())
+app.use(xssClean())
+app.use(hpp())
+app.use(cookieParser());
+
+
+app.use(async (req, res, next) => {
+  res.locals.messages = require('express-messages')(req, res);
+  next();
+});
+
+const limiter = limitReq({
+  max: 200,
+  windowMs: 1000 * 60 * 60,
+  message: 'Too many requests, try again after one hour'
+})
+
+
+// routes
+app.use("/api/medicines", medicineRoutes);
+app.use("/api/users", usersRoutes);
+
+
+//global midderware for not found routes
+app.all('*', (req, res) => {
+  return res.status(404).json({status: httpStatusText.ERROR, data: {message: "this resource not found"}});
+});
+
+//global error handler
+app.use((error, req, res, next) => {
+  res.status(error.statusCode || 500).json({status: error.statusText || httpStatusText.ERROR, message: error.message, code: error.statusCode || 500, data: null});
+});
+
+module.exports = app
