@@ -8,15 +8,22 @@ const userRoles = require("../utils/userRoles");
 const checkOwnership = require("../middlewares/Ownership");
 
 
-router.route("/")
-      .get(verifyToken, checkOwnership, medicineController.getAllMedicines)
-      .post(verifyToken, checkOwnership, // Only ADMIN and DOCTOR can add medicines
-      validationSchema(), medicineController.createMedicine
-);
+router
+  .route("/:childId")
+  .get(verifyToken, checkOwnership, medicineController.getAllMedicines)
+  .post(
+    verifyToken,
+    checkOwnership, // Only ADMIN and DOCTOR can add medicines
+    validationSchema(),
+    medicineController.createMedicine
+  );
 
-router.route("/:medicineId")
-      .patch(verifyToken, checkOwnership, medicineController.updateMedicine)
-      .delete(verifyToken, checkOwnership, medicineController.deleteMedicine
-);
+router
+  .route("/:childId/:medicineId")
+  .patch(verifyToken, checkOwnership, medicineController.updateMedicine)
+  .delete(verifyToken, checkOwnership, medicineController.deleteMedicine);
 
 module.exports = router;
+
+
+//باقى اظبطجزء الظكتور فى الhistoryكمان جزء اجيب دواء معين فى الادوية و

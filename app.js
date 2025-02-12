@@ -12,6 +12,8 @@ const hpp = require('hpp')
 const cors = require('cors')
 const medicineRoutes = require("./routes/medicine.route");
 const usersRoutes = require("./routes/users.route");
+const childRoutes = require("./routes/child.route");
+const historyRoutes = require("./routes/history.route");
 
 
 dotenv.config({ path: './.env' });
@@ -43,8 +45,11 @@ const limiter = limitReq({
 
 
 // routes
-app.use("/api/medicines", medicineRoutes);
 app.use("/api/users", usersRoutes);
+app.use("/api/medicines", medicineRoutes);
+app.use("/api/children", childRoutes);
+app.use("/api/history", historyRoutes);
+
 
 
 //global midderware for not found routes
