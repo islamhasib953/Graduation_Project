@@ -1,68 +1,60 @@
 const mongoose = require("mongoose");
+const {
+  calculateDueDate,
+  updateDelayDays,
+} = require("../utils/calculateVaccinationDate");
 
-const UserVaccinationSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: true,
-  },
-  vaccinationId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Vaccination",
-    required: true,
-  },
-  status: {
-    type: String,
-    enum: ["Taken", "Skipped", "Pending"],
-    default: "Pending",
-  },
-  actualDate: {
-    type: Date,
-    validate: {
-      validator: function (value) {
-        return value instanceof Date;
+const UserVaccinationSchema = new mongoose.Schema(
+  {
+    childId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Child",
+      required: [true, "Child ID is required"],
+    },
+    vaccineInfoId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "VaccineInfo",
+      required: [true, "Vaccine Info ID is required"],
+    },
+    dueDate: {
+      type: Date,
+      required: true,
+      immutable: true,
+    },
+    actualDate: {
+      type: Date,
+    },
+    delayDays: {
+      type: Number,
+      default: 0,
+      min: [0, "Delay days cannot be negative"],
+    },
+    status: {
+      type: String,
+      enum: ["Pending", "Taken", "Missed"],
+      default: "Pending",
+    },
+    notes: {
+      type: String,
+      trim: true,
+      maxlength: [500, "Notes cannot exceed 500 characters"],
+    },
+    image: {
+      type: String,
+      default: "uploads/vaccination.jpg",
+      validate: {
+        validator: function (value) {
+          return /\.(jpg|jpeg|png|gif)$/i.test(value);
+        },
+        message: "Image must be a valid image file",
       },
-      message: "Invalid date format",
     },
   },
-  actualTime: {
-    type: String,
-    validate: {
-      validator: function (value) {
-        return /^(0[0-9]|1[0-2]):[0-5][0-9]$/.test(value);
-      },
-      message: "Invalid time format",
-    },
-  },
-  notes: {
-    type: String,
-    maxlength: 500,
-    trim: true,
-  },
-  image: {
-    type: String, // حفظ رابط الصورة
-  },
-  nextScheduledDate: {
-    type: Date,
-  },
-});
+  { timestamps: true }
+);
 
-// تحديث `nextScheduledDate` تلقائيًا بناءً على `actualDate`
-UserVaccinationSchema.pre("save", async function (next) {
-  if (this.isModified("actualDate") && this.actualDate) {
-    // البحث عن تفاصيل التطعيم
-    const vaccination = await mongoose
-      .model("Vaccination")
-      .findById(this.vaccinationId);
-    if (vaccination) {
-      const intervalMonths = 2; // مثال: الجرعة التالية بعد شهرين
-      this.nextScheduledDate = new Date(this.actualDate);
-      this.nextScheduledDate.setMonth(
-        this.actualDate.getMonth() + intervalMonths
-      );
-    }
-  }
-  next();
-});
+// ✅ Attach Middlewares
+UserVaccinationSchema.pre("save", calculateDueDate);
+UserVaccinationSchema.pre("save", updateDelayDays);
 
 module.exports = mongoose.model("UserVaccination", UserVaccinationSchema);

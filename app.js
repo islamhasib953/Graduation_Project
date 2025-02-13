@@ -14,6 +14,9 @@ const medicineRoutes = require("./routes/medicine.route");
 const usersRoutes = require("./routes/users.route");
 const childRoutes = require("./routes/child.route");
 const historyRoutes = require("./routes/history.route");
+const memoryRoutes = require("./routes/memory.route");
+const vaccinationRoutes = require("./routes/vaccination.route");
+
 
 
 dotenv.config({ path: './.env' });
@@ -49,6 +52,8 @@ app.use("/api/users", usersRoutes);
 app.use("/api/medicines", medicineRoutes);
 app.use("/api/children", childRoutes);
 app.use("/api/history", historyRoutes);
+app.use("/api/memory", memoryRoutes);
+app.use("/api/vaccinations", vaccinationRoutes);
 
 
 

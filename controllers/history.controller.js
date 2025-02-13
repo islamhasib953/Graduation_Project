@@ -129,10 +129,57 @@ const deleteHistory = asyncWrapper(async (req, res, next) => {
   });
 });
 
+
+// ✅ Filter history records without pagination
+const filterHistory = asyncWrapper(async (req, res, next) => {
+  const { childId } = req.params;
+  const { diagnosis, disease, treatment, fromDate, toDate, doctor, sortBy } = req.query;
+
+  let query = { childId };
+
+  if (diagnosis) {
+    query.diagnosis = { $regex: diagnosis, $options: "i" };
+  }
+
+  if (disease) {
+    query.disease = { $regex: disease, $options: "i" };
+  }
+
+  if (treatment) {
+    query.treatment = { $regex: treatment, $options: "i" };
+  }
+
+  if (doctor) {
+    query.doctor = { $regex: doctor, $options: "i" };
+  }
+
+  if (fromDate && toDate) {
+    query.date = { $gte: new Date(fromDate), $lte: new Date(toDate) };
+  }
+
+  let sortOption = { date: -1 };
+  if (sortBy === "oldest") {
+    sortOption = { date: 1 };
+  }
+
+  const history = await History.find(query).sort(sortOption).populate("childId", "name birthDate photo");
+
+  if (!history.length) {
+    return next(appError.create("not found history for child", 404, httpStatusText.FAIL));
+  }
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: history,
+  });
+});
+
+
 module.exports = {
   createHistory,
   getAllHistory,
   getSingleHistory,
   updateHistory,
   deleteHistory,
+  filterHistory,
 };
