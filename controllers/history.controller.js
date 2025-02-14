@@ -38,13 +38,13 @@ const createHistory = asyncWrapper(async (req, res, next) => {
   });
 });
 
+
 // ✅ Get all history records for a specific child
 const getAllHistory = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
 
-  const history = await History.find({ childId }).populate(
-    "childId",
-    "name birthDate photo"
+  const history = await History.find({ childId }).select(
+    "diagnosis disease treatment date childId"
   );
 
   if (!history.length) {
@@ -59,17 +59,23 @@ const getAllHistory = asyncWrapper(async (req, res, next) => {
 
   res.json({
     status: httpStatusText.SUCCESS,
-    data: history,
+    data: history.map((record) => ({
+      _id: record._id, // Child's ID
+      diagnosis: record.diagnosis,
+      disease: record.disease,
+      treatment: record.treatment,
+      date: record.date,
+    })),
   });
 });
+
 
 // ✅ Get a single history record for a specific child
 const getSingleHistory = asyncWrapper(async (req, res, next) => {
   const { childId, historyId } = req.params;
 
-  const history = await History.findOne({ _id: historyId, childId }).populate(
-    "childId",
-    "name birthDate photo"
+  const history = await History.findOne({ _id: historyId, childId }).select(
+    "_id diagnosis disease treatment notes notesImage date time"
   );
 
   if (!history) {
@@ -80,9 +86,19 @@ const getSingleHistory = asyncWrapper(async (req, res, next) => {
 
   res.json({
     status: httpStatusText.SUCCESS,
-    data: { history },
+    data: {
+      _id: history._id,
+      diagnosis: history.diagnosis,
+      disease: history.disease,
+      treatment: history.treatment,
+      notes: history.notes,
+      notesImage: history.notesImage,
+      date: history.date,
+      time: history.time,
+    },
   });
 });
+
 
 // ✅ Update a history record
 const updateHistory = asyncWrapper(async (req, res, next) => {

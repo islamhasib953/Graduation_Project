@@ -62,7 +62,7 @@ const createChild = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Get all children
+// ✅ Get all children for admin
 const getAllChildren = asyncWrapper(async (req, res) => {
   const children = await Child.find({}, "_id name birthDate photo");
   res.json({
@@ -76,24 +76,75 @@ const getAllChildren = asyncWrapper(async (req, res) => {
   });
 });
 
+
+// ✅ Get all children for a specific user (logged-in user)
+const getChildrenForUser = asyncWrapper(async (req, res, next) => {
+  const userId = req.user.id;
+  const children = await Child.find({ parentId: userId })
+    .select(
+      "_id name gender birthDate heightAtBirth weightAtBirth bloodType photo parentId"
+    )
+    .populate("parentId", "phone");
+
+  if (!children.length) {
+    return next(
+      appError.create(
+        "No children found for this user",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: children.map((child) => ({
+      _id: child._id,
+      name: child.name,
+      gender: child.gender,
+      birthDate: child.birthDate,
+      heightAtBirth: child.heightAtBirth,
+      weightAtBirth: child.weightAtBirth,
+      bloodType: child.bloodType,
+      photo: child.photo,
+      parentPhone: child.parentId?.phone || null,
+      parentId: child.parentId?._id || null,
+    })),
+  });
+});
+
+
+
 // ✅ Get single child with all details
 const getSingleChild = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
-  const child = await Child.findById(childId).populate("parentId", "phone");
+
+  const child = await Child.findById(childId)
+    .select(
+      "_id name gender birthDate heightAtBirth weightAtBirth bloodType photo parentId"
+    )
+    .populate("parentId", "phone");
 
   if (!child) {
-    const error = appError.create("Child not found", 404, httpStatusText.FAIL);
-    return next(error);
+    return next(appError.create("Child not found", 404, httpStatusText.FAIL));
   }
 
   res.json({
     status: httpStatusText.SUCCESS,
     data: {
-      child,
-      parentPhone: child.parentId.phone,
+      _id: child._id,
+      name: child.name,
+      gender: child.gender,
+      birthDate: child.birthDate,
+      heightAtBirth: child.heightAtBirth,
+      weightAtBirth: child.weightAtBirth,
+      bloodType: child.bloodType,
+      photo: child.photo,
+      parentPhone: child.parentId?.phone || null,
     },
   });
 });
+
 
 // ✅ Update a child
 const updateChild = asyncWrapper(async (req, res, next) => {
@@ -141,6 +192,7 @@ const deleteChild = asyncWrapper(async (req, res, next) => {
 module.exports = {
   createChild,
   getAllChildren,
+  getChildrenForUser,
   getSingleChild,
   updateChild,
   deleteChild,

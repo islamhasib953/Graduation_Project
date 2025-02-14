@@ -33,7 +33,7 @@ router
   )
   .patch(
     verifyToken,
-    checkOwnership,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
     validationschema.validateHistory,
     historyController.updateHistory
   )

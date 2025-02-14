@@ -16,9 +16,8 @@ const ChildSchema = new mongoose.Schema(
       type: String,
       match: [/^(A|B|AB|O)[+-]$/, "Invalid blood type"],
     },
-    parentId: [
+    parentId:
       { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    ],
     photo: {
       type: String,
       default: "uploads/vaccination.jpg",

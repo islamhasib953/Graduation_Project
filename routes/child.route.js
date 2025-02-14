@@ -11,12 +11,18 @@ const validationschema = require("../middlewares/validationschema");
 
 router
   .route("/")
-  .get(verifyToken, checkOwnership, childController.getAllChildren)
+  // .get(verifyToken, checkOwnership, childController.getAllChildren)
   .post(
     verifyToken,
     checkOwnership,
     validationschema.validateChild,
     childController.createChild
+  )
+  .get(
+    verifyToken,
+    checkOwnership,
+    validationschema.validateChild,
+    childController.getChildrenForUser
   );
 
 router
