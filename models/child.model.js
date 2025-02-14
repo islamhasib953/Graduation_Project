@@ -21,7 +21,13 @@ const ChildSchema = new mongoose.Schema(
     ],
     photo: {
       type: String,
-      default: "uploads/child.jpg",
+      default: "uploads/vaccination.jpg",
+      validate: {
+        validator: function (value) {
+          return /\.(jpg|jpeg|png|gif)$/i.test(value);
+        },
+        message: "Image must be a valid image file",
+      },
     },
   },
   { timestamps: true }

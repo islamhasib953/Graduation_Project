@@ -1,7 +1,9 @@
 const express = require("express");
+const { validationResult } = require("express-validator");
 const router = express.Router();
+
 const medicineController = require("../controllers/medicine.controller");
-const { validationSchema } = require("../middlewares/validationschema");
+const validationschema = require("../middlewares/validationschema");
 const verifyToken = require("../middlewares/virifyToken");
 const allowedTo = require("../middlewares/allowedTo");
 const userRoles = require("../utils/userRoles");
@@ -13,17 +15,20 @@ router
   .get(verifyToken, checkOwnership, medicineController.getAllMedicines)
   .post(
     verifyToken,
-    checkOwnership, // Only ADMIN and DOCTOR can add medicines
-    validationSchema(),
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+    validationschema.validateMedicine,
     medicineController.createMedicine
   );
 
 router
   .route("/:childId/:medicineId")
-  .patch(verifyToken, checkOwnership, medicineController.updateMedicine)
+  .get(verifyToken, checkOwnership, medicineController.getSingleMedicine)
+  .patch(
+    verifyToken,
+    checkOwnership,
+    validationschema.validateMedicine,
+    medicineController.updateMedicine
+  )
   .delete(verifyToken, checkOwnership, medicineController.deleteMedicine);
 
 module.exports = router;
-
-
-//باقى اظبطجزء الظكتور فى الhistoryكمان جزء اجيب دواء معين فى الادوية و

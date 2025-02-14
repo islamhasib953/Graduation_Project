@@ -9,11 +9,18 @@ const memorySchema = new mongoose.Schema(
     },
     image: {
       type: String,
-      default: "uploads/child.jpg",
+      default: "uploads/vaccination.jpg",
+      validate: {
+        validator: function (value) {
+          return /\.(jpg|jpeg|png|gif)$/i.test(value);
+        },
+        message: "Image must be a valid image file",
+      },
     },
     description: {
       type: String,
-      required: true,
+      trim: true,
+      maxlength: [500, "Notes cannot exceed 500 characters"],
     },
     date: {
       type: Date,

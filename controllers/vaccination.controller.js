@@ -165,9 +165,6 @@ if (futureVaccinations.length > 0) {
     let lastnewdate = newDueDate.setDate(newDueDate.getDate() + accumulatedDelay);
     let storeDueDate = new Date(lastnewdate);
 console.log(storeDueDate);
-    // console.log(`Updating ${future._id}: New Due Date ->`, newDueDate);
-
-    // console.log(newDueDate +' + '+ accumulatedDelay);
     console.log(future._id);
     await UserVaccination.updateOne(
       { _id: future._id },
@@ -180,7 +177,6 @@ console.log(storeDueDate);
     );
 
     accumulatedDelay = delayDays;
-    // lastDueDate = newDueDate;
   }
 }
 

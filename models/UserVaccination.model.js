@@ -22,6 +22,7 @@ const UserVaccinationSchema = new mongoose.Schema(
     },
     actualDate: {
       type: Date,
+      required: true,
     },
     // actualTime: {
     //   type: String,
@@ -70,7 +71,3 @@ UserVaccinationSchema.pre("save", async function (next) {
 });
 
 module.exports = mongoose.model("UserVaccination", UserVaccinationSchema);
-
-
-// 2020-11-15
-// 2021-05-15

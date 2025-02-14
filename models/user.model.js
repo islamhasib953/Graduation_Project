@@ -23,10 +23,10 @@ const userSchema = new mongoose.Schema({
   phone: {
     type: String,
     required: true,
-    unique: true, // ✅ اجعل رقم الهاتف فريدًا لكل مستخدم
+    unique: true,
     validate: {
       validator: function (value) {
-        return /^01[0-2,5]\d{8}$/.test(value); // ✅ التحقق من رقم الهاتف المصري
+        return /^01[0-2,5]\d{8}$/.test(value);
       },
       message: "Invalid Egyptian phone number",
     },

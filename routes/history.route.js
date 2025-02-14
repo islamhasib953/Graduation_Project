@@ -1,11 +1,14 @@
 const express = require("express");
+const { validationResult } = require("express-validator");
 const router = express.Router();
+
 const verifyToken = require("../middlewares/virifyToken");
 const checkOwnership = require("../middlewares/Ownership");
-const { validationSchema } = require("../middlewares/validationschema");
+const validationschema = require("../middlewares/validationschema");
 const historyController = require("../controllers/history.controller");
-const allowedTo = require('../middlewares/allowedTo');
-const userRoles = require('../utils/userRoles');
+const allowedTo = require("../middlewares/allowedTo");
+const userRoles = require("../utils/userRoles");
+
 
 router
   .route("/:childId")
@@ -17,6 +20,7 @@ router
   .post(
     verifyToken,
     allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+    validationschema.validateHistory,
     historyController.createHistory
   );
 
@@ -27,20 +31,24 @@ router
     allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
     historyController.getSingleHistory
   )
-  .patch(verifyToken, checkOwnership, historyController.updateHistory)
+  .patch(
+    verifyToken,
+    checkOwnership,
+    validationschema.validateHistory,
+    historyController.updateHistory
+  )
   .delete(
     verifyToken,
     allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
     historyController.deleteHistory
   );
 
-  router
-    .route("/filter/:childId")
-    .get(
-      verifyToken,
-      allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-      historyController.filterHistory
-    );
-
+router
+  .route("/filter/:childId")
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    historyController.filterHistory
+  );
 
 module.exports = router;
