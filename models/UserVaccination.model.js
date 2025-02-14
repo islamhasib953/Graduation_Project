@@ -19,11 +19,14 @@ const UserVaccinationSchema = new mongoose.Schema(
     dueDate: {
       type: Date,
       required: true,
-      immutable: true,
     },
     actualDate: {
       type: Date,
     },
+    // actualTime: {
+    //   type: String,
+    //   required: true,
+    // },
     delayDays: {
       type: Number,
       default: 0,
@@ -54,7 +57,20 @@ const UserVaccinationSchema = new mongoose.Schema(
 );
 
 // ✅ Attach Middlewares
-UserVaccinationSchema.pre("save", calculateDueDate);
-UserVaccinationSchema.pre("save", updateDelayDays);
+UserVaccinationSchema.pre("validate", async function (next) {
+  if (!this.dueDate) {
+    await calculateDueDate.call(this, next);
+  }
+  next();
+});
+
+
+UserVaccinationSchema.pre("save", async function (next) {
+  await updateDelayDays.call(this, next);
+});
 
 module.exports = mongoose.model("UserVaccination", UserVaccinationSchema);
+
+
+// 2020-11-15
+// 2021-05-15

@@ -2,18 +2,17 @@ const express = require("express");
 const router = express.Router();
 const vaccinationController = require("../controllers/vaccination.controller");
 const verifyToken = require("../middlewares/virifyToken");
-const checkOwnership = require("../middlewares/Ownership");
 const allowedTo = require("../middlewares/allowedTo");
 const userRoles = require("../utils/userRoles");
 
-/**
- * Routes for managing vaccinations
- */
 
-// ✅ Route to get all vaccinations and create a new vaccination (Admin only)
 router
   .route("/")
-  .get(verifyToken, checkOwnership, vaccinationController.getAllVaccinations)
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN),
+    vaccinationController.getAllVaccinations
+  )
   .post(
     verifyToken,
     allowedTo(userRoles.ADMIN),
@@ -24,14 +23,33 @@ router
   .route("/:childId")
   .get(
     verifyToken,
-    checkOwnership, vaccinationController.getVaccinationsByChildId
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    vaccinationController.getVaccinationsByChildId
   );
 
-// ✅ Routes for handling a single vaccination by ID
 // router
-//   .route("/:vaccinationId")
-//   .get(verifyToken, checkOwnership, vaccinationController.getSingleVaccination)
-//   .patch(verifyToken, checkOwnership, vaccinationController.updateVaccination)
-//   .delete(verifyToken, checkOwnership, vaccinationController.deleteVaccination);
+//   .route("/:childId/:vaccineInfoId")
+  // .post(
+  //   verifyToken,
+  //   allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+  //   vaccinationController.createUserVaccination
+  // )
+//   .patch(
+//     verifyToken,
+//     allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+//     vaccinationController.updateUserVaccination
+//   );
 
+  router
+    .route("/:childId/:vaccinationId")
+    .get(
+      verifyToken,
+      allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+      vaccinationController.getUserVaccination
+    )
+    .patch(
+      verifyToken,
+      allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+      vaccinationController.updateUserVaccination
+    );
 module.exports = router;

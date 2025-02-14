@@ -6,18 +6,18 @@ const mongoose = require("mongoose");
 const calculateDueDate = async function (next) {
   if (this.isNew) {
     const child = await mongoose.model("Child").findById(this.childId);
-    if (!child) {
-      return next(new Error("Invalid child ID"));
+    if (!child || !child.birthDate) {
+      return next(new Error("Invalid child ID or missing birth date"));
     }
 
     const vaccineInfo = await mongoose
       .model("VaccineInfo")
       .findById(this.vaccineInfoId);
-    if (!vaccineInfo) {
+    if (!vaccineInfo || vaccineInfo.originalSchedule === undefined) {
       return next(new Error("Invalid vaccine information ID"));
     }
 
-    // ✅ Fetch last delayDays for this child only
+    // ✅ Fetch last delay for this specific child
     const lastVaccination = await mongoose
       .model("UserVaccination")
       .findOne({ childId: this.childId })
@@ -26,12 +26,14 @@ const calculateDueDate = async function (next) {
 
     const lastDelayDays = lastVaccination ? lastVaccination.delayDays : 0;
 
-    // ✅ Calculate dueDate (birthDate + originalSchedule + last delayDays)
+    // ✅ Calculate `dueDate`
     this.dueDate = new Date(child.birthDate);
     this.dueDate.setMonth(
       this.dueDate.getMonth() + vaccineInfo.originalSchedule
     );
     this.dueDate.setDate(this.dueDate.getDate() + lastDelayDays);
+
+    console.log("📌 Calculated dueDate:", this.dueDate);
   }
   next();
 };
@@ -40,26 +42,37 @@ const calculateDueDate = async function (next) {
  * Middleware to update delayDays and shift future vaccinations for the same child.
  */
 const updateDelayDays = async function (next) {
-  if (this.isModified("actualDate") && this.actualDate) {
-    const delay = Math.floor(
-      (new Date(this.actualDate) - new Date(this.dueDate)) /
-        (1000 * 60 * 60 * 24)
-    );
-
-    if (delay > 0) {
-      this.delayDays = delay; // ✅ Store delayDays in database
-
-      // ✅ Update all future vaccinations for this child with the new delay
-      await mongoose.model("UserVaccination").updateMany(
-        {
-          childId: this.childId,
-          dueDate: { $gt: this.dueDate },
-        },
-        { $inc: { dueDate: delay * 24 * 60 * 60 * 1000 } } // Shift future vaccinations
+  try {
+    if (this.isModified("actualDate") && this.actualDate) {
+      const delay = Math.floor(
+        (new Date(this.actualDate) - new Date(this.dueDate)) /
+          (1000 * 60 * 60 * 24)
       );
+
+      this.delayDays = delay > 0 ? delay : 0;
+
+      if (delay > 0) {
+        // ✅ Fetch all future vaccinations for the child
+        const futureVaccinations = await mongoose
+          .model("UserVaccination")
+          .find({
+            childId: this.childId,
+            dueDate: { $gt: this.dueDate },
+          });
+
+        // ✅ Update each future vaccination record manually
+        for (let vaccination of futureVaccinations) {
+          vaccination.dueDate = new Date(vaccination.dueDate);
+          vaccination.dueDate.setDate(vaccination.dueDate.getDate() + delay);
+          vaccination.delayDays += delay;
+          await vaccination.save();
+        }
+      }
     }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 };
 
 module.exports = {

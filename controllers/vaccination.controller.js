@@ -4,7 +4,6 @@ const Child = require("../models/child.model");
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const appError = require("../utils/appError");
 const httpStatusText = require("../utils/httpStatusText");
-
 const { calculateDueDate } = require("../utils/calculateVaccinationDate");
 
 // ✅ Admin creates a new vaccine and assigns it to all children
@@ -35,7 +34,6 @@ const createVaccinationForAllChildren = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // ✅ إنشاء سجل جديد في VaccineInfo بدون `childId`
   const vaccineInfo = await VaccineInfo.create({
     originalSchedule,
     doseName,
@@ -44,10 +42,7 @@ const createVaccinationForAllChildren = asyncWrapper(async (req, res, next) => {
     administrationMethod,
     description,
   });
-
-  // ✅ جلب جميع الأطفال المسجلين
   const children = await Child.find();
-
   if (!children.length) {
     return next(
       appError.create(
@@ -58,15 +53,16 @@ const createVaccinationForAllChildren = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // ✅ إنشاء تطعيمات لكل طفل
   await Promise.all(
     children.map(async (child) => {
+      const dueDate = new Date(child.birthDate);
+      dueDate.setMonth(dueDate.getMonth() + originalSchedule);
+
       const userVaccination = new UserVaccination({
         childId: child._id,
         vaccineInfoId: vaccineInfo._id,
+        dueDate,
       });
-
-      await calculateDueDate.call(userVaccination, () => {});
       await userVaccination.save();
     })
   );
@@ -78,18 +74,20 @@ const createVaccinationForAllChildren = asyncWrapper(async (req, res, next) => {
   });
 });
 
-
 // ✅ Get all vaccinations for a specific child using childId
 const getVaccinationsByChildId = asyncWrapper(async (req, res, next) => {
-  const { childId } = req.params; // استخراج childId من الطلب
-
+  const { childId } = req.params;
   const vaccinations = await UserVaccination.find({ childId })
-    .populate("childId", "name birthDate gender") // Populate child details
-    .populate("vaccineInfoId"); // Populate all vaccine details
+    .populate("childId", "name birthDate gender")
+    .populate("vaccineInfoId");
 
   if (!vaccinations.length) {
     return next(
-      appError.create("No vaccinations found for this child", 404, httpStatusText.FAIL)
+      appError.create(
+        "No vaccinations found for this child",
+        404,
+        httpStatusText.FAIL
+      )
     );
   }
 
@@ -99,14 +97,11 @@ const getVaccinationsByChildId = asyncWrapper(async (req, res, next) => {
   });
 });
 
-
-
-
-// ✅ Get all vaccinations with child and vaccine details, including dueDate from UserVaccination
+// ✅ Get all vaccinations
 const getAllVaccinations = asyncWrapper(async (req, res, next) => {
   const vaccinations = await UserVaccination.find()
-    .populate("childId", "name birthDate gender") // Populate child details
-    .populate("vaccineInfoId"); // Populate all vaccine details
+    .populate("childId", "name birthDate gender")
+    .populate("vaccineInfoId");
 
   if (!vaccinations.length) {
     return next(
@@ -114,64 +109,111 @@ const getAllVaccinations = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  res.status(200).json({
-    status: httpStatusText.SUCCESS,
-    data: vaccinations,
-  });
+  res.status(200).json({ status: httpStatusText.SUCCESS, data: vaccinations });
 });
 
-// ✅ Update actual vaccination date and adjust future vaccinations if delayed
-const updateActualDate = asyncWrapper(async (req, res, next) => {
-  const { vaccinationId } = req.params;
-  const { actualDate } = req.body;
+const updateUserVaccination = asyncWrapper(async (req, res, next) => {
+  const { childId, vaccinationId } = req.params;
+  const { actualDate, status, notes, image } = req.body;
 
-  if (!actualDate) {
+  if (!actualDate || !status) {
     return next(
-      appError.create("Actual date is required", 400, httpStatusText.FAIL)
+      appError.create(
+        "Vaccination details are required",
+        400,
+        httpStatusText.FAIL
+      )
     );
   }
-
-  const vaccination = await UserVaccination.findById(vaccinationId);
+  const vaccination = await UserVaccination.findOne({
+    _id: vaccinationId,
+    childId,
+  });
   if (!vaccination) {
     return next(
-      appError.create("Vaccination not found", 404, httpStatusText.FAIL)
+      appError.create("Vaccination record not found", 404, httpStatusText.FAIL)
     );
   }
 
-  // Calculate delay in days
-  const delay = Math.floor(
-    (new Date(actualDate) - new Date(vaccination.dueDate)) /
-      (1000 * 60 * 60 * 24)
+  const delayDays = Math.max(
+    0,
+    Math.floor(
+      (new Date(actualDate) - new Date(vaccination.dueDate)) /
+        (1000 * 60 * 60 * 24)
+    )
   );
 
-  if (delay > 0) {
-    vaccination.delayDays = delay;
-  }
-
-  vaccination.actualDate = actualDate;
+  vaccination.actualDate = new Date(actualDate);
+  vaccination.delayDays = delayDays;
+  vaccination.status = status;
+  vaccination.notes = notes;
+  vaccination.image = image || vaccination.image;
   await vaccination.save();
 
-  res.json({
-    status: httpStatusText.SUCCESS,
+  const futureVaccinations = await UserVaccination.find({
+    childId,
+    dueDate: { $gt: vaccination.dueDate },
+  }).sort("dueDate");
+  // console.log(futureVaccinations);
+if (futureVaccinations.length > 0) {
+  let accumulatedDelay = delayDays > 0 ? delayDays : 1;
+  // let lastDueDate = new Date(vaccination.dueDate);
+
+  for (let future of futureVaccinations) {
+    let newDueDate = new Date(future.dueDate);
+    console.log(newDueDate);
+    let lastnewdate = newDueDate.setDate(newDueDate.getDate() + accumulatedDelay);
+    let storeDueDate = new Date(lastnewdate);
+console.log(storeDueDate);
+    // console.log(`Updating ${future._id}: New Due Date ->`, newDueDate);
+
+    // console.log(newDueDate +' + '+ accumulatedDelay);
+    console.log(future._id);
+    await UserVaccination.updateOne(
+      { _id: future._id },
+      {
+        $set: {
+          dueDate: storeDueDate,
+          delayDays: accumulatedDelay,
+        },
+      }
+    );
+
+    accumulatedDelay = delayDays;
+    // lastDueDate = newDueDate;
+  }
+}
+
+
+  res.status(200).json({
+    status: "success",
+    message: "Vaccination record and future due dates updated successfully",
     data: vaccination,
   });
 });
 
-// ❌ Prevent vaccination deletion (only admin can delete)
-const deleteVaccination = asyncWrapper(async (req, res, next) => {
-  return next(
-    appError.create(
-      "Vaccination deletion is not allowed",
-      403,
-      httpStatusText.FAIL
-    )
-  );
+
+
+
+// ✅ Get a specific user vaccination record
+const getUserVaccination = asyncWrapper(async (req, res, next) => {
+  const { vaccinationId } = req.params;
+
+  const vaccination = await UserVaccination.findById(vaccinationId).populate("childId vaccineInfoId");
+  if (!vaccination) {
+    return next(appError.create("Vaccination record not found", 404, httpStatusText.FAIL));
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: vaccination,
+  });
 });
 
 module.exports = {
   createVaccinationForAllChildren,
   getVaccinationsByChildId,
   getAllVaccinations,
-  // updateActualDate,
-  // deleteVaccination,
+  updateUserVaccination,
+  getUserVaccination,
 };
