@@ -15,7 +15,7 @@ router
   .get(verifyToken, checkOwnership, medicineController.getAllMedicines)
   .post(
     verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+    checkOwnership,
     validationschema.validateMedicine,
     medicineController.createMedicine
   );

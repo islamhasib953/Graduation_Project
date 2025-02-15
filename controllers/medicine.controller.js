@@ -35,9 +35,11 @@ const createMedicine = asyncWrapper(async (req, res, next) => {
 
 // ✅ Get all medicines for a specific child
 const getAllMedicines = asyncWrapper(async (req, res, next) => {
-  const { childId } = req.params;
+  const { childId } = req.params; // Assuming you pass childId in the URL
 
-  const medicines = await Medicine.find({ childId });
+  const medicines = await Medicine.find({ childId }).select(
+    "_id name description days times createdAt"
+  );
 
   if (!medicines.length) {
     return next(
@@ -51,15 +53,25 @@ const getAllMedicines = asyncWrapper(async (req, res, next) => {
 
   res.json({
     status: httpStatusText.SUCCESS,
-    data: { medicines },
+    data: medicines.map((medicine) => ({
+      _id: medicine._id,
+      name: medicine.name,
+      description: medicine.description,
+      days: medicine.days,
+      times: medicine.times,
+      createdAt: medicine.createdAt,
+    })),
   });
 });
+
 
 // ✅ Get a single medicine record for a specific child
 const getSingleMedicine = asyncWrapper(async (req, res, next) => {
   const { childId, medicineId } = req.params;
 
-  const medicine = await Medicine.findOne({ _id: medicineId, childId });
+  const medicine = await Medicine.findOne({ _id: medicineId, childId }).select(
+    "_id name description days times createdAt"
+  );
 
   if (!medicine) {
     return next(
@@ -69,9 +81,17 @@ const getSingleMedicine = asyncWrapper(async (req, res, next) => {
 
   res.json({
     status: httpStatusText.SUCCESS,
-    data: { medicine },
+    data: {
+      _id: medicine._id,
+      name: medicine.name,
+      description: medicine.description,
+      days: medicine.days,
+      times: medicine.times,
+      createdAt: medicine.createdAt,
+    },
   });
 });
+
 
 // ✅ Update a medicine record
 const updateMedicine = asyncWrapper(async (req, res, next) => {
@@ -82,7 +102,7 @@ const updateMedicine = asyncWrapper(async (req, res, next) => {
     { _id: medicineId, childId },
     { name, description, days, times },
     { new: true, runValidators: true }
-  );
+  ).select("_id name description days times createdAt");
 
   if (!updatedMedicine) {
     return next(
@@ -92,9 +112,17 @@ const updateMedicine = asyncWrapper(async (req, res, next) => {
 
   res.json({
     status: httpStatusText.SUCCESS,
-    data: { medicine: updatedMedicine },
+    data: {
+      _id: updatedMedicine._id,
+      name: updatedMedicine.name,
+      description: updatedMedicine.description,
+      days: updatedMedicine.days,
+      times: updatedMedicine.times,
+      createdAt: updatedMedicine.createdAt,
+    },
   });
 });
+
 
 // ✅ Delete a medicine record
 const deleteMedicine = asyncWrapper(async (req, res, next) => {
