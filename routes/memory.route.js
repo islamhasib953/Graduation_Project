@@ -11,10 +11,14 @@ const checkOwnership = require("../middlewares/Ownership");
 
 router
   .route("/:childId")
-  .get(verifyToken, checkOwnership, memoryController.getAllMemories)
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+    memoryController.getAllMemories
+  )
   .post(
     verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.PARENT),
+    allowedTo(userRoles.ADMIN, userRoles.PATIENT),
     validationschema.validateMemory,
     memoryController.createMemory
   );
@@ -35,7 +39,7 @@ router
   .get(verifyToken, checkOwnership, memoryController.getFavoriteMemories);
 
 router
-  .route("/:childId/:memoryId/favorite")
+  .route("/favorites/:childId/:memoryId")
   .patch(verifyToken, checkOwnership, memoryController.toggleFavoriteMemory);
 
 module.exports = router;

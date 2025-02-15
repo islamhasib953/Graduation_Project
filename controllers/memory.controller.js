@@ -28,10 +28,17 @@ const createMemory = asyncWrapper(async (req, res, next) => {
 
   await newMemory.save();
 
-  res.status(201).json({
-    status: httpStatusText.SUCCESS,
-    data: { memory: newMemory },
-  });
+      res.json({
+        status: httpStatusText.SUCCESS,
+        data: {
+          _id: newMemory._id,
+          image: newMemory.image,
+          description: newMemory.description,
+          date: newMemory.date,
+          time: newMemory.time,
+          isFavorite: newMemory.isFavorite,
+        },
+      });
 });
 
 // ✅ get all memories
@@ -49,11 +56,17 @@ const getAllMemories = asyncWrapper(async (req, res, next) => {
       )
     );
   }
-
-  res.json({
-    status: httpStatusText.SUCCESS,
-    data: memories,
-  });
+    res.json({
+      status: httpStatusText.SUCCESS,
+      data: memories.map((record) => ({
+        _id: record._id, // Child's ID
+        image: record.image,
+        description: record.description,
+        date: record.date,
+        time: record.time,
+        isFavorite: record.isFavorite,
+      })),
+    });
 });
 
 // ✅get all Favorite Memories
@@ -74,11 +87,17 @@ const getFavoriteMemories = asyncWrapper(async (req, res, next) => {
       )
     );
   }
-
-  res.json({
-    status: httpStatusText.SUCCESS,
-    data: favoriteMemories,
-  });
+    res.json({
+      status: httpStatusText.SUCCESS,
+      data: favoriteMemories.map((record) => ({
+        _id: record._id, // Child's ID
+        image: record.image,
+        description: record.description,
+        date: record.date,
+        time: record.time,
+        isFavorite: record.isFavorite,
+      })),
+    });
 });
 
 // ✅ update memory to put favorite memory or none
@@ -92,10 +111,16 @@ const toggleFavoriteMemory = asyncWrapper(async (req, res, next) => {
 
   memory.isFavorite = !memory.isFavorite;
   await memory.save();
-
   res.json({
     status: httpStatusText.SUCCESS,
-    data: { memory },
+    data: {
+      _id: memory._id,
+      image: memory.image,
+      description: memory.description,
+      date: memory.date,
+      time: memory.time,
+      isFavorite: memory.isFavorite,
+    },
   });
 });
 
@@ -116,9 +141,16 @@ const updateMemory = asyncWrapper(async (req, res, next) => {
   }
 
   res.json({
-    status: httpStatusText.SUCCESS,
-    data: { memory },
-  });
+        status: httpStatusText.SUCCESS,
+        data: {
+          _id: memory._id,
+          image: memory.image,
+          description: memory.description,
+          date: memory.date,
+          time: memory.time,
+          isFavorite: memory.isFavorite,
+        },
+      });
 });
 
 // ✅ delete memory
