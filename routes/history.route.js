@@ -10,6 +10,17 @@ const allowedTo = require("../middlewares/allowedTo");
 const userRoles = require("../utils/userRoles");
 
 
+
+router
+  .route("/filter/:childId")
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    historyController.filterHistory
+  );
+
+
+
 router
   .route("/:childId")
   .get(
@@ -43,12 +54,5 @@ router
     historyController.deleteHistory
   );
 
-router
-  .route("/filter/:childId")
-  .get(
-    verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    historyController.filterHistory
-  );
 
 module.exports = router;

@@ -32,10 +32,20 @@ const createHistory = asyncWrapper(async (req, res, next) => {
 
   await newHistory.save();
 
-  res.status(201).json({
-    status: httpStatusText.SUCCESS,
-    data: { history: newHistory },
-  });
+
+    res.json({
+      status: httpStatusText.SUCCESS,
+      data: {
+        _id: newHistory._id,
+        diagnosis: newHistory.diagnosis,
+        disease: newHistory.disease,
+        treatment: newHistory.treatment,
+        notes: newHistory.notes,
+        notesImage: newHistory.notesImage,
+        date: newHistory.date,
+        time: newHistory.time,
+      },
+    });
 });
 
 
@@ -146,10 +156,10 @@ const deleteHistory = asyncWrapper(async (req, res, next) => {
 });
 
 
-// ✅ Filter history records without pagination
+// ✅ Filter history records using query parameters
 const filterHistory = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
-  const { diagnosis, disease, treatment, fromDate, toDate, doctor, sortBy } = req.query;
+  const { diagnosis, disease, treatment, fromDate, toDate, sortBy } = req.query;
 
   let query = { childId };
 
@@ -165,9 +175,9 @@ const filterHistory = asyncWrapper(async (req, res, next) => {
     query.treatment = { $regex: treatment, $options: "i" };
   }
 
-  if (doctor) {
-    query.doctor = { $regex: doctor, $options: "i" };
-  }
+  // if (doctor) {
+  //   query.doctor = { $regex: doctor, $options: "i" };
+  // }
 
   if (fromDate && toDate) {
     query.date = { $gte: new Date(fromDate), $lte: new Date(toDate) };
@@ -178,17 +188,29 @@ const filterHistory = asyncWrapper(async (req, res, next) => {
     sortOption = { date: 1 };
   }
 
-  const history = await History.find(query).sort(sortOption).populate("childId", "name birthDate photo");
+  const history = await History.find(query)
+    .sort(sortOption)
+    .select("_id diagnosis disease treatment date");
 
   if (!history.length) {
-    return next(appError.create("not found history for child", 404, httpStatusText.FAIL));
+    return next(
+      appError.create("No history records found", 404, httpStatusText.FAIL)
+    );
   }
 
   res.json({
     status: httpStatusText.SUCCESS,
-    data: history,
+    data: history.map((record) => ({
+      _id: record._id,
+      diagnosis: record.diagnosis,
+      disease: record.disease,
+      treatment: record.treatment,
+      date: record.date,
+    })),
   });
 });
+
+
 
 
 module.exports = {
