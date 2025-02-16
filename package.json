@@ -2,6 +2,9 @@
   "name": "graduation_project",
   "version": "1.0.0",
   "description": "index side",
+  "engines": {
+    "node": "20.x"
+  },
   "main": "index.js",
   "scripts": {
     "dev": "nodemon index.js",
