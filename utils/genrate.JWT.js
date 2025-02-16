@@ -1,8 +1,7 @@
-const JWT = require('jsonwebtoken');
+const JWT = require("jsonwebtoken");
 
-module.exports = async(payload)=>{
-  const token = await JWT.sign(payload, process.env.TOKEN_SECRET_KEY, {expiresIn: '10min'});
-  return token;
-}
+module.exports = async (payload, expiresIn) => {
+  return JWT.sign(payload, process.env.TOKEN_SECRET_KEY, { expiresIn });
+};
 
-//payload like this ==> {email: newUser.email, id: newUser._id }
+

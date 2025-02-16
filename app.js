@@ -21,6 +21,7 @@ const childRoutes = require("./routes/child.route");
 const historyRoutes = require("./routes/history.route");
 const memoryRoutes = require("./routes/memory.route");
 const vaccinationRoutes = require("./routes/vaccination.route");
+// const authRoutes = require("./routes/auth.route");
 
 dotenv.config({ path: "./.env" });
 const app = express();
@@ -91,6 +92,7 @@ const limiter = limitReq({
 });
 
 // routes
+// app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/medicines", medicineRoutes);
 app.use("/api/children", childRoutes);
