@@ -3,8 +3,11 @@ const User = require("../models/user.model");
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
+const VaccineInfo = require("../models/vaccineInfo.model");
+const UserVaccination = require("../models/UserVaccination.model");
 
-// ✅ create new child
+
+// ✅ Create new child and assign all existing vaccinations
 const createChild = asyncWrapper(async (req, res, next) => {
   const {
     name,
@@ -40,6 +43,7 @@ const createChild = asyncWrapper(async (req, res, next) => {
 
   const childPhoto = photo || "uploads/child.jpg";
 
+  // إنشاء الطفل الجديد
   const newChild = new Child({
     name,
     gender,
@@ -53,14 +57,92 @@ const createChild = asyncWrapper(async (req, res, next) => {
 
   await newChild.save();
 
+  // ✅ جلب جميع التطعيمات من قاعدة البيانات
+  const allVaccines = await VaccineInfo.find();
+
+  // ✅ إذا كان هناك تطعيمات، أضفها للطفل الجديد
+  if (allVaccines.length > 0) {
+    const vaccinationsToCreate = allVaccines.map((vaccine) => {
+      const dueDate = new Date(birthDate);
+      dueDate.setMonth(dueDate.getMonth() + vaccine.originalSchedule);
+
+      return {
+        childId: newChild._id,
+        vaccineInfoId: vaccine._id,
+        dueDate,
+      };
+    });
+
+    await UserVaccination.insertMany(vaccinationsToCreate);
+  }
+
   res.status(201).json({
     status: httpStatusText.SUCCESS,
+    message: "Child created successfully and assigned vaccinations.",
     data: {
       child: newChild,
       parentPhone: parent.phone,
     },
   });
 });
+
+// ✅ create new child
+// const createChild = asyncWrapper(async (req, res, next) => {
+//   const {
+//     name,
+//     gender,
+//     photo,
+//     birthDate,
+//     bloodType,
+//     heightAtBirth,
+//     weightAtBirth,
+//   } = req.body;
+
+//   const parentId = req.user.id; // Get parentId from logged-in user
+
+//   if (
+//     !name ||
+//     !gender ||
+//     !birthDate ||
+//     !bloodType ||
+//     !heightAtBirth ||
+//     !weightAtBirth
+//   ) {
+//     return next(
+//       appError.create("All fields are required", 400, httpStatusText.FAIL)
+//     );
+//   }
+
+//   const parent = await User.findById(parentId);
+//   if (!parent) {
+//     return next(
+//       appError.create("Parent does not exist", 404, httpStatusText.FAIL)
+//     );
+//   }
+
+//   const childPhoto = photo || "uploads/child.jpg";
+
+//   const newChild = new Child({
+//     name,
+//     gender,
+//     photo: childPhoto,
+//     parentId,
+//     birthDate,
+//     bloodType,
+//     heightAtBirth,
+//     weightAtBirth,
+//   });
+
+//   await newChild.save();
+
+//   res.status(201).json({
+//     status: httpStatusText.SUCCESS,
+//     data: {
+//       child: newChild,
+//       parentPhone: parent.phone,
+//     },
+//   });
+// });
 
 // ✅ Get all children for admin
 const getAllChildren = asyncWrapper(async (req, res) => {

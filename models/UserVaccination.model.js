@@ -22,7 +22,7 @@ const UserVaccinationSchema = new mongoose.Schema(
     },
     actualDate: {
       type: Date,
-      required: true,
+      required: false,
     },
     // actualTime: {
     //   type: String,
@@ -58,16 +58,16 @@ const UserVaccinationSchema = new mongoose.Schema(
 );
 
 // ✅ Attach Middlewares
-UserVaccinationSchema.pre("validate", async function (next) {
-  if (!this.dueDate) {
-    await calculateDueDate.call(this, next);
-  }
-  next();
-});
+// UserVaccinationSchema.pre("validate", async function (next) {
+//   if (!this.dueDate) {
+//     await calculateDueDate.call(this, next);
+//   }
+//   next();
+// });
 
 
-UserVaccinationSchema.pre("save", async function (next) {
-  await updateDelayDays.call(this, next);
-});
+// UserVaccinationSchema.pre("save", async function (next) {
+//   await updateDelayDays.call(this, next);
+// });
 
 module.exports = mongoose.model("UserVaccination", UserVaccinationSchema);

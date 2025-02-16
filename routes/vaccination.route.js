@@ -17,6 +17,14 @@ router
     allowedTo(userRoles.ADMIN),
     vaccinationController.createVaccinationForAllChildren
   );
+  
+  // Admin deletes a vaccination for all children
+  router.route('/:vaccinationId')
+  .delete(
+    verifyToken,
+    allowedTo(userRoles.ADMIN),
+    vaccinationController.deleteVaccinationForAllChildren
+  );
 
 router
   .route("/:childId")
@@ -37,6 +45,11 @@ router
     verifyToken,
     allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
     vaccinationController.updateUserVaccination
+  )
+  .delete(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    vaccinationController.deleteUserVaccination
   );
 
 module.exports = router;

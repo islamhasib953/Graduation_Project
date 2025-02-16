@@ -44,10 +44,10 @@ const calculateDueDate = async function (next) {
 const updateDelayDays = async function (next) {
   try {
     if (this.isModified("actualDate") && this.actualDate) {
-      const delay = Math.floor(
-        (new Date(this.actualDate) - new Date(this.dueDate)) /
-          (1000 * 60 * 60 * 24)
-      );
+      const delay =
+        Math.floor(
+          (new Date(actualDate) - new Date(dueDate)) / (1000 * 60 * 60 * 24)
+        ) + 1;
 
       this.delayDays = delay > 0 ? delay : 0;
 
@@ -67,6 +67,7 @@ const updateDelayDays = async function (next) {
           vaccination.delayDays += delay;
           await vaccination.save();
         }
+        
       }
     }
     next();

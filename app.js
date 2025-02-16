@@ -122,4 +122,4 @@ app.use((error, req, res, next) => {
 
 module.exports = app;
 
-//memory, vaccination ارفع السيرفرو ايميلات فايربيز
+//,  ارفع السيرفرو ايميلات فايربيز
