@@ -54,7 +54,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
   });
 
   //genrate JWT token
-      const accessToken = await genrateJWT(
+      const token = await genrateJWT(
         {
           email: newUser.email,
           id: newUser._id,
@@ -62,7 +62,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
         },
         "7d"
       );
-  newUser.token = accessToken;
+  newUser.token = token;
 
   //save new user in database
   await newUser.save();
@@ -91,8 +91,8 @@ const loginUser = asyncWrapper(async (req, res, next) => {
 
   const isPasswordCorrect = await bcrypt.compare(password, user.password);
   if (isPasswordCorrect && user) {
-    // genrate accessToken
-    const accessToken = await genrateJWT(
+    // genrate token
+    const token = await genrateJWT(
       {
         email: user.email,
         id: user._id,
@@ -114,7 +114,7 @@ const loginUser = asyncWrapper(async (req, res, next) => {
 
     res.status(200).json({
       status: httpStatusText.SUCCESS,
-      data: { accessToken },
+      data: { token },
     });
   } else {
     const error = appError.create(

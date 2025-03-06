@@ -10,6 +10,17 @@ const mongoSanitize = require("express-mongo-sanitize");
 const xssClean = require("xss-clean");
 const hpp = require("hpp");
 const cors = require("cors");
+const http = require("http");
+// const testRoutes = require("./routes/watchhttp");
+const morgan = require("morgan");
+
+
+//************* */
+// const { Server } = require("socket.io");
+// const mqttClient = require("./mqtt/mqtt");
+// const watchRoutes = require("./routes/watchRoutes");
+//*********************** */
+
 
 const passport = require("passport");
 const session = require("express-session");
@@ -26,47 +37,6 @@ const vaccinationRoutes = require("./routes/vaccination.route");
 dotenv.config({ path: "./.env" });
 const app = express();
 
-// app.use(session({
-//   secret: "secret",  //process.env.SESSION_SECRET,
-//   resave: false,
-//   saveUninitialized: true,
-//   // cookie: { secure: process.env.NODE_ENV === 'production' }
-// }))
-
-// app.use(passport.initialize);
-// app.use(passport.session());
-
-// passport.serializeUser(function(user, done) {
-//   done(null, user);
-// });
-
-// passport.deserializeUser(function(user, done) {
-//   done(null, user);
-// });
-
-// passport.use(new GoogleStrategy({
-//   clientID: process.env.GOOGLE_CLIENT_ID,
-//   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-//   callbackURL: process.env.GOOGLE_CALLBACK_URL,
-//   scope: ['profile', 'email']
-//   },
-//   async (accessToken, refreshToken, profile, done) => {
-//     try {
-//       const user = await User.findOne({ googleId: profile.id });
-//       if (user) {
-//         return done(null, user);
-//       } else {
-//         const newUser = await User.create({
-//           googleId: profile.id,
-//           name: profile.displayName,
-//           email: profile.emails[0].value
-//         });
-//         return done(null, newUser);
-//       }
-//     } catch (error) {
-//       done(error);
-//     }
-//   }
 
 app.use("/uploads", express.static("uploads"));
 
@@ -91,6 +61,9 @@ const limiter = limitReq({
   message: "Too many requests, try again after one hour",
 });
 
+
+app.use(morgan("combined"));
+
 // routes
 // app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
@@ -99,6 +72,8 @@ app.use("/api/children", childRoutes);
 app.use("/api/history", historyRoutes);
 app.use("/api/memory", memoryRoutes);
 app.use("/api/vaccinations", vaccinationRoutes);
+
+// app.use("/api/testing", testRoutes);
 
 //global midderware for not found routes
 app.all("*", (req, res) => {
@@ -109,6 +84,19 @@ app.all("*", (req, res) => {
       data: { message: "this resource not found" },
     });
 });
+
+
+// test
+// const server = http.createServer(app);
+// const io = new Server(server, {
+//   cors: { origin: "*" },
+// });
+
+// global.io = io;
+// app.use("/api", watchRoutes);
+
+//********************** */
+
 
 //global error handler
 app.use((error, req, res, next) => {
@@ -124,4 +112,3 @@ app.use((error, req, res, next) => {
 
 module.exports = app;
 
-//,  ارفع السيرفرو ايميلات فايربيز
