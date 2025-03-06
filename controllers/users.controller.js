@@ -105,7 +105,7 @@ const loginUser = asyncWrapper(async (req, res, next) => {
 
     res.status(200).json({
       status: httpStatusText.SUCCESS,
-      data: { token },
+      data: { tokengg:token },
     });
   } else {
     const error = appError.create(
