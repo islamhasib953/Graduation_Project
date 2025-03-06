@@ -100,12 +100,11 @@ const loginUser = asyncWrapper(async (req, res, next) => {
       },
       "7d"
     );
-     user.token = token;
   await user.save();
 
     res.status(200).json({
       status: httpStatusText.SUCCESS,
-      data: { tokengg:token },
+      data: { token:token },
     });
   } else {
     const error = appError.create(
