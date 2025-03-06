@@ -100,16 +100,7 @@ const loginUser = asyncWrapper(async (req, res, next) => {
       },
       "7d"
     );
-    // genrate refreshToken
-  //   const refreshToken = await genrateJWT(
-  //     {
-  //       email: user.email,
-  //       id: user._id,
-  //       role: user.role,
-  //     },
-  //     "7d"
-  //   );
-  // user.refreshToken = refreshToken;
+     user.token = token;
   await user.save();
 
     res.status(200).json({
