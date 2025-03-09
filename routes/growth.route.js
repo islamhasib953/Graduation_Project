@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
-const verifyToken = require("../middleware/verifyToken");
-const allowedTo = require("../middleware/allowedTo");
+const verifyToken = require("../middlewares/virifyToken");
+const allowedTo = require("../middlewares/allowedTo");
 const userRoles = require("../utils/userRoles");
-const validationschema = require("../middleware/validationschema");
+// const validationschema = require("../middleware/validationschema");
 const growthController = require("../controllers/growth.controller");
 
 router
@@ -11,7 +11,7 @@ router
   .post(
     verifyToken,
     allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    validationschema.validateGrowth,
+    // validationschema.validateGrowth,
     growthController.createGrowth
   )
   .get(
@@ -30,7 +30,7 @@ router
   .patch(
     verifyToken,
     allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    validationschema.validateGrowth,
+    // validationschema.validateGrowth,
     growthController.updateGrowth
   )
   .delete(
