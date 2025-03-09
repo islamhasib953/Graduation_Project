@@ -1,19 +1,17 @@
 const express = require("express");
 const router = express.Router();
-const verifyToken = require("../middlewares/verifyToken");
-const checkOwnership = require("../middlewares/Ownership");
-const validationschema = require("../middlewares/validationschema");
-
-const growthController = require("../controllers/growth.controller");
-const allowedTo = require("../middlewares/allowedTo");
+const verifyToken = require("../middleware/verifyToken");
+const allowedTo = require("../middleware/allowedTo");
 const userRoles = require("../utils/userRoles");
+const validationschema = require("../middleware/validationschema");
+const growthController = require("../controllers/growth.controller");
 
 router
   .route("/:childId")
   .post(
     verifyToken,
     allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    validationschema.validateGrowth, // Validation middleware
+    validationschema.validateGrowth,
     growthController.createGrowth
   )
   .get(
@@ -43,10 +41,10 @@ router
 
 router
   .route("/:childId/last")
-  .get(verifyToken, checkOwnership, growthController.getLastGrowthRecord);
+  .get(verifyToken, growthController.getLastGrowthRecord);
 
 router
   .route("/:childId/last-change")
-  .get(verifyToken, checkOwnership, growthController.getLastGrowthChange);
+  .get(verifyToken, growthController.getLastGrowthChange);
 
 module.exports = router;
