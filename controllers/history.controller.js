@@ -32,28 +32,29 @@ const createHistory = asyncWrapper(async (req, res, next) => {
 
   await newHistory.save();
 
-
-    res.json({
-      status: httpStatusText.SUCCESS,
-      data: {
-        _id: newHistory._id,
-        diagnosis: newHistory.diagnosis,
-        disease: newHistory.disease,
-        treatment: newHistory.treatment,
-        notes: newHistory.notes,
-        notesImage: newHistory.notesImage,
-        date: newHistory.date,
-        time: newHistory.time,
-      },
-    });
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: {
+      _id: newHistory._id,
+      diagnosis: newHistory.diagnosis,
+      disease: newHistory.disease,
+      treatment: newHistory.treatment,
+      notes: newHistory.notes,
+      notesImage: newHistory.notesImage,
+      date: newHistory.date,
+      time: newHistory.time,
+    },
+  });
 });
-
 
 // ✅ Get all history records for a specific child
 const getAllHistory = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
 
-  const history = await History.find({ childId })
+  const history = await History.find({ childId }).select(
+    "diagnosis disease treatment date childId notes notesImage time"
+  );
+
   if (!history.length) {
     return next(
       appError.create(
@@ -63,34 +64,20 @@ const getAllHistory = asyncWrapper(async (req, res, next) => {
       )
     );
   }
-  // res.json({
-  //   status: httpStatusText.SUCCESS,
-  //   data: history.map((record) => ({
-  //     _id: record._id, // Child's ID
-  //     diagnosis: record.diagnosis,
-  //     disease: record.disease,
-  //     treatment: record.treatment,
-  //     notes: record.notes,
-  //     date: record.date,
-  //     time: record.time,
-  //     notesImage: record.notes
-  //   })),
-  // });
   res.json({
     status: httpStatusText.SUCCESS,
     data: history.map((record) => ({
-      _id: record._id,
+      _id: record._id, // Child's ID
       diagnosis: record.diagnosis,
       disease: record.disease,
       treatment: record.treatment,
-      notes: record.notes || "No notes available", // إذا لم تكن موجودة تعطي قيمة افتراضية
-      notesImage: record.notesImage || "No image available",
+      notes: record.notes,
       date: record.date,
-      time: record.time || "No time recorded",
+      time: record.time,
+      notesImage: record.notes,
     })),
   });
 });
-
 
 // ✅ Get a single history record for a specific child
 const getSingleHistory = asyncWrapper(async (req, res, next) => {
@@ -120,7 +107,6 @@ const getSingleHistory = asyncWrapper(async (req, res, next) => {
     },
   });
 });
-
 
 // ✅ Update a history record
 const updateHistory = asyncWrapper(async (req, res, next) => {
@@ -166,7 +152,6 @@ const deleteHistory = asyncWrapper(async (req, res, next) => {
     message: "History record deleted successfully",
   });
 });
-
 
 // ✅ Filter history records using query parameters
 const filterHistory = asyncWrapper(async (req, res, next) => {
@@ -221,9 +206,6 @@ const filterHistory = asyncWrapper(async (req, res, next) => {
     })),
   });
 });
-
-
-
 
 module.exports = {
   createHistory,
