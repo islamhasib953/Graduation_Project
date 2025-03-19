@@ -74,7 +74,10 @@ const getAllHistory = asyncWrapper(async (req, res, next) => {
       diagnosis: record.diagnosis,
       disease: record.disease,
       treatment: record.treatment,
+      notes: record.notes,
       date: record.date,
+      time: record.time,
+      notesImage: record.notes
     })),
   });
 });
