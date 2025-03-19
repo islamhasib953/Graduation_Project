@@ -30,7 +30,7 @@ router
   )
   .post(
     verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
     validationschema.validateHistory,
     historyController.createHistory
   );
@@ -44,13 +44,13 @@ router
   )
   .patch(
     verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
     validationschema.validateHistory,
     historyController.updateHistory
   )
   .delete(
     verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
     historyController.deleteHistory
   );
 
