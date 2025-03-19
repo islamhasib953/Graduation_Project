@@ -66,18 +66,30 @@ const getAllHistory = asyncWrapper(async (req, res, next) => {
       )
     );
   }
-
+  // res.json({
+  //   status: httpStatusText.SUCCESS,
+  //   data: history.map((record) => ({
+  //     _id: record._id, // Child's ID
+  //     diagnosis: record.diagnosis,
+  //     disease: record.disease,
+  //     treatment: record.treatment,
+  //     notes: record.notes,
+  //     date: record.date,
+  //     time: record.time,
+  //     notesImage: record.notes
+  //   })),
+  // });
   res.json({
     status: httpStatusText.SUCCESS,
     data: history.map((record) => ({
-      _id: record._id, // Child's ID
+      _id: record._id,
       diagnosis: record.diagnosis,
       disease: record.disease,
       treatment: record.treatment,
-      notes: record.notes,
+      notes: record.notes || "No notes available", // إذا لم تكن موجودة تعطي قيمة افتراضية
+      notesImage: record.notesImage || "No image available",
       date: record.date,
-      time: record.time,
-      notesImage: record.notes
+      time: record.time || "No time recorded",
     })),
   });
 });
