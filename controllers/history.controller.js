@@ -53,10 +53,7 @@ const createHistory = asyncWrapper(async (req, res, next) => {
 const getAllHistory = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
 
-  const history = await History.find({ childId }).select(
-    "diagnosis disease treatment date childId"
-  );
-
+  const history = await History.find({ childId })
   if (!history.length) {
     return next(
       appError.create(
