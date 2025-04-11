@@ -15,7 +15,7 @@ router
   .route("/filter/:childId")
   .get(
     verifyToken,
-    //// allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    // allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
     historyController.filterHistory
   );
 
