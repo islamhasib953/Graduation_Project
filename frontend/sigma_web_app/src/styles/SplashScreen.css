@@ -1,0 +1,64 @@
+/* src/styles/SplashScreen.css */
+.splash-screen {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background: linear-gradient(135deg, #90E0EF, #CAF0F8);
+  /* Gradient background to match the app */
+  overflow: hidden;
+}
+
+.splash-logo {
+  width: 300px;
+  /* Increased logo size (adjust as needed) */
+  height: auto;
+  /* Maintain aspect ratio */
+  animation: fadeInScale 1.5s ease-in-out;
+  /* Add a fade-in and scale animation */
+}
+
+/* Animation for the logo */
+@keyframes fadeInScale {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Responsive design for mobile */
+@media (max-width: 768px) {
+  .splash-logo {
+    width: 200px;
+    /* Smaller logo size on mobile */
+  }
+}
+
+/* Dark mode support (if enabled in the app) */
+body.dark-mode .splash-screen {
+  background: linear-gradient(135deg, #03045E, #0077B6);
+  /* Dark mode gradient */
+}
+
+
+@keyframes fadeInScale {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+
+  70% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

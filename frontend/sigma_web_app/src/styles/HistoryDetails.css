@@ -1,0 +1,243 @@
+/* src/styles/HistoryDetails.css */
+.history-details-container {
+  padding: 40px;
+  background: linear-gradient(135deg, #CAF0F8, #FFFFFF);
+  /* Updated gradient: light blue to white */
+  color: #03045E;
+  min-height: 100vh;
+  font-family: 'Roboto', sans-serif;
+}
+
+body.dark-mode .history-details-container {
+  background: linear-gradient(135deg, #03045E, #0077B6);
+  /* Dark mode gradient unchanged */
+  color: #CAF0F8;
+}
+
+body.dark-mode .page-title,
+body.dark-mode .section-card h3,
+body.dark-mode .section-card p,
+body.dark-mode .date,
+body.dark-mode .author,
+body.dark-mode .loader,
+body.dark-mode .error {
+  color: #CAF0F8;
+}
+
+body.dark-mode .section-card {
+  background-color: rgba(0, 119, 182, 0.2);
+}
+
+body.dark-mode .back-button,
+body.dark-mode .edit-button,
+body.dark-mode .share-button,
+body.dark-mode .download-button {
+  background-color: #00B4D8;
+  color: #03045E;
+}
+
+body.dark-mode .back-button:hover,
+body.dark-mode .edit-button:hover,
+body.dark-mode .share-button:hover,
+body.dark-mode .download-button:hover {
+  background-color: #90E0EF;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+}
+
+.back-button,
+.edit-button,
+.share-button,
+.download-button {
+  padding: 10px 20px;
+  background-color: #00B4D8;
+  color: #03045E;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  transition: background-color 0.3s, transform 0.1s;
+}
+
+.back-button:hover,
+.edit-button:hover,
+.share-button:hover,
+.download-button:hover {
+  background-color: #CAF0F8;
+  transform: scale(1.05);
+}
+
+.back-button:active,
+.edit-button:active,
+.share-button:active,
+.download-button:active {
+  animation: bounce 0.3s;
+}
+
+.page-title {
+  font-size: 36px;
+  font-weight: 600;
+  margin-bottom: 30px;
+  color: #03045E;
+  text-align: center;
+}
+
+.timeline-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 30px;
+  position: relative;
+}
+
+.timeline-dot {
+  width: 12px;
+  height: 12px;
+  background-color: #00B4D8;
+  border-radius: 50%;
+  position: relative;
+}
+
+.timeline-dot::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 2px;
+  height: 20px;
+  background-color: #00B4D8;
+  transform: translateX(-50%);
+}
+
+.date {
+  font-size: 16px;
+  color: #0077B6;
+  font-weight: 500;
+}
+
+.author {
+  font-size: 16px;
+  color: #0077B6;
+  font-weight: 500;
+}
+
+.section-card {
+  background-color: rgba(202, 240, 248, 0.5);
+  padding: 25px;
+  border-radius: 10px;
+  margin-bottom: 25px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s, box-shadow 0.3s;
+  animation: fadeIn 0.5s ease-in;
+}
+
+.section-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 180, 216, 0.5);
+}
+
+.section-card h3 {
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: #03045E;
+  text-transform: uppercase;
+}
+
+.section-card p {
+  font-size: 18px;
+  color: #03045E;
+  line-height: 1.8;
+}
+
+.notes-image {
+  max-width: 100%;
+  border-radius: 8px;
+  margin-top: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.loader,
+.error {
+  text-align: center;
+  padding: 30px;
+  color: #0077B6;
+  font-size: 18px;
+}
+
+.loader {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+/* Responsive design for mobile */
+@media (max-width: 768px) {
+  .history-details-container {
+    padding: 20px;
+  }
+
+  .page-title {
+    font-size: 28px;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .back-button,
+  .edit-button,
+  .share-button,
+  .download-button {
+    font-size: 14px;
+    padding: 8px 16px;
+  }
+
+  .date,
+  .author {
+    font-size: 14px;
+  }
+
+  .section-card h3 {
+    font-size: 18px;
+  }
+
+  .section-card p {
+    font-size: 16px;
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bounce {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(0.95);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
