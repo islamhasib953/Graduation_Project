@@ -15,7 +15,7 @@ router
   .route("/filter/:childId")
   .get(
     verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    // allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
     historyController.filterHistory
   );
 
@@ -25,7 +25,7 @@ router
   .route("/:childId")
   .get(
     verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    // allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
     historyController.getAllHistory
   )
   .post(
@@ -39,7 +39,7 @@ router
   .route("/:childId/:historyId")
   .get(
     verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    // allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
     historyController.getSingleHistory
   )
   .patch(
