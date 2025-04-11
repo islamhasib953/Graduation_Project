@@ -1,0 +1,127 @@
+/* src/styles/Header.css */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 30px;
+  background: linear-gradient(90deg, #0077B6, #00B4D8);
+  /* Gradient background */
+  color: #CAF0F8;
+  /* Light text color */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+}
+
+.logo-image {
+  width: 60px;
+  /* Increased from 50px to 60px for a larger logo */
+  height: 60px;
+  /* Increased to match the width and maintain aspect ratio */
+  margin-right: 8px;
+  /* Reduced from 15px to 8px to bring the logo closer to the text */
+}
+
+.logo-text {
+  font-size: 24px;
+  font-weight: 600;
+  color: #CAF0F8;
+}
+
+.nav-links {
+  display: flex;
+  gap: 20px;
+}
+
+.nav-links button {
+  background: none;
+  border: none;
+  color: #CAF0F8;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.3s;
+}
+
+.nav-links button:hover {
+  color: #FFFFFF;
+  /* White on hover */
+}
+
+.dark-mode-toggle button {
+  padding: 8px 16px;
+  background-color: #CAF0F8;
+  color: #03045E;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.3s, transform 0.1s;
+}
+
+.dark-mode-toggle button:hover {
+  background-color: #FFFFFF;
+  transform: scale(1.05);
+}
+
+body.dark-mode .header {
+  background: linear-gradient(90deg, #03045E, #0077B6);
+  /* Dark mode gradient */
+}
+
+body.dark-mode .logo-text,
+body.dark-mode .nav-links button {
+  color: #CAF0F8;
+}
+
+body.dark-mode .nav-links button:hover {
+  color: #90E0EF;
+  /* Light cyan on hover in dark mode */
+}
+
+body.dark-mode .dark-mode-toggle button {
+  background-color: #00B4D8;
+  color: #03045E;
+}
+
+body.dark-mode .dark-mode-toggle button:hover {
+  background-color: #90E0EF;
+}
+
+/* Responsive design for mobile */
+@media (max-width: 768px) {
+  .header {
+    padding: 10px 15px;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .logo-image {
+    width: 45px;
+    /* Adjusted for mobile: slightly smaller than desktop */
+    height: 45px;
+    margin-right: 6px;
+    /* Slightly reduced spacing on mobile */
+  }
+
+  .logo-text {
+    font-size: 20px;
+  }
+
+  .nav-links {
+    gap: 10px;
+  }
+
+  .nav-links button {
+    font-size: 14px;
+  }
+
+  .dark-mode-toggle button {
+    font-size: 12px;
+    padding: 6px 12px;
+  }
+}

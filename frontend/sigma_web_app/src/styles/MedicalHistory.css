@@ -1,0 +1,266 @@
+/* src/styles/MedicalHistory.css */
+.medical-history-container {
+  padding: 30px;
+  background: linear-gradient(135deg, #CAF0F8, #FFFFFF);
+  /* Updated gradient: light blue to white */
+  color: #03045E;
+  /* Dark blue for main text */
+  min-height: 100vh;
+  font-family: 'Roboto', sans-serif;
+}
+
+body.dark-mode .medical-history-container {
+  background: linear-gradient(135deg, #03045E, #0077B6);
+  /* Dark mode gradient unchanged */
+  color: #CAF0F8;
+  /* Very light cyan for text in dark mode */
+}
+
+body.dark-mode .page-title,
+body.dark-mode .table-row,
+body.dark-mode .table-row span,
+body.dark-mode .no-records,
+body.dark-mode .loader,
+body.dark-mode .error {
+  color: #CAF0F8;
+}
+
+body.dark-mode .table-row span:nth-child(4),
+body.dark-mode .table-row span:nth-child(5) {
+  color: #90E0EF;
+  /* Light cyan for date and doctor in dark mode */
+}
+
+body.dark-mode .search-bar input {
+  background-color: #0077B6;
+  color: #CAF0F8;
+}
+
+body.dark-mode .search-bar input::placeholder {
+  color: #90E0EF;
+}
+
+body.dark-mode .search-bar input:focus {
+  background-color: #005F8C;
+}
+
+body.dark-mode .history-table {
+  background-color: #0077B6;
+}
+
+body.dark-mode .table-header {
+  background-color: #03045E;
+}
+
+body.dark-mode .table-row {
+  border-bottom: 1px solid #90E0EF;
+}
+
+body.dark-mode .table-row:hover {
+  background-color: #005F8C;
+}
+
+body.dark-mode .details-button {
+  background-color: #00B4D8;
+  color: #03045E;
+}
+
+body.dark-mode .details-button:hover {
+  background-color: #90E0EF;
+}
+
+.page-title {
+  font-size: 28px;
+  font-weight: 500;
+  margin-bottom: 20px;
+  color: #03045E;
+  text-align: center;
+}
+
+.search-bar {
+  margin-bottom: 30px;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.search-bar input {
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 8px;
+  background-color: #CAF0F8;
+  /* Very light cyan for the input */
+  color: #03045E;
+  font-size: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  transition: background-color 0.3s;
+}
+
+.search-bar input::placeholder {
+  color: #0077B6;
+  /* Deep blue for placeholder */
+}
+
+.search-bar input:focus {
+  outline: none;
+  background-color: #FFFFFF;
+  /* White on focus */
+}
+
+.history-table {
+  width: 100%;
+  background-color: #CAF0F8;
+  /* Very light cyan for the table */
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.table-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr 120px;
+  padding: 15px;
+  background-color: #0077B6;
+  /* Deep blue for the header */
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 14px;
+  color: #CAF0F8;
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr 120px;
+  padding: 15px;
+  border-bottom: 1px solid #00B4D8;
+  /* Bright cyan for the divider */
+  font-size: 14px;
+  color: #03045E;
+  align-items: center;
+  transition: background-color 0.3s;
+  animation: fadeIn 0.5s ease-in;
+}
+
+.table-row:hover {
+  background-color: #FFFFFF;
+  /* White on hover */
+}
+
+.table-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-row span:nth-child(4) {
+  color: #0077B6;
+  /* Deep blue for the date */
+}
+
+.table-row span:nth-child(5) {
+  color: #0077B6;
+  /* Deep blue for the doctor */
+}
+
+.details-button {
+  padding: 8px 16px;
+  background-color: #00B4D8;
+  /* Bright cyan for the button */
+  color: #03045E;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.3s, transform 0.1s;
+}
+
+.details-button:hover {
+  background-color: #CAF0F8;
+  /* Very light cyan on hover */
+  transform: scale(1.05);
+}
+
+.details-button:active {
+  animation: bounce 0.3s;
+  /* Bounce animation on click */
+}
+
+.no-records {
+  text-align: center;
+  padding: 30px;
+  color: #0077B6;
+  font-size: 16px;
+}
+
+.loader,
+.error {
+  text-align: center;
+  padding: 30px;
+  color: #0077B6;
+  font-size: 16px;
+}
+
+.loader {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+/* Responsive design for mobile */
+@media (max-width: 768px) {
+  .medical-history-container {
+    padding: 15px;
+  }
+
+  .page-title {
+    font-size: 24px;
+  }
+
+  .table-header,
+  .table-row {
+    grid-template-columns: 1fr 1fr 1fr;
+    font-size: 12px;
+  }
+
+  .table-header span:nth-child(4),
+  .table-header span:nth-child(5),
+  .table-row span:nth-child(4),
+  .table-row span:nth-child(5) {
+    display: none;
+  }
+
+  .details-button {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bounce {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(0.95);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
