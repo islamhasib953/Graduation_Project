@@ -1,0 +1,41 @@
+/* src/styles/Footer.css */
+.footer {
+  padding: 20px 30px;
+  background-color: #0077B6;
+  /* Deep blue for the footer */
+  color: #CAF0F8;
+  /* Very light cyan for text */
+  text-align: center;
+  border-top: 1px solid #00B4D8;
+}
+
+.footer-links {
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+.footer-links a {
+  color: #CAF0F8;
+  text-decoration: none;
+  font-size: 14px;
+  transition: color 0.3s;
+}
+
+.footer-links a:hover {
+  color: #00B4D8;
+  /* Bright cyan on hover */
+}
+
+/* Responsive design for mobile */
+@media (max-width: 768px) {
+  .footer {
+    padding: 15px;
+  }
+
+  .footer-links {
+    flex-direction: column;
+    gap: 10px;
+  }
+}

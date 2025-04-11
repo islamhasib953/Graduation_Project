@@ -1,0 +1,31 @@
+/* src/styles/SearchPage.css */
+.search-page {
+  padding: 20px;
+  background-color: #1a1a1a;
+  color: white;
+  min-height: 100vh;
+}
+
+.search-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.search-form input,
+.search-form button {
+  padding: 10px;
+  border-radius: 5px;
+  border: none;
+}
+
+.search-form button {
+  background-color: #007bff;
+  color: white;
+  cursor: pointer;
+}
+
+.search-form button:last-child {
+  background-color: #dc3545;
+}
