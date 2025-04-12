@@ -1,4 +1,3 @@
-
 const express = require("express");
 const usersController = require("../controllers/users.controller");
 const verifyToken = require("../middlewares/virifyToken");
@@ -10,41 +9,23 @@ const {
   validateLogin,
   validateUpdateUser,
 } = require("../middlewares/validationschema");
-
-
+const cloudinary = require("cloudinary").v2;
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const multer = require("multer");
-const appError = require("../utils/appError");
-const fs = require("fs");
-const path = require("path");
-
-const diskStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, "..", "uploads"); // ← طلع مستوى لفوق
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    const ext = file.mimetype.split("/")[1];
-    cb(null, `user-${Date.now()}.${ext}`);
-  },
-});
-
-
-const fileFilter = (req, file, cb) => {
-  file.mimetype.startsWith("image")
-    ? cb(null, true)
-    : cb(appError.create("The file must be an image", 400), false);
-};
-
-const upload = multer({ storage: diskStorage, fileFilter });
 
 // const multer = require("multer");
 // const appError = require("../utils/appError");
+// const fs = require("fs");
+// const path = require("path");
 
 // const diskStorage = multer.diskStorage({
-//   destination: (req, file, cb) => cb(null, "uploads"),
+//   destination: (req, file, cb) => {
+//     const uploadPath = path.join(__dirname, "..", "uploads"); // ← طلع مستوى لفوق
+//     if (!fs.existsSync(uploadPath)) {
+//       fs.mkdirSync(uploadPath, { recursive: true });
+//     }
+//     cb(null, uploadPath);
+//   },
 //   filename: (req, file, cb) => {
 //     const ext = file.mimetype.split("/")[1];
 //     cb(null, `user-${Date.now()}.${ext}`);
@@ -58,6 +39,24 @@ const upload = multer({ storage: diskStorage, fileFilter });
 // };
 
 // const upload = multer({ storage: diskStorage, fileFilter });
+
+cloudinary.config({
+  cloud_name: process.env.CLOUD_NAME,
+  api_key: process.env.CLOUD_API_KEY,
+  api_secret: process.env.CLOUD_API_SECRET,
+});
+
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "avatars",
+    allowed_formats: ["jpg", "jpeg", "png"],
+  },
+});
+
+const upload = multer({ storage: storage });
+
+
 
 const router = express.Router();
 
