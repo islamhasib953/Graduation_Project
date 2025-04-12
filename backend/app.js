@@ -11,16 +11,7 @@ const xssClean = require("xss-clean");
 const hpp = require("hpp");
 const cors = require("cors");
 const http = require("http");
-// const testRoutes = require("./routes/watchhttp");
 const morgan = require("morgan");
-
-
-//************* */
-// const { Server } = require("socket.io");
-// const mqttClient = require("./mqtt/mqtt");
-// const watchRoutes = require("./routes/watchRoutes");
-//*********************** */
-
 
 const passport = require("passport");
 const session = require("express-session");
@@ -39,13 +30,13 @@ dotenv.config({ path: "./.env" });
 const app = express();
 
 
+
+
 app.use("/uploads", express.static("uploads"));
 
 app.use(express.json());
 app.use(bodyParser.json());
-
 app.use(cors());
-
 app.use(mongoSanitize());
 app.use(xssClean());
 app.use(hpp());
@@ -66,7 +57,6 @@ const limiter = limitReq({
 app.use(morgan("combined"));
 
 // routes
-// app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/medicines", medicineRoutes);
 app.use("/api/children", childRoutes);
@@ -86,18 +76,6 @@ app.all("*", (req, res) => {
       data: { message: "this resource not found" },
     });
 });
-
-
-// test
-// const server = http.createServer(app);
-// const io = new Server(server, {
-//   cors: { origin: "*" },
-// });
-
-// global.io = io;
-// app.use("/api", watchRoutes);
-
-//********************** */
 
 
 //global error handler
