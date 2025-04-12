@@ -11,7 +11,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import "../styles/HistoryDetails.css";
 
-const BASE_URL = "http://localhost:3000"; // Replace with your actual server BASE_URL
+const BASE_URL = "https://graduation-projectgmabackend.vercel.app"; // Replace with your actual server BASE_URL
 
 const HistoryDetails = () => {
   const { childId, historyId } = useParams();

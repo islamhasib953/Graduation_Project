@@ -1,7 +1,7 @@
 // src/services/api.js
 import axios from "axios";
 
-const API_BASE_URL = "https://sigma-three-ruby.vercel.app"; // استبدل هذا بـ URL الـ API الخاص بك
+const API_BASE_URL = "https://graduation-projectgmabackend.vercel.app"; // استبدل هذا بـ URL الـ API الخاص بك
 
 // export const getHistory = async (childId) => {
 //   const response = await axios.get(`${API_BASE_URL}/api/history/${childId}`);
