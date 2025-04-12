@@ -1,7 +1,6 @@
 const { body } = require("express-validator");
 const userRoles = require("../utils/userRoles");
 
-
 // ✅ child validation
 const validateChild = [
   body("name").notEmpty().withMessage("Name is required").trim(),
@@ -34,7 +33,6 @@ const validateHistory = [
   body("time").notEmpty().withMessage("Time is required"),
 ];
 
-
 // ✅ medicine validation
 const validateMedicine = [
   body("name").notEmpty().withMessage("Medicine name is required"),
@@ -42,13 +40,11 @@ const validateMedicine = [
   body("times").isArray().withMessage("Times must be an array"),
 ];
 
-
 // ✅ memory validation
 const validateMemory = [
   body("description").notEmpty().withMessage("Description is required"),
   body("time").notEmpty().withMessage("Time is required"),
 ];
-
 
 // ✅ vaccineInfo validation
 const validateVaccineInfo = [
@@ -62,14 +58,12 @@ const validateVaccineInfo = [
   body("description").notEmpty().withMessage("Description is required"),
 ];
 
-
 // ✅ vaccine validation
 const validateUserVaccination = [
   body("status")
     .isIn(["Pending", "Taken", "Missed"])
     .withMessage("Invalid status"),
 ];
-
 
 // ✅ user register validation
 const validateRegister = [
@@ -114,23 +108,59 @@ const validateRegister = [
     .isLength({ min: 6 })
     .withMessage("Password must be at least 6 characters long."),
 
-  body("role")
-    .optional()
-    .isIn([userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT])
-    .withMessage(
-      `Role must be one of: ${userRoles.ADMIN}, ${userRoles.DOCTOR}, ${userRoles.PATIENT}`
-    ),
+  // التعديل هنا: استبدلنا role بـ accountType
+  body("accountType")
+    .notEmpty()
+    .withMessage("Account type is required")
+    .isIn([userRoles.PATIENT, userRoles.DOCTOR])
+    .withMessage("Account type must be PATIENT or DOCTOR"),
+
+  // إضافة تحقق للحقول الخاصة بالدكتور لو الـ accountType هو DOCTOR
+  body("specialise")
+    .if(body("accountType").equals(userRoles.DOCTOR))
+    .notEmpty()
+    .withMessage("Specialise is required for doctors")
+    .isLength({ min: 2, max: 255 })
+    .withMessage("Specialise must be between 2 and 255 characters")
+    .trim(),
+
+  body("about")
+    .if(body("accountType").equals(userRoles.DOCTOR))
+    .notEmpty()
+    .withMessage("About is required for doctors")
+    .isLength({ min: 2, max: 500 })
+    .withMessage("About must be between 2 and 500 characters")
+    .trim(),
+
+  body("rate")
+    .if(body("accountType").equals(userRoles.DOCTOR))
+    .notEmpty()
+    .withMessage("Rate is required for doctors")
+    .isFloat({ min: 0, max: 5 })
+    .withMessage("Rate must be between 0 and 5"),
+
+  body("availableDays")
+    .if(body("accountType").equals(userRoles.DOCTOR))
+    .notEmpty()
+    .withMessage("Available days are required for doctors")
+    .isArray()
+    .withMessage("Available days must be an array"),
+
+  body("availableTimes")
+    .if(body("accountType").equals(userRoles.DOCTOR))
+    .notEmpty()
+    .withMessage("Available times are required for doctors")
+    .isArray()
+    .withMessage("Available times must be an array"),
 
   body("avatar").optional().isString().withMessage("Avatar must be a string."),
 ];
-
 
 // ✅ user login validation
 const validateLogin = [
   body("email").isEmail().withMessage("Invalid email format."),
   body("password").notEmpty().withMessage("Password is required."),
 ];
-
 
 // ✅ update user validation
 const validateUpdateUser = [
@@ -185,8 +215,6 @@ const validateUpdateUser = [
   body("avatar").optional().isString().withMessage("Avatar must be a string."),
 ];
 
-
-
 module.exports = {
   validateChild,
   validateHistory,
@@ -196,8 +224,5 @@ module.exports = {
   validateUserVaccination,
   validateRegister,
   validateLogin,
-  validateUpdateUser
+  validateUpdateUser,
 };
-
-
-

@@ -1,9 +1,11 @@
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const User = require("../models/user.model");
+const Doctor = require("../models/doctor.model"); // أضفنا موديل الدكتور
 const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
 const bcrypt = require("bcryptjs");
 const genrateJWT = require("../utils/genrate.JWT");
+const userRoles = require("../utils/userRoles"); // أضفنا userRoles
 
 // Get all users
 const getAllUsers = asyncWrapper(async (req, res) => {
@@ -24,57 +26,116 @@ const getUserById = asyncWrapper(async (req, res, next) => {
   res.json({ status: httpStatusText.SUCCESS, data: { user } });
 });
 
-// Register New User
+// Register New User or Doctor
 const registerUser = asyncWrapper(async (req, res, next) => {
-  const { firstName, lastName, gender, phone, address, email, password, role } =
-    req.body;
-  // console.log("req.file -> ", req.file);
-  const oldUser = await User.findOne({ email: email });
-  if (oldUser) {
-    const error = appError.create(
-      "User already exist",
-      400,
-      httpStatusText.FAIL
-    );
-    return next(error);
-  }
-  //passwird hasing
-  const hashedPassword = await bcrypt.hash(password, 12);
-
-  const newUser = new User({
+  const {
     firstName,
     lastName,
     gender,
     phone,
     address,
     email,
-    password: hashedPassword,
-    role,
-    avatar: req.file ? req.file.filename : "uploads/profile.jpg", // if user uploaded photo, save it in uploads folder and save path in database. Else, save default profile photo.  // req.file.path ==> path of uploaded photo  // req.file.originalname ==> name of uploaded photo  // req.file.mimetype ==> type of uploaded photo (like jpg, png, etc)  // req.file.size ==> size
-  });
+    password,
+    accountType, // التعديل هنا: استبدلنا role بـ accountType
+    specialise,
+    about,
+    rate,
+    availableDays,
+    availableTimes,
+  } = req.body;
 
-  //genrate JWT token
-  const token = await genrateJWT(
-    {
-      email: newUser.email,
-      id: newUser._id,
-      role: newUser.role,
-    },
-    "7d"
-  );
-  newUser.token = token;
+  // التحقق إن الإيميل مش مستخدم قبل كده في أي موديل (User أو Doctor)
+  const oldUser = await User.findOne({ email });
+  const oldDoctor = await Doctor.findOne({ email });
+  if (oldUser || oldDoctor) {
+    const error = appError.create(
+      "Email already exists",
+      400,
+      httpStatusText.FAIL
+    );
+    return next(error);
+  }
 
-  //save new user in database
-  await newUser.save();
-  res
-    .status(201)
-    .json({ status: httpStatusText.SUCCESS, data: { user: newUser } });
+  // هاش الباسورد
+  const hashedPassword = await bcrypt.hash(password, 12);
+
+  // بناءً على accountType، هنحدد الموديل اللي هنستخدمه
+  if (accountType === userRoles.DOCTOR) {
+    const newDoctor = new Doctor({
+      firstName,
+      lastName,
+      gender,
+      phone,
+      address,
+      email,
+      password: hashedPassword,
+      role: userRoles.DOCTOR, // الـ role بيتحدد تلقائيًا
+      specialise,
+      about,
+      rate,
+      availableDays,
+      availableTimes,
+      avatar: req.file ? req.file.filename : "uploads/doctor.jpg",
+    });
+
+    // إنشاء توكن للدكتور
+    const token = await genrateJWT(
+      {
+        email: newDoctor.email,
+        id: newDoctor._id,
+        role: newDoctor.role,
+      },
+      "7d"
+    );
+    newDoctor.token = token;
+
+    // حفظ الدكتور
+    await newDoctor.save();
+
+    res.status(201).json({
+      status: httpStatusText.SUCCESS,
+      message: "Doctor registered successfully",
+      data: { doctor: newDoctor },
+    });
+  } else {
+    const newUser = new User({
+      firstName,
+      lastName,
+      gender,
+      phone,
+      address,
+      email,
+      password: hashedPassword,
+      role: userRoles.PATIENT, // الـ role بيتحدد تلقائيًا
+      avatar: req.file ? req.file.filename : "uploads/profile.jpg",
+    });
+
+    // إنشاء توكن لليوزر
+    const token = await genrateJWT(
+      {
+        email: newUser.email,
+        id: newUser._id,
+        role: newUser.role,
+      },
+      "7d"
+    );
+    newUser.token = token;
+
+    // حفظ اليوزر
+    await newUser.save();
+
+    res.status(201).json({
+      status: httpStatusText.SUCCESS,
+      message: "User registered successfully",
+      data: { user: newUser },
+    });
+  }
 });
 
-//login New User
+// Login User or Doctor
 const loginUser = asyncWrapper(async (req, res, next) => {
   const { email, password } = req.body;
-  if (!email && !password) {
+  if (!email || !password) {
     const error = appError.create(
       "Email and Password are required",
       400,
@@ -83,24 +144,31 @@ const loginUser = asyncWrapper(async (req, res, next) => {
     return next(error);
   }
 
-  const user = await User.findOne({ email: email });
+  // التحقق من الإيميل في موديل اليوزر أو الدكتور
+  let user = await User.findOne({ email });
+  let role = userRoles.PATIENT;
+
   if (!user) {
-    const error = appError.create("user not found", 400, httpStatusText.FAIL);
+    user = await Doctor.findOne({ email });
+    role = userRoles.DOCTOR;
+  }
+
+  if (!user) {
+    const error = appError.create("User not found", 400, httpStatusText.FAIL);
     return next(error);
   }
 
   const isPasswordCorrect = await bcrypt.compare(password, user.password);
   if (isPasswordCorrect && user) {
-    // genrate token
+    // إنشاء توكن
     const token = await genrateJWT(
       {
         email: user.email,
         id: user._id,
-        role: user.role,
+        role: role,
       },
       "7d"
     );
-    await user.save();
 
     res.status(200).json({
       status: httpStatusText.SUCCESS,
@@ -169,3 +237,4 @@ module.exports = {
   updateUser,
   deleteUser,
 };
+//***** */

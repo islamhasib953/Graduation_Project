@@ -1,0 +1,537 @@
+const Doctor = require("../models/doctor.model");
+const User = require("../models/user.model");
+const Appointment = require("../models/appointment.model");
+const asyncWrapper = require("../middlewares/asyncWrapper");
+const httpStatusText = require("../utils/httpStatusText");
+const appError = require("../utils/appError");
+const userRoles = require("../utils/userRoles");
+const moment = require("moment");
+
+// ✅ عرض كل الدكاترة
+const getAllDoctors = asyncWrapper(async (req, res, next) => {
+  const doctors = await Doctor.find().select(
+    "firstName lastName phone availableTimes availableDays created_at address avatar specialise about rate"
+  );
+
+  if (!doctors.length) {
+    return next(appError.create("No doctors found", 404, httpStatusText.FAIL));
+  }
+
+  const currentDay = moment().format("dddd");
+  const currentHour = moment().format("h A");
+
+  const doctorsWithStatus = doctors.map((doctor) => {
+    const isDayAvailable = doctor.availableDays.includes(currentDay);
+    const isTimeAvailable = doctor.availableTimes.some((time) => {
+      const availableHour = moment(time, "h:mm A").format("h A");
+      return availableHour === currentHour;
+    });
+    const status = isDayAvailable && isTimeAvailable ? "Open" : "Closed";
+
+    return {
+      _id: doctor._id,
+      firstName: doctor.firstName,
+      lastName: doctor.lastName,
+      phone: doctor.phone,
+      availableTimes: doctor.availableTimes,
+      availableDays: doctor.availableDays,
+      created_at: doctor.created_at,
+      address: doctor.address,
+      avatar: doctor.avatar,
+      specialise: doctor.specialise,
+      about: doctor.about,
+      rate: doctor.rate,
+      status,
+    };
+  });
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: doctorsWithStatus,
+  });
+});
+
+// ✅ عرض تفاصيل دكتور معين
+const getSingleDoctor = asyncWrapper(async (req, res, next) => {
+  const { doctorId } = req.params;
+
+  const doctor = await Doctor.findById(doctorId).select(
+    "firstName lastName phone availableTimes availableDays created_at address avatar specialise about rate"
+  );
+
+  if (!doctor) {
+    return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
+  }
+
+  const currentDay = moment().format("dddd");
+  const currentHour = moment().format("h A");
+
+  const isDayAvailable = doctor.availableDays.includes(currentDay);
+  const isTimeAvailable = doctor.availableTimes.some((time) => {
+    const availableHour = moment(time, "h:mm A").format("h A");
+    return availableHour === currentHour;
+  });
+  const status = isDayAvailable && isTimeAvailable ? "Open" : "Closed";
+
+  const bookedAppointments = await Appointment.find({ doctorId }).select(
+    "date time"
+  );
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: {
+      _id: doctor._id,
+      firstName: doctor.firstName,
+      lastName: doctor.lastName,
+      phone: doctor.phone,
+      availableTimes: doctor.availableTimes,
+      availableDays: doctor.availableDays,
+      created_at: doctor.created_at,
+      address: doctor.address,
+      avatar: doctor.avatar,
+      specialise: doctor.specialise,
+      about: doctor.about,
+      rate: doctor.rate,
+      status,
+      bookedAppointments: bookedAppointments.map((appointment) => ({
+        date: appointment.date,
+        time: appointment.time,
+      })),
+    },
+  });
+});
+
+// ✅ حجز موعد مع دكتور
+const bookAppointment = asyncWrapper(async (req, res, next) => {
+  const { doctorId } = req.params;
+  const { date, time, visitType } = req.body;
+  const userId = req.user.id; // غيرنا من _id إلى id
+
+  if (!date || !time || !visitType) {
+    return next(
+      appError.create(
+        "Date, time, and visit type are required",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const doctor = await Doctor.findById(doctorId);
+
+  if (!doctor) {
+    return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
+  }
+
+  const existingAppointment = await Appointment.findOne({
+    doctorId,
+    date,
+    time,
+  });
+
+  if (existingAppointment) {
+    return next(
+      appError.create(
+        "This appointment is already booked",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const newAppointment = new Appointment({
+    userId,
+    doctorId,
+    date,
+    time,
+    visitType,
+  });
+
+  await newAppointment.save();
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    message: "Appointment booked successfully",
+    data: {
+      appointmentId: newAppointment._id,
+      doctorId: doctor._id,
+      date,
+      time,
+      visitType,
+    },
+  });
+});
+
+// ✅ جلب كل الحجوزات بتاعة اليوزر
+const getUserAppointments = asyncWrapper(async (req, res, next) => {
+  const userId = req.user.id; // غيرنا من _id إلى id
+
+  const appointments = await Appointment.find({ userId })
+    .populate("doctorId", "firstName lastName avatar address")
+    .select("doctorId date time visitType status created_at");
+
+  if (!appointments.length) {
+    return next(
+      appError.create("No appointments found", 404, httpStatusText.FAIL)
+    );
+  }
+
+  const sortedAppointments = appointments.sort(
+    (a, b) => new Date(a.date) - new Date(b.date)
+  );
+
+  const groupedAppointments = sortedAppointments.reduce((acc, appointment) => {
+    const date = new Date(appointment.date);
+    const monthYear = `${date.toLocaleString("default", {
+      month: "short",
+    })} ${date.getFullYear()}`;
+
+    if (!acc[monthYear]) {
+      acc[monthYear] = [];
+    }
+
+    acc[monthYear].push({
+      appointmentId: appointment._id,
+      doctorName: `${appointment.doctorId.firstName} ${appointment.doctorId.lastName}`,
+      doctorAvatar: appointment.doctorId.avatar,
+      doctorAddress: appointment.doctorId.address,
+      date: appointment.date,
+      time: appointment.time,
+      visitType: appointment.visitType,
+      status: appointment.status,
+    });
+
+    return acc;
+  }, {});
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: groupedAppointments,
+  });
+});
+
+// ✅ تحديث حالة الحجز (Accept أو Close)
+const updateAppointmentStatus = asyncWrapper(async (req, res, next) => {
+  const { appointmentId } = req.params;
+  const { status } = req.body;
+  const doctorId = req.user.id; // غيرنا من _id إلى id
+
+  if (!status || !["Accepted", "Closed"].includes(status)) {
+    return next(
+      appError.create(
+        "Status must be either 'Accepted' or 'Closed'",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const appointment = await Appointment.findById(appointmentId);
+
+  if (!appointment) {
+    return next(
+      appError.create("Appointment not found", 404, httpStatusText.FAIL)
+    );
+  }
+
+  if (appointment.doctorId.toString() !== doctorId.toString()) {
+    return next(
+      appError.create(
+        "You are not authorized to update this appointment",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  appointment.status = status;
+  await appointment.save();
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    message: "Appointment status updated successfully",
+    data: {
+      appointmentId: appointment._id,
+      status: appointment.status,
+    },
+  });
+});
+
+// ✅ تعديل موعد الحجز (Reschedule)
+const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
+  const { appointmentId } = req.params;
+  const { date, time } = req.body;
+  const userId = req.user.id; // غيرنا من _id إلى id
+
+  if (!date || !time) {
+    return next(
+      appError.create("Date and time are required", 400, httpStatusText.FAIL)
+    );
+  }
+
+  const appointment = await Appointment.findById(appointmentId);
+
+  if (!appointment) {
+    return next(
+      appError.create("Appointment not found", 404, httpStatusText.FAIL)
+    );
+  }
+
+  if (appointment.userId.toString() !== userId.toString()) {
+    return next(
+      appError.create(
+        "You are not authorized to reschedule this appointment",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const existingAppointment = await Appointment.findOne({
+    doctorId: appointment.doctorId,
+    date,
+    time,
+    _id: { $ne: appointmentId },
+  });
+
+  if (existingAppointment) {
+    return next(
+      appError.create(
+        "This new time slot is already booked",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  appointment.date = date;
+  appointment.time = time;
+  await appointment.save();
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    message: "Appointment rescheduled successfully",
+    data: {
+      appointmentId: appointment._id,
+      date: appointment.date,
+      time: appointment.time,
+    },
+  });
+});
+
+// ✅ إلغاء الحجز
+const deleteAppointment = asyncWrapper(async (req, res, next) => {
+  const { appointmentId } = req.params;
+  const userId = req.user.id; // غيرنا من _id إلى id
+
+  const appointment = await Appointment.findById(appointmentId);
+
+  if (!appointment) {
+    return next(
+      appError.create("Appointment not found", 404, httpStatusText.FAIL)
+    );
+  }
+
+  if (appointment.userId.toString() !== userId.toString()) {
+    return next(
+      appError.create(
+        "You are not authorized to delete this appointment",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  await Appointment.deleteOne({ _id: appointmentId });
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    message: "Appointment deleted successfully",
+  });
+});
+
+// ✅ جلب كل الحجوزات القادمة للدكتور
+const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
+  const doctorId = req.user.id; // غيرنا من _id إلى id
+
+  const doctor = await Doctor.findById(doctorId).select(
+    "firstName lastName avatar"
+  );
+  if (!doctor) {
+    return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
+  }
+
+  const today = moment().format("YYYY-MM-DD");
+  const appointments = await Appointment.find({
+    doctorId,
+    date: { $gte: today },
+  })
+    .populate("userId", "firstName lastName")
+    .select("userId date time visitType status");
+
+  const upcomingCount = appointments.length;
+
+  const upcomingAppointments = appointments.map((appointment) => ({
+    userName: `${appointment.userId.firstName} ${appointment.userId.lastName}`,
+    place: appointment.visitType,
+    date: appointment.date,
+    time: appointment.time,
+    status:
+      appointment.status === "Accepted"
+        ? "ACCEPTED"
+        : appointment.status === "Closed"
+        ? "REFUSED"
+        : "PENDING",
+  }));
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: {
+      doctor: {
+        name: `${doctor.firstName} ${doctor.lastName}`,
+        avatar: doctor.avatar,
+        upcomingCount: upcomingCount,
+      },
+      appointments: upcomingAppointments,
+    },
+  });
+});
+
+// ✅ جلب بيانات الدكتور (Profile)
+const getDoctorProfile = asyncWrapper(async (req, res, next) => {
+  const doctorId = req.user.id; // غيرنا من _id إلى id
+
+  const doctor = await Doctor.findById(doctorId).select(
+    "firstName lastName email phone avatar"
+  );
+
+  if (!doctor) {
+    return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
+  }
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: {
+      firstName: doctor.firstName,
+      lastName: doctor.lastName,
+      email: doctor.email,
+      phone: doctor.phone,
+      avatar: doctor.avatar,
+    },
+  });
+});
+
+// ✅ تعديل بيانات الدكتور (Profile)
+const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
+  const doctorId = req.user.id; // غيرنا من _id إلى id
+  const { firstName, lastName, email, phone } = req.body;
+
+  const doctor = await Doctor.findById(doctorId);
+
+  if (!doctor) {
+    return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
+  }
+
+  // تحديث البيانات
+  if (firstName) doctor.firstName = firstName;
+  if (lastName) doctor.lastName = lastName;
+  if (email) doctor.email = email;
+  if (phone) doctor.phone = phone;
+
+  await doctor.save();
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    message: "Profile updated successfully",
+    data: {
+      firstName: doctor.firstName,
+      lastName: doctor.lastName,
+      email: doctor.email,
+      phone: doctor.phone,
+      avatar: doctor.avatar,
+    },
+  });
+});
+
+// ✅ تسجيل الخروج للدكتور
+const logoutDoctor = asyncWrapper(async (req, res, next) => {
+  // في السيستم ده، التسجيل بيحصل عن طريق JWT Token
+  // لما الدكتور يعمل Logout، بنقول للفرونت إنه يمسح الـ Token من عنده
+  res.json({
+    status: httpStatusText.SUCCESS,
+    message: "Logged out successfully",
+  });
+});
+
+// ✅ إضافة دكتور للمفضلة
+const addToFavorite = asyncWrapper(async (req, res, next) => {
+  const { doctorId } = req.params;
+  const userId = req.user.id; // غيرنا من _id إلى id
+
+  const doctor = await Doctor.findById(doctorId);
+  if (!doctor) {
+    return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    return next(appError.create("User not found", 404, httpStatusText.FAIL));
+  }
+
+  if (user.favorite.includes(doctorId)) {
+    return next(
+      appError.create("Doctor already in favorites", 400, httpStatusText.FAIL)
+    );
+  }
+
+  user.favorite.push(doctorId);
+  await user.save();
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    message: "Doctor added to favorites successfully",
+  });
+});
+
+// ✅ إزالة دكتور من المفضلة
+const removeFromFavorite = asyncWrapper(async (req, res, next) => {
+  const { doctorId } = req.params;
+  const userId = req.user.id; // غيرنا من _id إلى id
+
+  const user = await User.findById(userId);
+  if (!user) {
+    return next(appError.create("User not found", 404, httpStatusText.FAIL));
+  }
+
+  if (!user.favorite.includes(doctorId)) {
+    return next(
+      appError.create("Doctor not found in favorites", 400, httpStatusText.FAIL)
+    );
+  }
+
+  user.favorite = user.favorite.filter(
+    (favId) => favId.toString() !== doctorId
+  );
+  await user.save();
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    message: "Doctor removed from favorites successfully",
+  });
+});
+
+module.exports = {
+  getAllDoctors,
+  getSingleDoctor,
+  bookAppointment,
+  getUserAppointments,
+  updateAppointmentStatus,
+  rescheduleAppointment,
+  deleteAppointment,
+  getUpcomingAppointments,
+  getDoctorProfile,
+  updateDoctorProfile,
+  logoutDoctor,
+  addToFavorite,
+  removeFromFavorite,
+};

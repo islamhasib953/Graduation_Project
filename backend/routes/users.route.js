@@ -17,7 +17,7 @@ const path = require("path");
 
 const diskStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, "..", "uploads"); // ← طلع مستوى لفوق
+    const uploadPath = path.join(__dirname, "..", "uploads");
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }
@@ -36,25 +36,6 @@ const fileFilter = (req, file, cb) => {
 };
 
 const upload = multer({ storage: diskStorage, fileFilter });
-
-// const multer = require("multer");
-// const appError = require("../utils/appError");
-
-// const diskStorage = multer.diskStorage({
-//   destination: (req, file, cb) => cb(null, "uploads"),
-//   filename: (req, file, cb) => {
-//     const ext = file.mimetype.split("/")[1];
-//     cb(null, `user-${Date.now()}.${ext}`);
-//   },
-// });
-
-// const fileFilter = (req, file, cb) => {
-//   file.mimetype.startsWith("image")
-//     ? cb(null, true)
-//     : cb(appError.create("The file must be an image", 400), false);
-// };
-
-// const upload = multer({ storage: diskStorage, fileFilter });
 
 const router = express.Router();
 
@@ -84,3 +65,5 @@ router
   .delete(verifyToken, checkOwnership, usersController.deleteUser);
 
 module.exports = router;
+
+//***** */
