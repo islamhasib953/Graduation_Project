@@ -38,24 +38,6 @@ const registerUser = asyncWrapper(async (req, res, next) => {
     );
     return next(error);
   }
-  // رفع الصورة إلى Cloudinary
-  let avatarUrl = ""; // رابط الصورة الافتراضية
-  if (req.file) {
-    try {
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: "users/avatars", // تحديد مجلد حفظ الصور في Cloudinary
-      });
-      avatarUrl = result.secure_url; // الرابط النهائي للصورة
-    } catch (error) {
-      return next(
-        appError.create(
-          "Error uploading image to Cloudinary",
-          500,
-          httpStatusText.ERROR
-        )
-      );
-    }
-  }
   //passwird hasing
   const hashedPassword = await bcrypt.hash(password, 12);
 
@@ -68,8 +50,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
     email,
     password: hashedPassword,
     role,
-    avatar: avatarUrl,
-    // avatar: req.file ? req.file.filename : "uploads/profile.jpg", // if user uploaded photo, save it in uploads folder and save path in database. Else, save default profile photo.  // req.file.path ==> path of uploaded photo  // req.file.originalname ==> name of uploaded photo  // req.file.mimetype ==> type of uploaded photo (like jpg, png, etc)  // req.file.size ==> size
+    avatar: req.file ? req.file.filename : "uploads/profile.jpg", // if user uploaded photo, save it in uploads folder and save path in database. Else, save default profile photo.  // req.file.path ==> path of uploaded photo  // req.file.originalname ==> name of uploaded photo  // req.file.mimetype ==> type of uploaded photo (like jpg, png, etc)  // req.file.size ==> size
   });
 
   //genrate JWT token
@@ -119,11 +100,11 @@ const loginUser = asyncWrapper(async (req, res, next) => {
       },
       "7d"
     );
-  await user.save();
+    await user.save();
 
     res.status(200).json({
       status: httpStatusText.SUCCESS,
-      data: { token:token },
+      data: { token: token },
     });
   } else {
     const error = appError.create(
