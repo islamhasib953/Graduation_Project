@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
 const User = require("../models/user.model");
+const Doctor = require("../models/doctor.model"); // استيراد الـ Doctor Model
 
 const verifyToken = async (req, res, next) => {
   try {
@@ -22,10 +23,22 @@ const verifyToken = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.TOKEN_SECRET_KEY);
 
-    const user = await User.findById(decoded.id).select("-password");
+    let user;
+    // بناءً على الـ role في الـ Token، هنحدد الموديل اللي هنستخدمه
+    if (decoded.role === "doctor") {
+      user = await Doctor.findById(decoded.id).select("-password");
+    } else {
+      user = await User.findById(decoded.id).select("-password");
+    }
 
     if (!user) {
-      return next(appError.create("User not found", 404, httpStatusText.FAIL));
+      return next(
+        appError.create(
+          decoded.role === "doctor" ? "Doctor not found" : "User not found",
+          404,
+          httpStatusText.FAIL
+        )
+      );
     }
 
     req.user = user;
