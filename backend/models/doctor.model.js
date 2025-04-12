@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 const validator = require("validator");
 const userRoles = require("../utils/userRoles");
 
-const userSchema = new mongoose.Schema({
+const doctorSchema = new mongoose.Schema({
   firstName: {
     type: String,
     required: true,
@@ -57,18 +57,45 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: [userRoles.ADMIN, userRoles.PATIENT], // التعديل هنا: استبعدنا DOCTOR لأنه دلوقتي في موديل منفصل
-    default: userRoles.PATIENT,
+    default: userRoles.DOCTOR,
   },
   avatar: {
     type: String,
-    default: "uploads/profile.jpg",
+    default: "uploads/doctor.jpg",
   },
-  favorite: [
+  specialise: {
+    type: String,
+    required: true,
+    minlength: 2,
+    maxlength: 255,
+    trim: true,
+  },
+  about: {
+    type: String,
+    required: true,
+    minlength: 2,
+    maxlength: 500,
+    trim: true,
+  },
+  rate: {
+    type: Number,
+    required: true,
+    min: 0,
+    max: 5,
+    default: 0,
+  },
+  availableDays: [
     {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Doctor",
-      required: false,
+      type: String,
+      required: true,
+      trim: true,
+    },
+  ],
+  availableTimes: [
+    {
+      type: String,
+      required: true,
+      trim: true,
     },
   ],
   created_at: {
@@ -77,6 +104,7 @@ const userSchema = new mongoose.Schema({
   },
 });
 
-module.exports = mongoose.model("User", userSchema);
+module.exports = mongoose.model("Doctor", doctorSchema);
+
 
 //***** */
