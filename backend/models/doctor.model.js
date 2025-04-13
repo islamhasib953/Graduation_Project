@@ -65,21 +65,21 @@ const doctorSchema = new mongoose.Schema({
   },
   specialise: {
     type: String,
-    required: true,
+    required: false,
     minlength: 2,
     maxlength: 255,
     trim: true,
   },
   about: {
     type: String,
-    required: true,
+    required: false,
     minlength: 2,
     maxlength: 500,
     trim: true,
   },
   rate: {
     type: Number,
-    required: true,
+    required: false,
     min: 0,
     max: 5,
     default: 0,
@@ -87,14 +87,14 @@ const doctorSchema = new mongoose.Schema({
   availableDays: [
     {
       type: String,
-      required: true,
+      required: false,
       trim: true,
     },
   ],
   availableTimes: [
     {
       type: String,
-      required: true,
+      required: false,
       trim: true,
     },
   ],
