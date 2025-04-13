@@ -147,10 +147,12 @@ const loginUser = asyncWrapper(async (req, res, next) => {
   // التحقق من الإيميل في موديل اليوزر أو الدكتور
   let user = await User.findOne({ email });
   let role = userRoles.PATIENT;
+  let accountType = "patient"; // تحديد الـ accountType بناءً على الـ role
 
   if (!user) {
     user = await Doctor.findOne({ email });
     role = userRoles.DOCTOR;
+    accountType = "doctor"; // تحديد الـ accountType للدكتور
   }
 
   if (!user) {
@@ -172,7 +174,10 @@ const loginUser = asyncWrapper(async (req, res, next) => {
 
     res.status(200).json({
       status: httpStatusText.SUCCESS,
-      data: { token: token },
+      data: {
+        token: token,
+        accountType: accountType, // إضافة الـ accountType في الـ Response
+      },
     });
   } else {
     const error = appError.create(
@@ -183,6 +188,7 @@ const loginUser = asyncWrapper(async (req, res, next) => {
     return next(error);
   }
 });
+
 
 // Update user details
 const updateUser = asyncWrapper(async (req, res, next) => {
