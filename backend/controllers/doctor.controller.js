@@ -20,30 +20,103 @@ const getAllDoctors = asyncWrapper(async (req, res, next) => {
   const currentDay = moment().format("dddd");
   const currentHour = moment().format("h A");
 
-  const doctorsWithStatus = doctors.map((doctor) => {
-    const isDayAvailable = doctor.availableDays.includes(currentDay);
-    const isTimeAvailable = doctor.availableTimes.some((time) => {
-      const availableHour = moment(time, "h:mm A").format("h A");
-      return availableHour === currentHour;
-    });
-    const status = isDayAvailable && isTimeAvailable ? "Open" : "Closed";
+  const doctorsWithStatus = await Promise.all(
+    doctors.map(async (doctor) => {
+      // التحقق من وجود أيام وأوقات متاحة
+      const hasAvailableDays =
+        doctor.availableDays && doctor.availableDays.length > 0;
+      const hasAvailableTimes =
+        doctor.availableTimes && doctor.availableTimes.length > 0;
 
-    return {
-      _id: doctor._id,
-      firstName: doctor.firstName,
-      lastName: doctor.lastName,
-      phone: doctor.phone,
-      availableTimes: doctor.availableTimes,
-      availableDays: doctor.availableDays,
-      created_at: doctor.created_at,
-      address: doctor.address,
-      avatar: doctor.avatar,
-      specialise: doctor.specialise,
-      about: doctor.about,
-      rate: doctor.rate,
-      status,
-    };
-  });
+      // إذا لم يكن هناك أيام أو أوقات متاحة، يظهر الدكتور كـ Closed
+      if (!hasAvailableDays || !hasAvailableTimes) {
+        return {
+          _id: doctor._id,
+          firstName: doctor.firstName,
+          lastName: doctor.lastName,
+          phone: doctor.phone,
+          availableTimes: doctor.availableTimes,
+          availableDays: doctor.availableDays,
+          created_at: doctor.created_at,
+          address: doctor.address,
+          avatar: doctor.avatar,
+          specialise: doctor.specialise,
+          about: doctor.about,
+          rate: doctor.rate,
+          status: "Closed", // الدكتور مغلق لعدم وجود مواعيد
+        };
+      }
+
+      // جلب كل المواعيد المحجوزة للدكتور
+      const bookedAppointments = await Appointment.find({
+        doctorId: doctor._id,
+        date: { $gte: moment().startOf("day").toDate() },
+      }).select("date time");
+
+      // حساب عدد المواعيد المحجوزة لكل يوم ووقت
+      const bookedSlots = bookedAppointments.map((appointment) => ({
+        date: moment(appointment.date).format("YYYY-MM-DD"),
+        time: appointment.time,
+      }));
+
+      // إنشاء قائمة بالمواعيد المتاحة بناءً على الأيام والأوقات
+      const availableSlots = [];
+      doctor.availableDays.forEach((day) => {
+        doctor.availableTimes.forEach((time) => {
+          // نفترض إننا بنحسب المواعيد المتاحة لمدة 30 يوم من اليوم
+          for (let i = 0; i < 30; i++) {
+            const futureDate = moment().add(i, "days");
+            if (futureDate.format("dddd") === day) {
+              availableSlots.push({
+                date: futureDate.format("YYYY-MM-DD"),
+                time: time,
+              });
+            }
+          }
+        });
+      });
+
+      // التحقق من إذا كان فيه مواعيد متاحة بعد مقارنة المحجوز مع المتاح
+      let hasAvailableSlot = false;
+      for (const slot of availableSlots) {
+        const isBooked = bookedSlots.some(
+          (booked) => booked.date === slot.date && booked.time === slot.time
+        );
+        if (!isBooked) {
+          hasAvailableSlot = true;
+          break;
+        }
+      }
+
+      // تحديد حالة الدكتور بناءً على الوقت الحالي وتوفر المواعيد
+      const isDayAvailable = doctor.availableDays.includes(currentDay);
+      const isTimeAvailable = doctor.availableTimes.some((time) => {
+        const availableHour = moment(time, "h:mm A").format("h A");
+        return availableHour === currentHour;
+      });
+
+      const status =
+        hasAvailableSlot && isDayAvailable && isTimeAvailable
+          ? "Open"
+          : "Closed";
+
+      return {
+        _id: doctor._id,
+        firstName: doctor.firstName,
+        lastName: doctor.lastName,
+        phone: doctor.phone,
+        availableTimes: doctor.availableTimes,
+        availableDays: doctor.availableDays,
+        created_at: doctor.created_at,
+        address: doctor.address,
+        avatar: doctor.avatar,
+        specialise: doctor.specialise,
+        about: doctor.about,
+        rate: doctor.rate,
+        status,
+      };
+    })
+  );
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -66,24 +139,66 @@ const getSingleDoctor = asyncWrapper(async (req, res, next) => {
   const currentDay = moment().format("dddd");
   const currentHour = moment().format("h A");
 
+  // التحقق من وجود أيام وأوقات متاحة
   const hasAvailableDays =
     doctor.availableDays && doctor.availableDays.length > 0;
   const hasAvailableTimes =
     doctor.availableTimes && doctor.availableTimes.length > 0;
 
-  const isDayAvailable =
-    hasAvailableDays && doctor.availableDays.includes(currentDay);
-  const isTimeAvailable =
-    hasAvailableTimes &&
-    doctor.availableTimes.some((time) => {
+  // إذا لم يكن هناك أيام أو أوقات متاحة، يظهر الدكتور كـ Closed
+  let status = "Closed";
+  let hasAvailableSlot = false;
+
+  if (hasAvailableDays && hasAvailableTimes) {
+    // جلب كل المواعيد المحجوزة للدكتور
+    const bookedAppointments = await Appointment.find({
+      doctorId: doctor._id,
+      date: { $gte: moment().startOf("day").toDate() },
+    }).select("date time");
+
+    // حساب عدد المواعيد المحجوزة لكل يوم ووقت
+    const bookedSlots = bookedAppointments.map((appointment) => ({
+      date: moment(appointment.date).format("YYYY-MM-DD"),
+      time: appointment.time,
+    }));
+
+    // إنشاء قائمة بالمواعيد المتاحة بناءً على الأيام والأوقات
+    const availableSlots = [];
+    doctor.availableDays.forEach((day) => {
+      doctor.availableTimes.forEach((time) => {
+        for (let i = 0; i < 30; i++) {
+          const futureDate = moment().add(i, "days");
+          if (futureDate.format("dddd") === day) {
+            availableSlots.push({
+              date: futureDate.format("YYYY-MM-DD"),
+              time: time,
+            });
+          }
+        }
+      });
+    });
+
+    // التحقق من إذا كان فيه مواعيد متاحة بعد مقارنة المحجوز مع المتاح
+    for (const slot of availableSlots) {
+      const isBooked = bookedSlots.some(
+        (booked) => booked.date === slot.date && booked.time === slot.time
+      );
+      if (!isBooked) {
+        hasAvailableSlot = true;
+        break;
+      }
+    }
+
+    // تحديد الحالة بناءً على الوقت الحالي وتوفر المواعيد
+    const isDayAvailable = doctor.availableDays.includes(currentDay);
+    const isTimeAvailable = doctor.availableTimes.some((time) => {
       const availableHour = moment(time, "h:mm A").format("h A");
       return availableHour === currentHour;
     });
 
-  const status =
-    hasAvailableDays && hasAvailableTimes && isDayAvailable && isTimeAvailable
-      ? "Open"
-      : "Closed";
+    status =
+      hasAvailableSlot && isDayAvailable && isTimeAvailable ? "Open" : "Closed";
+  }
 
   const bookedAppointments = await Appointment.find({ doctorId }).select(
     "date time"
@@ -135,6 +250,7 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
   }
 
+  // التحقق من وجود أيام وأوقات متاحة
   const hasAvailableDays =
     doctor.availableDays && doctor.availableDays.length > 0;
   const hasAvailableTimes =
@@ -149,6 +265,54 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
+  // التحقق من إذا كان فيه مواعيد متاحة
+  const bookedAppointments = await Appointment.find({
+    doctorId: doctor._id,
+    date: { $gte: moment().startOf("day").toDate() },
+  }).select("date time");
+
+  const bookedSlots = bookedAppointments.map((appointment) => ({
+    date: moment(appointment.date).format("YYYY-MM-DD"),
+    time: appointment.time,
+  }));
+
+  const availableSlots = [];
+  doctor.availableDays.forEach((day) => {
+    doctor.availableTimes.forEach((time) => {
+      for (let i = 0; i < 30; i++) {
+        const futureDate = moment().add(i, "days");
+        if (futureDate.format("dddd") === day) {
+          availableSlots.push({
+            date: futureDate.format("YYYY-MM-DD"),
+            time: time,
+          });
+        }
+      }
+    });
+  });
+
+  let hasAvailableSlot = false;
+  for (const slot of availableSlots) {
+    const isBooked = bookedSlots.some(
+      (booked) => booked.date === slot.date && booked.time === slot.time
+    );
+    if (!isBooked) {
+      hasAvailableSlot = true;
+      break;
+    }
+  }
+
+  if (!hasAvailableSlot) {
+    return next(
+      appError.create(
+        "No available slots for booking with this doctor",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  // التحقق من إن اليوم والوقت المطلوبين متاحين
   const requestedDay = moment(date).format("dddd");
   const isDayAvailable = doctor.availableDays.includes(requestedDay);
   const isTimeAvailable = doctor.availableTimes.includes(time);
