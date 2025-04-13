@@ -66,12 +66,24 @@ const getSingleDoctor = asyncWrapper(async (req, res, next) => {
   const currentDay = moment().format("dddd");
   const currentHour = moment().format("h A");
 
-  const isDayAvailable = doctor.availableDays.includes(currentDay);
-  const isTimeAvailable = doctor.availableTimes.some((time) => {
-    const availableHour = moment(time, "h:mm A").format("h A");
-    return availableHour === currentHour;
-  });
-  const status = isDayAvailable && isTimeAvailable ? "Open" : "Closed";
+  const hasAvailableDays =
+    doctor.availableDays && doctor.availableDays.length > 0;
+  const hasAvailableTimes =
+    doctor.availableTimes && doctor.availableTimes.length > 0;
+
+  const isDayAvailable =
+    hasAvailableDays && doctor.availableDays.includes(currentDay);
+  const isTimeAvailable =
+    hasAvailableTimes &&
+    doctor.availableTimes.some((time) => {
+      const availableHour = moment(time, "h:mm A").format("h A");
+      return availableHour === currentHour;
+    });
+
+  const status =
+    hasAvailableDays && hasAvailableTimes && isDayAvailable && isTimeAvailable
+      ? "Open"
+      : "Closed";
 
   const bookedAppointments = await Appointment.find({ doctorId }).select(
     "date time"
@@ -105,7 +117,7 @@ const getSingleDoctor = asyncWrapper(async (req, res, next) => {
 const bookAppointment = asyncWrapper(async (req, res, next) => {
   const { doctorId } = req.params;
   const { date, time, visitType } = req.body;
-  const userId = req.user.id; // غيرنا من _id إلى id
+  const userId = req.user.id;
 
   if (!date || !time || !visitType) {
     return next(
@@ -123,9 +135,37 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
   }
 
+  const hasAvailableDays =
+    doctor.availableDays && doctor.availableDays.length > 0;
+  const hasAvailableTimes =
+    doctor.availableTimes && doctor.availableTimes.length > 0;
+  if (!hasAvailableDays || !hasAvailableTimes) {
+    return next(
+      appError.create(
+        "Doctor is not available for booking",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const requestedDay = moment(date).format("dddd");
+  const isDayAvailable = doctor.availableDays.includes(requestedDay);
+  const isTimeAvailable = doctor.availableTimes.includes(time);
+
+  if (!isDayAvailable || !isTimeAvailable) {
+    return next(
+      appError.create(
+        "Doctor is not available at this date or time",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
   const existingAppointment = await Appointment.findOne({
     doctorId,
-    date,
+    date: moment(date).startOf("day").toDate(),
     time,
   });
 
@@ -142,7 +182,7 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
   const newAppointment = new Appointment({
     userId,
     doctorId,
-    date,
+    date: moment(date).startOf("day").toDate(),
     time,
     visitType,
   });
@@ -155,7 +195,7 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     data: {
       appointmentId: newAppointment._id,
       doctorId: doctor._id,
-      date,
+      date: moment(newAppointment.date).format("YYYY-MM-DD"),
       time,
       visitType,
     },
@@ -164,7 +204,7 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
 
 // ✅ جلب كل الحجوزات بتاعة اليوزر
 const getUserAppointments = asyncWrapper(async (req, res, next) => {
-  const userId = req.user.id; // غيرنا من _id إلى id
+  const userId = req.user.id;
 
   const appointments = await Appointment.find({ userId })
     .populate("doctorId", "firstName lastName avatar address")
@@ -214,7 +254,7 @@ const getUserAppointments = asyncWrapper(async (req, res, next) => {
 const updateAppointmentStatus = asyncWrapper(async (req, res, next) => {
   const { appointmentId } = req.params;
   const { status } = req.body;
-  const doctorId = req.user.id; // غيرنا من _id إلى id
+  const doctorId = req.user.id;
 
   if (!status || !["Accepted", "Closed"].includes(status)) {
     return next(
@@ -261,7 +301,7 @@ const updateAppointmentStatus = asyncWrapper(async (req, res, next) => {
 const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
   const { appointmentId } = req.params;
   const { date, time } = req.body;
-  const userId = req.user.id; // غيرنا من _id إلى id
+  const userId = req.user.id;
 
   if (!date || !time) {
     return next(
@@ -282,6 +322,16 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
       appError.create(
         "You are not authorized to reschedule this appointment",
         403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  if (appointment.status === "Accepted") {
+    return next(
+      appError.create(
+        "Cannot reschedule an accepted appointment. You can only cancel it.",
+        400,
         httpStatusText.FAIL
       )
     );
@@ -322,7 +372,7 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
 // ✅ إلغاء الحجز
 const deleteAppointment = asyncWrapper(async (req, res, next) => {
   const { appointmentId } = req.params;
-  const userId = req.user.id; // غيرنا من _id إلى id
+  const userId = req.user.id;
 
   const appointment = await Appointment.findById(appointmentId);
 
@@ -352,7 +402,7 @@ const deleteAppointment = asyncWrapper(async (req, res, next) => {
 
 // ✅ جلب كل الحجوزات القادمة للدكتور
 const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
-  const doctorId = req.user.id; // غيرنا من _id إلى id
+  const doctorId = req.user.id;
 
   const doctor = await Doctor.findById(doctorId).select(
     "firstName lastName avatar"
@@ -361,7 +411,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
   }
 
-  const today = moment().format("YYYY-MM-DD");
+  const today = moment().startOf("day").toDate();
   const appointments = await Appointment.find({
     doctorId,
     date: { $gte: today },
@@ -374,7 +424,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
   const upcomingAppointments = appointments.map((appointment) => ({
     userName: `${appointment.userId.firstName} ${appointment.userId.lastName}`,
     place: appointment.visitType,
-    date: appointment.date,
+    date: moment(appointment.date).format("YYYY-MM-DD"),
     time: appointment.time,
     status:
       appointment.status === "Accepted"
@@ -399,7 +449,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
 
 // ✅ جلب بيانات الدكتور (Profile)
 const getDoctorProfile = asyncWrapper(async (req, res, next) => {
-  const doctorId = req.user.id; // غيرنا من _id إلى id
+  const doctorId = req.user.id;
 
   const doctor = await Doctor.findById(doctorId).select(
     "firstName lastName email phone avatar"
@@ -423,7 +473,7 @@ const getDoctorProfile = asyncWrapper(async (req, res, next) => {
 
 // ✅ تعديل بيانات الدكتور (Profile)
 const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
-  const doctorId = req.user.id; // غيرنا من _id إلى id
+  const doctorId = req.user.id;
   const { firstName, lastName, email, phone } = req.body;
 
   const doctor = await Doctor.findById(doctorId);
@@ -432,7 +482,6 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
   }
 
-  // تحديث البيانات
   if (firstName) doctor.firstName = firstName;
   if (lastName) doctor.lastName = lastName;
   if (email) doctor.email = email;
@@ -455,8 +504,6 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
 
 // ✅ تسجيل الخروج للدكتور
 const logoutDoctor = asyncWrapper(async (req, res, next) => {
-  // في السيستم ده، التسجيل بيحصل عن طريق JWT Token
-  // لما الدكتور يعمل Logout، بنقول للفرونت إنه يمسح الـ Token من عنده
   res.json({
     status: httpStatusText.SUCCESS,
     message: "Logged out successfully",
@@ -466,7 +513,7 @@ const logoutDoctor = asyncWrapper(async (req, res, next) => {
 // ✅ إضافة دكتور للمفضلة
 const addToFavorite = asyncWrapper(async (req, res, next) => {
   const { doctorId } = req.params;
-  const userId = req.user.id; // غيرنا من _id إلى id
+  const userId = req.user.id;
 
   const doctor = await Doctor.findById(doctorId);
   if (!doctor) {
@@ -496,7 +543,7 @@ const addToFavorite = asyncWrapper(async (req, res, next) => {
 // ✅ إزالة دكتور من المفضلة
 const removeFromFavorite = asyncWrapper(async (req, res, next) => {
   const { doctorId } = req.params;
-  const userId = req.user.id; // غيرنا من _id إلى id
+  const userId = req.user.id;
 
   const user = await User.findById(userId);
   if (!user) {
