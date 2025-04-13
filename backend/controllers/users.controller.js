@@ -95,7 +95,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
     res.status(201).json({
       status: httpStatusText.SUCCESS,
       message: "Doctor registered successfully",
-      data: { doctor: newDoctor },
+      data: { user: newDoctor },
     });
   } else {
     const newUser = new User({
