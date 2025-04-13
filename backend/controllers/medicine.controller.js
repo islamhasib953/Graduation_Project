@@ -1,4 +1,5 @@
 const Medicine = require("../models/medicine.model");
+const Child = require("../models/child.model"); // هنحتاج موديل الـ Child عشان نتحقق من الـ userId
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
@@ -6,6 +7,7 @@ const appError = require("../utils/appError");
 // ✅ Create a new medicine for a specific child
 const createMedicine = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params; // Extract childId from URL params
+  const userId = req.user.id; // جلب الـ userId من الـ JWT (بعد تسجيل الدخول)
   const { name, description, days, times } = req.body;
 
   if (!name || !days || !times) {
@@ -18,7 +20,20 @@ const createMedicine = asyncWrapper(async (req, res, next) => {
     );
   }
 
+  // التحقق إن الـ childId ده ينتمي لليوزر اللي سجل دخول
+  const child = await Child.findOne({ _id: childId, userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or you are not authorized",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
   const newMedicine = new Medicine({
+    userId, // إضافة الـ userId للدواء
     childId,
     name,
     description,
@@ -29,15 +44,39 @@ const createMedicine = asyncWrapper(async (req, res, next) => {
   await newMedicine.save();
   res.status(201).json({
     status: httpStatusText.SUCCESS,
-    data: { medicine: newMedicine },
+    data: {
+      medicine: {
+        _id: newMedicine._id,
+        userId: newMedicine.userId,
+        childId: newMedicine.childId,
+        name: newMedicine.name,
+        description: newMedicine.description,
+        days: newMedicine.days,
+        times: newMedicine.times,
+        createdAt: newMedicine.createdAt,
+      },
+    },
   });
 });
 
 // ✅ Get all medicines for a specific child
 const getAllMedicines = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params; // Assuming you pass childId in the URL
+  const userId = req.user.id; // جلب الـ userId من الـ JWT
 
-  const medicines = await Medicine.find({ childId }).select(
+  // التحقق إن الـ childId ده ينتمي لليوزر اللي سجل دخول
+  const child = await Child.findOne({ _id: childId, userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or you are not authorized",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const medicines = await Medicine.find({ childId, userId }).select(
     "_id name description days times createdAt"
   );
 
@@ -64,14 +103,28 @@ const getAllMedicines = asyncWrapper(async (req, res, next) => {
   });
 });
 
-
 // ✅ Get a single medicine record for a specific child
 const getSingleMedicine = asyncWrapper(async (req, res, next) => {
   const { childId, medicineId } = req.params;
+  const userId = req.user.id; // جلب الـ userId من الـ JWT
 
-  const medicine = await Medicine.findOne({ _id: medicineId, childId }).select(
-    "_id name description days times createdAt"
-  );
+  // التحقق إن الـ childId ده ينتمي لليوزر اللي سجل دخول
+  const child = await Child.findOne({ _id: childId, userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or you are not authorized",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const medicine = await Medicine.findOne({
+    _id: medicineId,
+    childId,
+    userId,
+  }).select("_id name description days times createdAt");
 
   if (!medicine) {
     return next(
@@ -92,14 +145,26 @@ const getSingleMedicine = asyncWrapper(async (req, res, next) => {
   });
 });
 
-
 // ✅ Update a medicine record
 const updateMedicine = asyncWrapper(async (req, res, next) => {
   const { childId, medicineId } = req.params;
+  const userId = req.user.id; // جلب الـ userId من الـ JWT
   const { name, description, days, times } = req.body;
 
+  // التحقق إن الـ childId ده ينتمي لليوزر اللي سجل دخول
+  const child = await Child.findOne({ _id: childId, userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or you are not authorized",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
   const updatedMedicine = await Medicine.findOneAndUpdate(
-    { _id: medicineId, childId },
+    { _id: medicineId, childId, userId },
     { name, description, days, times },
     { new: true, runValidators: true }
   ).select("_id name description days times createdAt");
@@ -123,14 +188,27 @@ const updateMedicine = asyncWrapper(async (req, res, next) => {
   });
 });
 
-
 // ✅ Delete a medicine record
 const deleteMedicine = asyncWrapper(async (req, res, next) => {
   const { childId, medicineId } = req.params;
+  const userId = req.user.id; // جلب الـ userId من الـ JWT
+
+  // التحقق إن الـ childId ده ينتمي لليوزر اللي سجل دخول
+  const child = await Child.findOne({ _id: childId, userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or you are not authorized",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
 
   const deletedMedicine = await Medicine.findOneAndDelete({
     _id: medicineId,
     childId,
+    userId,
   });
 
   if (!deletedMedicine) {
