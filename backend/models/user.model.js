@@ -58,7 +58,7 @@ const userSchema = new mongoose.Schema({
   role: {
     type: String,
     enum: [userRoles.ADMIN, userRoles.PATIENT], // التعديل هنا: استبعدنا DOCTOR لأنه دلوقتي في موديل منفصل
-    default: userRoles.PATIENT,
+    // default: userRoles.PATIENT,
   },
   avatar: {
     type: String,

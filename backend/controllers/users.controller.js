@@ -36,7 +36,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
     address,
     email,
     password,
-    accountType, // التعديل هنا: استبدلنا role بـ accountType
+    role, // التعديل هنا: استبدلنا role بـ accountType
     specialise,
     about,
     rate,
@@ -60,7 +60,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
   const hashedPassword = await bcrypt.hash(password, 12);
 
   // بناءً على accountType، هنحدد الموديل اللي هنستخدمه
-  if (accountType === userRoles.DOCTOR) {
+  if (role === userRoles.DOCTOR) {
     const newDoctor = new Doctor({
       firstName,
       lastName,
@@ -69,7 +69,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       address,
       email,
       password: hashedPassword,
-      role: userRoles.DOCTOR, // الـ role بيتحدد تلقائيًا
+      role, // الـ role بيتحدد تلقائيًا
       specialise,
       about,
       rate,
@@ -106,7 +106,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       address,
       email,
       password: hashedPassword,
-      role: userRoles.PATIENT, // الـ role بيتحدد تلقائيًا
+      role, // الـ role بيتحدد تلقائيًا
       avatar: req.file ? req.file.filename : "uploads/profile.jpg",
     });
 
@@ -147,12 +147,12 @@ const loginUser = asyncWrapper(async (req, res, next) => {
   // التحقق من الإيميل في موديل اليوزر أو الدكتور
   let user = await User.findOne({ email });
   let role = userRoles.PATIENT;
-  let accountType = "patient"; // تحديد الـ accountType بناءً على الـ role
+  // let accountType = "patient"; // تحديد الـ accountType بناءً على الـ role
 
   if (!user) {
     user = await Doctor.findOne({ email });
     role = userRoles.DOCTOR;
-    accountType = "doctor"; // تحديد الـ accountType للدكتور
+    // accountType = "doctor"; // تحديد الـ accountType للدكتور
   }
 
   if (!user) {
@@ -176,7 +176,7 @@ const loginUser = asyncWrapper(async (req, res, next) => {
       status: httpStatusText.SUCCESS,
       data: {
         token: token,
-        accountType: accountType, // إضافة الـ accountType في الـ Response
+        role: role, // إضافة الـ accountType في الـ Response
       },
     });
   } else {
