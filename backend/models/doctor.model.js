@@ -57,7 +57,7 @@ const doctorSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    default: userRoles.DOCTOR,
+    // default: userRoles.DOCTOR,
   },
   avatar: {
     type: String,
