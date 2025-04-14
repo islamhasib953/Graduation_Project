@@ -7,28 +7,27 @@ const validationschema = require("../middlewares/validationschema");
 const verifyToken = require("../middlewares/virifyToken");
 const allowedTo = require("../middlewares/allowedTo");
 const userRoles = require("../utils/userRoles");
-const checkOwnership = require("../middlewares/Ownership");
 
 
 router
   .route("/:childId")
-  .get(verifyToken, checkOwnership, medicineController.getAllMedicines)
+  .get(verifyToken, allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT), medicineController.getAllMedicines)
   .post(
     verifyToken,
-    checkOwnership,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
     validationschema.validateMedicine,
     medicineController.createMedicine
   );
 
 router
   .route("/:childId/:medicineId")
-  .get(verifyToken, checkOwnership, medicineController.getSingleMedicine)
+  .get(verifyToken, allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT), medicineController.getSingleMedicine)
   .patch(
     verifyToken,
-    checkOwnership,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
     validationschema.validateMedicine,
     medicineController.updateMedicine
   )
-  .delete(verifyToken, checkOwnership, medicineController.deleteMedicine);
+  .delete(verifyToken, allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT), medicineController.deleteMedicine);
 
 module.exports = router;
