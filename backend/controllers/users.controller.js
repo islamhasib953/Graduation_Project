@@ -25,6 +25,8 @@ const getUserById = asyncWrapper(async (req, res, next) => {
 
   res.json({ status: httpStatusText.SUCCESS, data: { user } });
 });
+
+
 // Register New User or Doctor
 const registerUser = asyncWrapper(async (req, res, next) => {
   const {
@@ -35,7 +37,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
     address,
     email,
     password,
-    role, // التعديل هنا: استبدلنا role بـ accountType
+    role, // استلام الـ role من الـ body
     specialise,
     about,
     rate,
@@ -68,7 +70,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       address,
       email,
       password: hashedPassword,
-      role, // الـ role بيتحدد تلقائيًا
+      role: userRoles.DOCTOR, // التأكد إن الـ role بيتحدد هنا
       specialise,
       about,
       rate,
@@ -100,7 +102,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       phone: newDoctor.phone,
       address: newDoctor.address,
       email: newDoctor.email,
-      role: newDoctor.role, // إضافة الـ role
+      role: newDoctor.role, // التأكد إن الـ role بيترجع هنا
       specialise: newDoctor.specialise,
       about: newDoctor.about,
       rate: newDoctor.rate,
@@ -125,7 +127,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       address,
       email,
       password: hashedPassword,
-      role, // الـ role بيتحدد تلقائيًا
+      role: userRoles.PATIENT, // التأكد إن الـ role بيتحدد هنا
       avatar: req.file ? req.file.filename : "uploads/profile.jpg",
     });
 
@@ -152,7 +154,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       phone: newUser.phone,
       address: newUser.address,
       email: newUser.email,
-      role: newUser.role, // إضافة الـ role
+      role: newUser.role, // التأكد إن الـ role بيترجع هنا
       avatar: newUser.avatar,
       favorite: newUser.favorite,
       created_at: newUser.created_at,
@@ -181,11 +183,15 @@ const loginUser = asyncWrapper(async (req, res, next) => {
 
   // التحقق من الإيميل في موديل اليوزر أو الدكتور
   let user = await User.findOne({ email });
-  let role = userRoles.PATIENT;
+  let role;
 
-  if (!user) {
+  if (user) {
+    role = user.role; // جلب الـ role من الـ Schema مباشرة
+  } else {
     user = await Doctor.findOne({ email });
-    role = userRoles.DOCTOR;
+    if (user) {
+      role = user.role; // جلب الـ role من الـ Schema مباشرة
+    }
   }
 
   if (!user) {
@@ -209,7 +215,7 @@ const loginUser = asyncWrapper(async (req, res, next) => {
       status: httpStatusText.SUCCESS,
       data: {
         token: token,
-        role: role, // التأكد إن الـ role بيترجع
+        role: role, // التأكد إن الـ role بيترجع هنا
       },
     });
   } else {
@@ -221,6 +227,7 @@ const loginUser = asyncWrapper(async (req, res, next) => {
     return next(error);
   }
 });
+
 
 // Update user details
 const updateUser = asyncWrapper(async (req, res, next) => {
