@@ -57,7 +57,9 @@ const doctorSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    // default: userRoles.DOCTOR,
+    enum: [userRoles.DOCTOR], // تحديد إن الـ role هنا للدكتور بس
+    default: userRoles.DOCTOR, // التأكد إن الـ default مش معلّق
+    required: true, // جعلناه إجباري
   },
   avatar: {
     type: String,
@@ -105,6 +107,3 @@ const doctorSchema = new mongoose.Schema({
 });
 
 module.exports = mongoose.model("Doctor", doctorSchema);
-
-
-//***** */
