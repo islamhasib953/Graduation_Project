@@ -1,5 +1,5 @@
 const Medicine = require("../models/medicine.model");
-const Child = require("../models/child.model"); // هنحتاج موديل الـ Child عشان نتحقق من الـ userId
+const Child = require("../models/child.model");
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
@@ -21,7 +21,7 @@ const createMedicine = asyncWrapper(async (req, res, next) => {
   }
 
   // التحقق إن الـ childId ده ينتمي لليوزر اللي سجل دخول
-  const child = await Child.findOne({ _id: childId, userId });
+  const child = await Child.findOne({ _id: childId, parentId: userId }); // تعديل userId إلى parentId
   if (!child) {
     return next(
       appError.create(
@@ -65,7 +65,7 @@ const getAllMedicines = asyncWrapper(async (req, res, next) => {
   const userId = req.user.id; // جلب الـ userId من الـ JWT
 
   // التحقق إن الـ childId ده ينتمي لليوزر اللي سجل دخول
-  const child = await Child.findOne({ _id: childId, userId });
+  const child = await Child.findOne({ _id: childId, parentId: userId }); // تعديل userId إلى parentId
   if (!child) {
     return next(
       appError.create(
@@ -109,7 +109,7 @@ const getSingleMedicine = asyncWrapper(async (req, res, next) => {
   const userId = req.user.id; // جلب الـ userId من الـ JWT
 
   // التحقق إن الـ childId ده ينتمي لليوزر اللي سجل دخول
-  const child = await Child.findOne({ _id: childId, userId });
+  const child = await Child.findOne({ _id: childId, parentId: userId }); // تعديل userId إلى parentId
   if (!child) {
     return next(
       appError.create(
@@ -152,7 +152,7 @@ const updateMedicine = asyncWrapper(async (req, res, next) => {
   const { name, description, days, times } = req.body;
 
   // التحقق إن الـ childId ده ينتمي لليوزر اللي سجل دخول
-  const child = await Child.findOne({ _id: childId, userId });
+  const child = await Child.findOne({ _id: childId, parentId: userId }); // تعديل userId إلى parentId
   if (!child) {
     return next(
       appError.create(
@@ -194,7 +194,7 @@ const deleteMedicine = asyncWrapper(async (req, res, next) => {
   const userId = req.user.id; // جلب الـ userId من الـ JWT
 
   // التحقق إن الـ childId ده ينتمي لليوزر اللي سجل دخول
-  const child = await Child.findOne({ _id: childId, userId });
+  const child = await Child.findOne({ _id: childId, parentId: userId }); // تعديل userId إلى parentId
   if (!child) {
     return next(
       appError.create(
