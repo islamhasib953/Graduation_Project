@@ -25,7 +25,6 @@ const getUserById = asyncWrapper(async (req, res, next) => {
 
   res.json({ status: httpStatusText.SUCCESS, data: { user } });
 });
-
 // Register New User or Doctor
 const registerUser = asyncWrapper(async (req, res, next) => {
   const {
@@ -59,7 +58,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
   // هاش الباسورد
   const hashedPassword = await bcrypt.hash(password, 12);
 
-  // بناءً على accountType، هنحدد الموديل اللي هنستخدمه
+  // بناءً على role، هنحدد الموديل اللي هنستخدمه
   if (role === userRoles.DOCTOR) {
     const newDoctor = new Doctor({
       firstName,
@@ -92,10 +91,30 @@ const registerUser = asyncWrapper(async (req, res, next) => {
     // حفظ الدكتور
     await newDoctor.save();
 
+    // تنظيم الـ Response عشان يرجع البيانات المطلوبة فقط
+    const doctorData = {
+      _id: newDoctor._id,
+      firstName: newDoctor.firstName,
+      lastName: newDoctor.lastName,
+      gender: newDoctor.gender,
+      phone: newDoctor.phone,
+      address: newDoctor.address,
+      email: newDoctor.email,
+      role: newDoctor.role, // إضافة الـ role
+      specialise: newDoctor.specialise,
+      about: newDoctor.about,
+      rate: newDoctor.rate,
+      availableDays: newDoctor.availableDays,
+      availableTimes: newDoctor.availableTimes,
+      avatar: newDoctor.avatar,
+      created_at: newDoctor.created_at,
+      token: newDoctor.token,
+    };
+
     res.status(201).json({
       status: httpStatusText.SUCCESS,
       message: "Doctor registered successfully",
-      data: { user: newDoctor },
+      data: { user: doctorData },
     });
   } else {
     const newUser = new User({
@@ -124,10 +143,26 @@ const registerUser = asyncWrapper(async (req, res, next) => {
     // حفظ اليوزر
     await newUser.save();
 
+    // تنظيم الـ Response عشان يرجع البيانات المطلوبة فقط
+    const userData = {
+      _id: newUser._id,
+      firstName: newUser.firstName,
+      lastName: newUser.lastName,
+      gender: newUser.gender,
+      phone: newUser.phone,
+      address: newUser.address,
+      email: newUser.email,
+      role: newUser.role, // إضافة الـ role
+      avatar: newUser.avatar,
+      favorite: newUser.favorite,
+      created_at: newUser.created_at,
+      token: newUser.token,
+    };
+
     res.status(201).json({
       status: httpStatusText.SUCCESS,
       message: "User registered successfully",
-      data: { user: newUser },
+      data: { user: userData },
     });
   }
 });
@@ -147,12 +182,10 @@ const loginUser = asyncWrapper(async (req, res, next) => {
   // التحقق من الإيميل في موديل اليوزر أو الدكتور
   let user = await User.findOne({ email });
   let role = userRoles.PATIENT;
-  // let accountType = "patient"; // تحديد الـ accountType بناءً على الـ role
 
   if (!user) {
     user = await Doctor.findOne({ email });
     role = userRoles.DOCTOR;
-    // accountType = "doctor"; // تحديد الـ accountType للدكتور
   }
 
   if (!user) {
@@ -176,7 +209,7 @@ const loginUser = asyncWrapper(async (req, res, next) => {
       status: httpStatusText.SUCCESS,
       data: {
         token: token,
-        role: role, // إضافة الـ accountType في الـ Response
+        role: role, // التأكد إن الـ role بيترجع
       },
     });
   } else {
@@ -188,7 +221,6 @@ const loginUser = asyncWrapper(async (req, res, next) => {
     return next(error);
   }
 });
-
 
 // Update user details
 const updateUser = asyncWrapper(async (req, res, next) => {
