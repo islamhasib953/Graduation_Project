@@ -37,7 +37,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
     address,
     email,
     password,
-    role, // استلام الـ role من الـ body
+    role, // استخدمنا role بدل accountType
     specialise,
     about,
     rate,
