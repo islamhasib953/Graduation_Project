@@ -615,22 +615,31 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
 const getDoctorProfile = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
 
-  const doctor = await Doctor.findById(doctorId).select(
-    "firstName lastName email phone avatar"
-  );
+  // نجيب كل الحقول ما عدا password و token باستخدام -password -token في الـ select
+  const doctor = await Doctor.findById(doctorId).select("-password -token");
 
   if (!doctor) {
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
   }
 
+  // نرجع كل البيانات اللي جبناها من الـ doctor
   res.json({
     status: httpStatusText.SUCCESS,
     data: {
       firstName: doctor.firstName,
       lastName: doctor.lastName,
-      email: doctor.email,
+      gender: doctor.gender,
       phone: doctor.phone,
+      address: doctor.address,
+      email: doctor.email,
+      role: doctor.role,
       avatar: doctor.avatar,
+      specialise: doctor.specialise,
+      about: doctor.about,
+      rate: doctor.rate,
+      availableDays: doctor.availableDays,
+      availableTimes: doctor.availableTimes,
+      created_at: doctor.created_at,
     },
   });
 });
