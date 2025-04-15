@@ -710,7 +710,14 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
 const getDoctorProfile = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
 
-  // تحسين: التأكد إن المستخدم دكتور
+  // التأكد إن req.user.id موجود
+  if (!doctorId) {
+    return next(
+      appError.create("User ID not found in token", 401, httpStatusText.FAIL)
+    );
+  }
+
+  // التأكد إن المستخدم دكتور
   if (req.user.role !== userRoles.DOCTOR) {
     return next(
       appError.create(
@@ -718,12 +725,6 @@ const getDoctorProfile = asyncWrapper(async (req, res, next) => {
         403,
         httpStatusText.FAIL
       )
-    );
-  }
-
-  if (!doctorId) {
-    return next(
-      appError.create("User ID not found in token", 401, httpStatusText.FAIL)
     );
   }
 
