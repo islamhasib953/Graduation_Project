@@ -27,6 +27,22 @@ router.post(
   doctorController.logoutDoctor
 );
 
+// Route لجلب الحجوزات القادمة (ثابت، لازم يكون الأول)
+router.get(
+  "/appointments/upcoming",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+  doctorController.getUpcomingAppointments
+);
+
+// Route لتحديث حالة الحجز (يحتوي على appointmentId، لازم يكون بعد الثابت)
+router.patch(
+  "/appointments/:appointmentId/status",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+  doctorController.updateAppointmentStatus
+);
+
 // Route لعرض كل الدكاترة مع childId في الـ Path
 router.get(
   "/:childId",
@@ -74,14 +90,6 @@ router.get(
   doctorController.getUserAppointments
 );
 
-// Route لجلب الحجوزات القادمة (مش محتاج childId)
-router.get(
-  "/appointments/upcoming",
-  verifyToken,
-  allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
-  doctorController.getUpcomingAppointments
-);
-
 // Routes لتعديل وإلغاء الحجز مع childId في الـ Path
 router
   .route("/appointments/:childId/:appointmentId")
@@ -95,12 +103,5 @@ router
     allowedTo(userRoles.ADMIN, userRoles.PATIENT),
     doctorController.deleteAppointment
   );
-
-router.patch(
-  "/appointments/:appointmentId/status",
-  verifyToken,
-  allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
-  doctorController.updateAppointmentStatus
-);
 
 module.exports = router;
