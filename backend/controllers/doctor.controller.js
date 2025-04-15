@@ -22,13 +22,11 @@ const getAllDoctors = asyncWrapper(async (req, res, next) => {
 
   const doctorsWithStatus = await Promise.all(
     doctors.map(async (doctor) => {
-      // التحقق من وجود أيام وأوقات متاحة
       const hasAvailableDays =
         doctor.availableDays && doctor.availableDays.length > 0;
       const hasAvailableTimes =
         doctor.availableTimes && doctor.availableTimes.length > 0;
 
-      // إذا لم يكن هناك أيام أو أوقات متاحة، يظهر الدكتور كـ Closed
       if (!hasAvailableDays || !hasAvailableTimes) {
         return {
           _id: doctor._id,
@@ -43,27 +41,24 @@ const getAllDoctors = asyncWrapper(async (req, res, next) => {
           specialise: doctor.specialise,
           about: doctor.about,
           rate: doctor.rate,
-          status: "Closed", // الدكتور مغلق لعدم وجود مواعيد
+          status: "Closed",
         };
       }
 
-      // جلب كل المواعيد المحجوزة للدكتور
+      // تحسين: جلب المواعيد المحجوزة مرة واحدة فقط
       const bookedAppointments = await Appointment.find({
         doctorId: doctor._id,
         date: { $gte: moment().startOf("day").toDate() },
       }).select("date time");
 
-      // حساب عدد المواعيد المحجوزة لكل يوم ووقت
       const bookedSlots = bookedAppointments.map((appointment) => ({
         date: moment(appointment.date).format("YYYY-MM-DD"),
         time: appointment.time,
       }));
 
-      // إنشاء قائمة بالمواعيد المتاحة بناءً على الأيام والأوقات
       const availableSlots = [];
       doctor.availableDays.forEach((day) => {
         doctor.availableTimes.forEach((time) => {
-          // نفترض إننا بنحسب المواعيد المتاحة لمدة 30 يوم من اليوم
           for (let i = 0; i < 30; i++) {
             const futureDate = moment().add(i, "days");
             if (futureDate.format("dddd") === day) {
@@ -76,7 +71,6 @@ const getAllDoctors = asyncWrapper(async (req, res, next) => {
         });
       });
 
-      // التحقق من إذا كان فيه مواعيد متاحة بعد مقارنة المحجوز مع المتاح
       let hasAvailableSlot = false;
       for (const slot of availableSlots) {
         const isBooked = bookedSlots.some(
@@ -88,7 +82,6 @@ const getAllDoctors = asyncWrapper(async (req, res, next) => {
         }
       }
 
-      // تحديد حالة الدكتور بناءً على الوقت الحالي وتوفر المواعيد
       const isDayAvailable = doctor.availableDays.includes(currentDay);
       const isTimeAvailable = doctor.availableTimes.some((time) => {
         const availableHour = moment(time, "h:mm A").format("h A");
@@ -128,6 +121,20 @@ const getAllDoctors = asyncWrapper(async (req, res, next) => {
 const getSingleDoctor = asyncWrapper(async (req, res, next) => {
   const { doctorId } = req.params;
 
+  // تحسين: إضافة تحقق إن اليوزر ليه صلاحية
+  if (
+    !req.user ||
+    ![userRoles.PATIENT, userRoles.DOCTOR].includes(req.user.role)
+  ) {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients or doctors can view doctor details",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
   const doctor = await Doctor.findById(doctorId).select(
     "firstName lastName phone availableTimes availableDays created_at address avatar specialise about rate"
   );
@@ -139,30 +146,25 @@ const getSingleDoctor = asyncWrapper(async (req, res, next) => {
   const currentDay = moment().format("dddd");
   const currentHour = moment().format("h A");
 
-  // التحقق من وجود أيام وأوقات متاحة
   const hasAvailableDays =
     doctor.availableDays && doctor.availableDays.length > 0;
   const hasAvailableTimes =
     doctor.availableTimes && doctor.availableTimes.length > 0;
 
-  // إذا لم يكن هناك أيام أو أوقات متاحة، يظهر الدكتور كـ Closed
   let status = "Closed";
   let hasAvailableSlot = false;
 
   if (hasAvailableDays && hasAvailableTimes) {
-    // جلب كل المواعيد المحجوزة للدكتور
     const bookedAppointments = await Appointment.find({
       doctorId: doctor._id,
       date: { $gte: moment().startOf("day").toDate() },
     }).select("date time");
 
-    // حساب عدد المواعيد المحجوزة لكل يوم ووقت
     const bookedSlots = bookedAppointments.map((appointment) => ({
       date: moment(appointment.date).format("YYYY-MM-DD"),
       time: appointment.time,
     }));
 
-    // إنشاء قائمة بالمواعيد المتاحة بناءً على الأيام والأوقات
     const availableSlots = [];
     doctor.availableDays.forEach((day) => {
       doctor.availableTimes.forEach((time) => {
@@ -178,7 +180,6 @@ const getSingleDoctor = asyncWrapper(async (req, res, next) => {
       });
     });
 
-    // التحقق من إذا كان فيه مواعيد متاحة بعد مقارنة المحجوز مع المتاح
     for (const slot of availableSlots) {
       const isBooked = bookedSlots.some(
         (booked) => booked.date === slot.date && booked.time === slot.time
@@ -189,7 +190,6 @@ const getSingleDoctor = asyncWrapper(async (req, res, next) => {
       }
     }
 
-    // تحديد الحالة بناءً على الوقت الحالي وتوفر المواعيد
     const isDayAvailable = doctor.availableDays.includes(currentDay);
     const isTimeAvailable = doctor.availableTimes.some((time) => {
       const availableHour = moment(time, "h:mm A").format("h A");
@@ -244,13 +244,34 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  const doctor = await Doctor.findById(doctorId);
+  // تحسين: التحقق من إن التاريخ مش في الماضي
+  const appointmentDate = moment(date);
+  if (appointmentDate.isBefore(moment(), "day")) {
+    return next(
+      appError.create(
+        "Cannot book an appointment in the past",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
 
+  // تحسين: التحقق من صيغة الوقت
+  if (!/^(1[0-2]|0?[1-9]):([0-5][0-9]) (AM|PM)$/i.test(time)) {
+    return next(
+      appError.create(
+        "Time must be in the format HH:MM AM/PM (e.g., 9:00 AM)",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const doctor = await Doctor.findById(doctorId);
   if (!doctor) {
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
   }
 
-  // التحقق من وجود أيام وأوقات متاحة
   const hasAvailableDays =
     doctor.availableDays && doctor.availableDays.length > 0;
   const hasAvailableTimes =
@@ -265,7 +286,6 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // التحقق من إذا كان فيه مواعيد متاحة
   const bookedAppointments = await Appointment.find({
     doctorId: doctor._id,
     date: { $gte: moment().startOf("day").toDate() },
@@ -312,7 +332,6 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // التحقق من إن اليوم والوقت المطلوبين متاحين
   const requestedDay = moment(date).format("dddd");
   const isDayAvailable = doctor.availableDays.includes(requestedDay);
   const isTimeAvailable = doctor.availableTimes.includes(time);
@@ -370,6 +389,17 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
 const getUserAppointments = asyncWrapper(async (req, res, next) => {
   const userId = req.user.id;
 
+  // تحسين: التأكد إن اليوزر هو PATIENT
+  if (req.user.role !== userRoles.PATIENT) {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can view their appointments",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
   const appointments = await Appointment.find({ userId })
     .populate("doctorId", "firstName lastName avatar address")
     .select("doctorId date time visitType status created_at");
@@ -419,6 +449,17 @@ const updateAppointmentStatus = asyncWrapper(async (req, res, next) => {
   const { appointmentId } = req.params;
   const { status } = req.body;
   const doctorId = req.user.id;
+
+  // تحسين: التأكد إن الدكتور هو اللي بيحدث الحالة
+  if (req.user.role !== userRoles.DOCTOR) {
+    return next(
+      appError.create(
+        "Unauthorized: Only doctors can update appointment status",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
 
   if (!status || !["Accepted", "Closed"].includes(status)) {
     return next(
@@ -473,6 +514,29 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
+  // تحسين: التحقق من إن التاريخ مش في الماضي
+  const newDate = moment(date);
+  if (newDate.isBefore(moment(), "day")) {
+    return next(
+      appError.create(
+        "Cannot reschedule to a past date",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  // تحسين: التحقق من صيغة الوقت
+  if (!/^(1[0-2]|0?[1-9]):([0-5][0-9]) (AM|PM)$/i.test(time)) {
+    return next(
+      appError.create(
+        "Time must be in the format HH:MM AM/PM (e.g., 9:00 AM)",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
   const appointment = await Appointment.findById(appointmentId);
 
   if (!appointment) {
@@ -503,7 +567,7 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
 
   const existingAppointment = await Appointment.findOne({
     doctorId: appointment.doctorId,
-    date,
+    date: newDate.startOf("day").toDate(),
     time,
     _id: { $ne: appointmentId },
   });
@@ -518,7 +582,27 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  appointment.date = date;
+  // تحسين: التحقق من إن اليوم والوقت الجديدين متاحين للدكتور
+  const doctor = await Doctor.findById(appointment.doctorId);
+  if (!doctor) {
+    return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
+  }
+
+  const requestedDay = newDate.format("dddd");
+  const isDayAvailable = doctor.availableDays.includes(requestedDay);
+  const isTimeAvailable = doctor.availableTimes.includes(time);
+
+  if (!isDayAvailable || !isTimeAvailable) {
+    return next(
+      appError.create(
+        "Doctor is not available at this new date or time",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  appointment.date = newDate.startOf("day").toDate();
   appointment.time = time;
   await appointment.save();
 
@@ -568,6 +652,17 @@ const deleteAppointment = asyncWrapper(async (req, res, next) => {
 const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
 
+  // تحسين: التأكد إن الدكتور هو اللي بيطلب
+  if (req.user.role !== userRoles.DOCTOR) {
+    return next(
+      appError.create(
+        "Unauthorized: Only doctors can view their upcoming appointments",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
   const doctor = await Doctor.findById(doctorId).select(
     "firstName lastName avatar"
   );
@@ -615,14 +710,29 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
 const getDoctorProfile = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
 
-  // نجيب كل الحقول ما عدا password و token باستخدام -password -token في الـ select
+  // تحسين: التأكد إن المستخدم دكتور
+  if (req.user.role !== userRoles.DOCTOR) {
+    return next(
+      appError.create(
+        "Unauthorized: Only doctors can view their profile",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  if (!doctorId) {
+    return next(
+      appError.create("User ID not found in token", 401, httpStatusText.FAIL)
+    );
+  }
+
   const doctor = await Doctor.findById(doctorId).select("-password -token");
 
   if (!doctor) {
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
   }
 
-  // نرجع كل البيانات اللي جبناها من الـ doctor
   res.json({
     status: httpStatusText.SUCCESS,
     data: {
@@ -647,7 +757,28 @@ const getDoctorProfile = asyncWrapper(async (req, res, next) => {
 // ✅ تعديل بيانات الدكتور (Profile)
 const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
-  const { firstName, lastName, email, phone } = req.body;
+  const {
+    firstName,
+    lastName,
+    email,
+    phone,
+    address,
+    specialise,
+    about,
+    availableDays,
+    availableTimes,
+  } = req.body;
+
+  // تحسين: التأكد إن المستخدم دكتور
+  if (req.user.role !== userRoles.DOCTOR) {
+    return next(
+      appError.create(
+        "Unauthorized: Only doctors can update their profile",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
 
   const doctor = await Doctor.findById(doctorId);
 
@@ -655,28 +786,64 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
   }
 
+  // تحسين: تحديث كل الحقول الممكنة
   if (firstName) doctor.firstName = firstName;
   if (lastName) doctor.lastName = lastName;
   if (email) doctor.email = email;
   if (phone) doctor.phone = phone;
+  if (address) doctor.address = address;
+  if (specialise) doctor.specialise = specialise;
+  if (about) doctor.about = about;
+  if (availableDays) doctor.availableDays = availableDays;
+  if (availableTimes) doctor.availableTimes = availableTimes;
 
   await doctor.save();
 
+  // تحسين: إرجاع كل البيانات المحدثة
   res.json({
     status: httpStatusText.SUCCESS,
     message: "Profile updated successfully",
     data: {
       firstName: doctor.firstName,
       lastName: doctor.lastName,
-      email: doctor.email,
+      gender: doctor.gender,
       phone: doctor.phone,
+      address: doctor.address,
+      email: doctor.email,
+      role: doctor.role,
       avatar: doctor.avatar,
+      specialise: doctor.specialise,
+      about: doctor.about,
+      rate: doctor.rate,
+      availableDays: doctor.availableDays,
+      availableTimes: doctor.availableTimes,
+      created_at: doctor.created_at,
     },
   });
 });
 
 // ✅ تسجيل الخروج للدكتور
 const logoutDoctor = asyncWrapper(async (req, res, next) => {
+  const doctorId = req.user.id;
+
+  // تحسين: التأكد إن المستخدم دكتور
+  if (req.user.role !== userRoles.DOCTOR) {
+    return next(
+      appError.create(
+        "Unauthorized: Only doctors can logout",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  // تحسين: تنظيف الـ token من الدكتور
+  const doctor = await Doctor.findById(doctorId);
+  if (doctor) {
+    doctor.token = null;
+    await doctor.save();
+  }
+
   res.json({
     status: httpStatusText.SUCCESS,
     message: "Logged out successfully",
@@ -687,6 +854,17 @@ const logoutDoctor = asyncWrapper(async (req, res, next) => {
 const addToFavorite = asyncWrapper(async (req, res, next) => {
   const { doctorId } = req.params;
   const userId = req.user.id;
+
+  // تحسين: التأكد إن اليوزر هو PATIENT
+  if (req.user.role !== userRoles.PATIENT) {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can add doctors to favorites",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
 
   const doctor = await Doctor.findById(doctorId);
   if (!doctor) {
@@ -717,6 +895,17 @@ const addToFavorite = asyncWrapper(async (req, res, next) => {
 const removeFromFavorite = asyncWrapper(async (req, res, next) => {
   const { doctorId } = req.params;
   const userId = req.user.id;
+
+  // تحسين: التأكد إن اليوزر هو PATIENT
+  if (req.user.role !== userRoles.PATIENT) {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can remove doctors from favorites",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
 
   const user = await User.findById(userId);
   if (!user) {
