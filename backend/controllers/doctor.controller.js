@@ -212,7 +212,6 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // تحسين: التحقق من إن التاريخ مش في الماضي
   const appointmentDate = moment(date);
   if (appointmentDate.isBefore(moment(), "day")) {
     return next(
@@ -224,7 +223,6 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // تحسين: التحقق من صيغة الوقت
   if (!/^(1[0-2]|0?[1-9]):([0-5][0-9]) (AM|PM)$/i.test(time)) {
     return next(
       appError.create(
@@ -254,10 +252,10 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // التحقق من إن اليوم والوقت المطلوبين متاحين بناءً على availableDays و availableTimes
-  const requestedDay = moment(date).format("dddd"); // بنجيب اسم اليوم (Monday, Tuesday, ...)
+  const requestedDay = moment(date).format("dddd");
+  const normalizedTime = time.trim().toUpperCase(); // Normalize the time
   const isDayAvailable = doctor.availableDays.includes(requestedDay);
-  const isTimeAvailable = doctor.availableTimes.includes(time);
+  const isTimeAvailable = doctor.availableTimes.includes(normalizedTime);
 
   if (!isDayAvailable || !isTimeAvailable) {
     return next(
@@ -269,11 +267,10 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // التحقق من إن نفس اليوم ونفس الوقت مش محجوزين
   const existingAppointment = await Appointment.findOne({
     doctorId,
     date: moment(date).startOf("day").toDate(),
-    time,
+    time: normalizedTime,
   });
 
   if (existingAppointment) {
@@ -290,7 +287,7 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     userId,
     doctorId,
     date: moment(date).startOf("day").toDate(),
-    time,
+    time: normalizedTime, // Save normalized time
     visitType,
   });
 
@@ -303,7 +300,7 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
       appointmentId: newAppointment._id,
       doctorId: doctor._id,
       date: moment(newAppointment.date).format("YYYY-MM-DD"),
-      time,
+      time: newAppointment.time,
       visitType,
     },
   });
