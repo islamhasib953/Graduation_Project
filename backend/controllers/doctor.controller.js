@@ -18,7 +18,7 @@ const getAllDoctors = asyncWrapper(async (req, res, next) => {
   }
 
   const currentDay = moment().format("dddd");
-  const currentHour = moment().format("h A");
+  const today = moment().startOf("day").toDate();
 
   const doctorsWithStatus = await Promise.all(
     doctors.map(async (doctor) => {
@@ -27,6 +27,7 @@ const getAllDoctors = asyncWrapper(async (req, res, next) => {
       const hasAvailableTimes =
         doctor.availableTimes && doctor.availableTimes.length > 0;
 
+      // لو الدكتور مش محدد مواعيد خالص، يبقى مغلق
       if (!hasAvailableDays || !hasAvailableTimes) {
         return {
           _id: doctor._id,
@@ -45,53 +46,42 @@ const getAllDoctors = asyncWrapper(async (req, res, next) => {
         };
       }
 
-      // تحسين: جلب المواعيد المحجوزة مرة واحدة فقط
-      const bookedAppointments = await Appointment.find({
-        doctorId: doctor._id,
-        date: { $gte: moment().startOf("day").toDate() },
-      }).select("date time");
-
-      const bookedSlots = bookedAppointments.map((appointment) => ({
-        date: moment(appointment.date).format("YYYY-MM-DD"),
-        time: appointment.time,
-      }));
-
-      const availableSlots = [];
-      doctor.availableDays.forEach((day) => {
-        doctor.availableTimes.forEach((time) => {
-          for (let i = 0; i < 30; i++) {
-            const futureDate = moment().add(i, "days");
-            if (futureDate.format("dddd") === day) {
-              availableSlots.push({
-                date: futureDate.format("YYYY-MM-DD"),
-                time: time,
-              });
-            }
-          }
-        });
-      });
-
-      let hasAvailableSlot = false;
-      for (const slot of availableSlots) {
-        const isBooked = bookedSlots.some(
-          (booked) => booked.date === slot.date && booked.time === slot.time
-        );
-        if (!isBooked) {
-          hasAvailableSlot = true;
-          break;
-        }
+      // التحقق من إن اليوم الحالي موجود في availableDays
+      const isDayAvailable = doctor.availableDays.includes(currentDay);
+      if (!isDayAvailable) {
+        return {
+          _id: doctor._id,
+          firstName: doctor.firstName,
+          lastName: doctor.lastName,
+          phone: doctor.phone,
+          availableTimes: doctor.availableTimes,
+          availableDays: doctor.availableDays,
+          created_at: doctor.created_at,
+          address: doctor.address,
+          avatar: doctor.avatar,
+          specialise: doctor.specialise,
+          about: doctor.about,
+          rate: doctor.rate,
+          status: "Closed",
+        };
       }
 
-      const isDayAvailable = doctor.availableDays.includes(currentDay);
-      const isTimeAvailable = doctor.availableTimes.some((time) => {
-        const availableHour = moment(time, "h:mm A").format("h A");
-        return availableHour === currentHour;
-      });
+      // جلب المواعيد المحجوزة النهاردة
+      const bookedAppointments = await Appointment.find({
+        doctorId: doctor._id,
+        date: today,
+      }).select("time");
 
-      const status =
-        hasAvailableSlot && isDayAvailable && isTimeAvailable
-          ? "Open"
-          : "Closed";
+      const bookedTimes = bookedAppointments.map(
+        (appointment) => appointment.time
+      );
+
+      // التحقق من إن فيه وقت متاح النهاردة
+      const hasAvailableTimeToday = doctor.availableTimes.some(
+        (time) => !bookedTimes.includes(time)
+      );
+
+      const status = hasAvailableTimeToday ? "Open" : "Closed";
 
       return {
         _id: doctor._id,
@@ -144,7 +134,7 @@ const getSingleDoctor = asyncWrapper(async (req, res, next) => {
   }
 
   const currentDay = moment().format("dddd");
-  const currentHour = moment().format("h A");
+  const today = moment().startOf("day").toDate();
 
   const hasAvailableDays =
     doctor.availableDays && doctor.availableDays.length > 0;
@@ -152,52 +142,30 @@ const getSingleDoctor = asyncWrapper(async (req, res, next) => {
     doctor.availableTimes && doctor.availableTimes.length > 0;
 
   let status = "Closed";
-  let hasAvailableSlot = false;
 
   if (hasAvailableDays && hasAvailableTimes) {
-    const bookedAppointments = await Appointment.find({
-      doctorId: doctor._id,
-      date: { $gte: moment().startOf("day").toDate() },
-    }).select("date time");
+    // التحقق من إن اليوم الحالي موجود في availableDays
+    const isDayAvailable = doctor.availableDays.includes(currentDay);
+    if (isDayAvailable) {
+      // جلب المواعيد المحجوزة النهاردة
+      const bookedAppointments = await Appointment.find({
+        doctorId: doctor._id,
+        date: today,
+      }).select("time");
 
-    const bookedSlots = bookedAppointments.map((appointment) => ({
-      date: moment(appointment.date).format("YYYY-MM-DD"),
-      time: appointment.time,
-    }));
-
-    const availableSlots = [];
-    doctor.availableDays.forEach((day) => {
-      doctor.availableTimes.forEach((time) => {
-        for (let i = 0; i < 30; i++) {
-          const futureDate = moment().add(i, "days");
-          if (futureDate.format("dddd") === day) {
-            availableSlots.push({
-              date: futureDate.format("YYYY-MM-DD"),
-              time: time,
-            });
-          }
-        }
-      });
-    });
-
-    for (const slot of availableSlots) {
-      const isBooked = bookedSlots.some(
-        (booked) => booked.date === slot.date && booked.time === slot.time
+      const bookedTimes = bookedAppointments.map(
+        (appointment) => appointment.time
       );
-      if (!isBooked) {
-        hasAvailableSlot = true;
-        break;
+
+      // التحقق من إن فيه وقت متاح النهاردة
+      const hasAvailableTimeToday = doctor.availableTimes.some(
+        (time) => !bookedTimes.includes(time)
+      );
+
+      if (hasAvailableTimeToday) {
+        status = "Open";
       }
     }
-
-    const isDayAvailable = doctor.availableDays.includes(currentDay);
-    const isTimeAvailable = doctor.availableTimes.some((time) => {
-      const availableHour = moment(time, "h:mm A").format("h A");
-      return availableHour === currentHour;
-    });
-
-    status =
-      hasAvailableSlot && isDayAvailable && isTimeAvailable ? "Open" : "Closed";
   }
 
   const bookedAppointments = await Appointment.find({ doctorId }).select(
@@ -244,7 +212,6 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // تحسين: التحقق من إن التاريخ مش في الماضي
   const appointmentDate = moment(date);
   if (appointmentDate.isBefore(moment(), "day")) {
     return next(
@@ -256,7 +223,6 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // تحسين: التحقق من صيغة الوقت
   if (!/^(1[0-2]|0?[1-9]):([0-5][0-9]) (AM|PM)$/i.test(time)) {
     return next(
       appError.create(
@@ -286,10 +252,10 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // التحقق من إن اليوم والوقت المطلوبين متاحين بناءً على availableDays و availableTimes
-  const requestedDay = moment(date).format("dddd"); // بنجيب اسم اليوم (Monday, Tuesday, ...)
+  const requestedDay = moment(date).format("dddd");
+  const normalizedTime = time.trim().toUpperCase(); // Normalize the time
   const isDayAvailable = doctor.availableDays.includes(requestedDay);
-  const isTimeAvailable = doctor.availableTimes.includes(time);
+  const isTimeAvailable = doctor.availableTimes.includes(normalizedTime);
 
   if (!isDayAvailable || !isTimeAvailable) {
     return next(
@@ -301,17 +267,16 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // التحقق من إن الموعد مش محجوز في التاريخ المحدد
   const existingAppointment = await Appointment.findOne({
     doctorId,
     date: moment(date).startOf("day").toDate(),
-    time,
+    time: normalizedTime,
   });
 
   if (existingAppointment) {
     return next(
       appError.create(
-        "This appointment is already booked",
+        "This exact appointment (date and time) is already booked",
         400,
         httpStatusText.FAIL
       )
@@ -322,7 +287,7 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     userId,
     doctorId,
     date: moment(date).startOf("day").toDate(),
-    time,
+    time: normalizedTime, // Save normalized time
     visitType,
   });
 
@@ -335,7 +300,7 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
       appointmentId: newAppointment._id,
       doctorId: doctor._id,
       date: moment(newAppointment.date).format("YYYY-MM-DD"),
-      time,
+      time: newAppointment.time,
       visitType,
     },
   });
@@ -541,7 +506,7 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // التحقق من إن الموعد الجديد مش محجوز
+  // التحقق من إن نفس اليوم ونفس الوقت الجديدين مش محجوزين
   const existingAppointment = await Appointment.findOne({
     doctorId: appointment.doctorId,
     date: newDate.startOf("day").toDate(),
@@ -552,7 +517,7 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
   if (existingAppointment) {
     return next(
       appError.create(
-        "This new time slot is already booked",
+        "This exact new time slot (date and time) is already booked",
         400,
         httpStatusText.FAIL
       )
