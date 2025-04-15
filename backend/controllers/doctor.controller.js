@@ -646,7 +646,29 @@ const deleteAppointment = asyncWrapper(async (req, res, next) => {
 
 // ✅ جلب كل الحجوزات القادمة للدكتور
 const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
+  // التحقق من وجود req.user و req.user.id
+  if (!req.user || !req.user.id) {
+    return next(
+      appError.create(
+        "Unauthorized: User ID not found in token",
+        401,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
   const doctorId = req.user.id;
+
+  // التحقق من إن doctorId صالح كـ ObjectId
+  if (!mongoose.Types.ObjectId.isValid(doctorId)) {
+    return next(
+      appError.create(
+        "Invalid Doctor ID in token",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
 
   if (req.user.role !== userRoles.DOCTOR) {
     return next(
