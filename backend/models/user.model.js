@@ -57,21 +57,14 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: [userRoles.ADMIN, userRoles.PATIENT], // التعديل هنا: استبعدنا DOCTOR لأنه دلوقتي في موديل منفصل
-    default: userRoles.PATIENT, // التأكد إن الـ default مش معلّق
-    required: true, // جعلناه إجباري
+    enum: [userRoles.ADMIN, userRoles.PATIENT],
+    default: userRoles.PATIENT,
+    required: true,
   },
   avatar: {
     type: String,
     default: "uploads/profile.jpg",
   },
-  favorite: [
-    {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Doctor",
-      required: false,
-    },
-  ],
   created_at: {
     type: Date,
     default: Date.now,

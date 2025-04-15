@@ -1,4 +1,3 @@
-// models/Child.js
 const mongoose = require("mongoose");
 
 const ChildSchema = new mongoose.Schema(
@@ -16,8 +15,11 @@ const ChildSchema = new mongoose.Schema(
       type: String,
       match: [/^(A|B|AB|O)[+-]$/, "Invalid blood type"],
     },
-    parentId:
-      { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    parentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
     photo: {
       type: String,
       default: "uploads/vaccination.jpg",
@@ -28,9 +30,15 @@ const ChildSchema = new mongoose.Schema(
         message: "Image must be a valid image file",
       },
     },
+    favorite: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Doctor",
+        required: false,
+      },
+    ], // حقل جديد لتخزين الدكاترة المفضلة لكل طفل
   },
   { timestamps: true }
 );
 
 module.exports = mongoose.model("Child", ChildSchema);
-
