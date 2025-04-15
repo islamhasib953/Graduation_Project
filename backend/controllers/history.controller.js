@@ -6,8 +6,16 @@ const appError = require("../utils/appError");
 // ✅ Create a new history record
 const createHistory = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params; // Extract childId from URL params
-  const { diagnosis, disease, treatment, notes, date, time, notesImage } =
-    req.body;
+  const {
+    diagnosis,
+    disease,
+    treatment,
+    notes,
+    date,
+    time,
+    notesImage,
+    doctorName,
+  } = req.body; // أضفنا doctorName هنا
 
   if (!diagnosis || !disease || !treatment || !date || !time) {
     return next(
@@ -27,11 +35,13 @@ const createHistory = asyncWrapper(async (req, res, next) => {
     notes,
     date,
     time,
+    doctorName: doctorName || undefined, // لو ما بعتيش doctorName، هياخد القيمة الافتراضية من الـ Schema
     notesImage: notesImage || null,
   });
 
   await newHistory.save();
 
+  // مكان التعديل: أضفنا doctorName في الـ Response
   res.json({
     status: httpStatusText.SUCCESS,
     data: {
@@ -43,6 +53,7 @@ const createHistory = asyncWrapper(async (req, res, next) => {
       notesImage: newHistory.notesImage,
       date: newHistory.date,
       time: newHistory.time,
+      doctorName: newHistory.doctorName, // أضفنا doctorName هنا
     },
   });
 });
@@ -51,8 +62,9 @@ const createHistory = asyncWrapper(async (req, res, next) => {
 const getAllHistory = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
 
+  // مكان التعديل: أضفنا doctorName في الـ select
   const history = await History.find({ childId }).select(
-    "diagnosis disease treatment date childId notes notesImage time"
+    "diagnosis disease treatment date childId notes notesImage time doctorName" // أضفنا doctorName هنا
   );
 
   if (!history.length) {
@@ -64,17 +76,20 @@ const getAllHistory = asyncWrapper(async (req, res, next) => {
       )
     );
   }
+
+  // مكان التعديل: أضفنا doctorName في الـ Response
   res.json({
     status: httpStatusText.SUCCESS,
     data: history.map((record) => ({
-      _id: record._id, // Child's ID
+      _id: record._id,
       diagnosis: record.diagnosis,
       disease: record.disease,
       treatment: record.treatment,
       notes: record.notes,
       date: record.date,
       time: record.time,
-      notesImage: record.notes,
+      notesImage: record.notesImage, // عدلنا notesImage بدل notes
+      doctorName: record.doctorName, // أضفنا doctorName هنا
     })),
   });
 });
@@ -83,8 +98,9 @@ const getAllHistory = asyncWrapper(async (req, res, next) => {
 const getSingleHistory = asyncWrapper(async (req, res, next) => {
   const { childId, historyId } = req.params;
 
+  // مكان التعديل: أضفنا doctorName في الـ select
   const history = await History.findOne({ _id: historyId, childId }).select(
-    "_id diagnosis disease treatment notes notesImage date time"
+    "_id diagnosis disease treatment notes notesImage date time doctorName" // أضفنا doctorName هنا
   );
 
   if (!history) {
@@ -93,6 +109,7 @@ const getSingleHistory = asyncWrapper(async (req, res, next) => {
     );
   }
 
+  // مكان التعديل: أضفنا doctorName في الـ Response
   res.json({
     status: httpStatusText.SUCCESS,
     data: {
@@ -104,6 +121,7 @@ const getSingleHistory = asyncWrapper(async (req, res, next) => {
       notesImage: history.notesImage,
       date: history.date,
       time: history.time,
+      doctorName: history.doctorName, // أضفنا doctorName هنا
     },
   });
 });
@@ -111,12 +129,30 @@ const getSingleHistory = asyncWrapper(async (req, res, next) => {
 // ✅ Update a history record
 const updateHistory = asyncWrapper(async (req, res, next) => {
   const { childId, historyId } = req.params;
-  const { diagnosis, disease, treatment, notes, date, time, notesImage } =
-    req.body;
+  const {
+    diagnosis,
+    disease,
+    treatment,
+    notes,
+    date,
+    time,
+    notesImage,
+    doctorName,
+  } = req.body; // أضفنا doctorName هنا
 
+  // مكان التعديل: أضفنا doctorName في الـ Update
   const updatedHistory = await History.findOneAndUpdate(
     { _id: historyId, childId },
-    { diagnosis, disease, treatment, notes, date, time, notesImage },
+    {
+      diagnosis,
+      disease,
+      treatment,
+      notes,
+      date,
+      time,
+      notesImage,
+      doctorName,
+    }, // أضفنا doctorName هنا
     { new: true, runValidators: true }
   );
 
@@ -126,9 +162,22 @@ const updateHistory = asyncWrapper(async (req, res, next) => {
     );
   }
 
+  // مكان التعديل: أضفنا doctorName في الـ Response
   res.json({
     status: httpStatusText.SUCCESS,
-    data: { history: updatedHistory },
+    data: {
+      history: {
+        _id: updatedHistory._id,
+        diagnosis: updatedHistory.diagnosis,
+        disease: updatedHistory.disease,
+        treatment: updatedHistory.treatment,
+        notes: updatedHistory.notes,
+        notesImage: updatedHistory.notesImage,
+        date: updatedHistory.date,
+        time: updatedHistory.time,
+        doctorName: updatedHistory.doctorName, // أضفنا doctorName هنا
+      },
+    },
   });
 });
 
@@ -172,10 +221,6 @@ const filterHistory = asyncWrapper(async (req, res, next) => {
     query.treatment = { $regex: treatment, $options: "i" };
   }
 
-  // if (doctor) {
-  //   query.doctor = { $regex: doctor, $options: "i" };
-  // }
-
   if (fromDate && toDate) {
     query.date = { $gte: new Date(fromDate), $lte: new Date(toDate) };
   }
@@ -185,9 +230,10 @@ const filterHistory = asyncWrapper(async (req, res, next) => {
     sortOption = { date: 1 };
   }
 
+  // مكان التعديل: أضفنا doctorName في الـ select
   const history = await History.find(query)
     .sort(sortOption)
-    .select("_id diagnosis disease treatment date");
+    .select("_id diagnosis disease treatment date doctorName"); // أضفنا doctorName هنا
 
   if (!history.length) {
     return next(
@@ -195,6 +241,7 @@ const filterHistory = asyncWrapper(async (req, res, next) => {
     );
   }
 
+  // مكان التعديل: أضفنا doctorName في الـ Response
   res.json({
     status: httpStatusText.SUCCESS,
     data: history.map((record) => ({
@@ -203,6 +250,7 @@ const filterHistory = asyncWrapper(async (req, res, next) => {
       disease: record.disease,
       treatment: record.treatment,
       date: record.date,
+      doctorName: record.doctorName, // أضفنا doctorName هنا
     })),
   });
 });

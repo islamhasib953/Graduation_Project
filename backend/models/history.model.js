@@ -42,18 +42,19 @@ const HistorySchema = new mongoose.Schema(
     },
     time: {
       type: String,
-      required: [true, "Time is required"]
+      required: [true, "Time is required"],
     },
     // doctor: {
     //   type: String,
     //   required: [true, "Doctor is required"],
     //   trim: true,
     // },
-    // doctorName: {
-    //   type: String,
-    //   required: [true, "Doctor name is required"],
-    //   trim: true,
-    // },
+    doctorName: {
+      type: String,
+      required: [true, "Doctor name is required"], // الحقل إجباري
+      trim: true,
+      default: "Dr. Islam Hasib", // القيمة الافتراضية لو ما اتحطش قيمة
+    },
     // doctorImage: {
     //   type: String,
     //   default: "uploads/default-doctor.jpg",
