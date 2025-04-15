@@ -1,14 +1,31 @@
 const Doctor = require("../models/doctor.model");
 const User = require("../models/user.model");
 const Appointment = require("../models/appointment.model");
+const Child = require("../models/child.model"); // إضافة موديل الـ Child
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
 const userRoles = require("../utils/userRoles");
 const moment = require("moment");
+const mongoose = require("mongoose");
 
-// ✅ عرض كل الدكاترة
+// ✅ عرض كل الدكاترة (مع childId في الـ Path)
 const getAllDoctors = asyncWrapper(async (req, res, next) => {
+  const { childId } = req.params;
+  const userId = req.user.id;
+
+  // التحقق من إن الـ childId مرتبط باليوزر
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or not associated with this user",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
   const doctors = await Doctor.find().select(
     "firstName lastName phone availableTimes availableDays created_at address avatar specialise about rate"
   );
@@ -27,7 +44,6 @@ const getAllDoctors = asyncWrapper(async (req, res, next) => {
       const hasAvailableTimes =
         doctor.availableTimes && doctor.availableTimes.length > 0;
 
-      // لو الدكتور مش محدد مواعيد خالص، يبقى مغلق
       if (!hasAvailableDays || !hasAvailableTimes) {
         return {
           _id: doctor._id,
@@ -43,10 +59,10 @@ const getAllDoctors = asyncWrapper(async (req, res, next) => {
           about: doctor.about,
           rate: doctor.rate,
           status: "Closed",
+          isFavorite: child.favorite.includes(doctor._id), // إضافة حالة إن الدكتور ده مفضل عند الطفل
         };
       }
 
-      // التحقق من إن اليوم الحالي موجود في availableDays
       const isDayAvailable = doctor.availableDays.includes(currentDay);
       if (!isDayAvailable) {
         return {
@@ -63,10 +79,10 @@ const getAllDoctors = asyncWrapper(async (req, res, next) => {
           about: doctor.about,
           rate: doctor.rate,
           status: "Closed",
+          isFavorite: child.favorite.includes(doctor._id),
         };
       }
 
-      // جلب المواعيد المحجوزة النهاردة
       const bookedAppointments = await Appointment.find({
         doctorId: doctor._id,
         date: today,
@@ -76,7 +92,6 @@ const getAllDoctors = asyncWrapper(async (req, res, next) => {
         (appointment) => appointment.time
       );
 
-      // التحقق من إن فيه وقت متاح النهاردة
       const hasAvailableTimeToday = doctor.availableTimes.some(
         (time) => !bookedTimes.includes(time)
       );
@@ -97,6 +112,7 @@ const getAllDoctors = asyncWrapper(async (req, res, next) => {
         about: doctor.about,
         rate: doctor.rate,
         status,
+        isFavorite: child.favorite.includes(doctor._id),
       };
     })
   );
@@ -107,11 +123,11 @@ const getAllDoctors = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ عرض تفاصيل دكتور معين
+// ✅ عرض تفاصيل دكتور معين (مع childId في الـ Path)
 const getSingleDoctor = asyncWrapper(async (req, res, next) => {
-  const { doctorId } = req.params;
+  const { doctorId, childId } = req.params;
+  const userId = req.user.id;
 
-  // تحسين: إضافة تحقق إن اليوزر ليه صلاحية
   if (
     !req.user ||
     ![userRoles.PATIENT, userRoles.DOCTOR].includes(req.user.role)
@@ -123,6 +139,20 @@ const getSingleDoctor = asyncWrapper(async (req, res, next) => {
         httpStatusText.FAIL
       )
     );
+  }
+
+  // التحقق من إن الـ childId مرتبط باليوزر (إذا كان المستخدم ليس دكتور)
+  if (req.user.role !== userRoles.DOCTOR) {
+    const child = await Child.findOne({ _id: childId, parentId: userId });
+    if (!child) {
+      return next(
+        appError.create(
+          "Child not found or not associated with this user",
+          404,
+          httpStatusText.FAIL
+        )
+      );
+    }
   }
 
   const doctor = await Doctor.findById(doctorId).select(
@@ -144,10 +174,8 @@ const getSingleDoctor = asyncWrapper(async (req, res, next) => {
   let status = "Closed";
 
   if (hasAvailableDays && hasAvailableTimes) {
-    // التحقق من إن اليوم الحالي موجود في availableDays
     const isDayAvailable = doctor.availableDays.includes(currentDay);
     if (isDayAvailable) {
-      // جلب المواعيد المحجوزة النهاردة
       const bookedAppointments = await Appointment.find({
         doctorId: doctor._id,
         date: today,
@@ -157,7 +185,6 @@ const getSingleDoctor = asyncWrapper(async (req, res, next) => {
         (appointment) => appointment.time
       );
 
-      // التحقق من إن فيه وقت متاح النهاردة
       const hasAvailableTimeToday = doctor.availableTimes.some(
         (time) => !bookedTimes.includes(time)
       );
@@ -168,9 +195,12 @@ const getSingleDoctor = asyncWrapper(async (req, res, next) => {
     }
   }
 
-  const bookedAppointments = await Appointment.find({ doctorId }).select(
-    "date time"
-  );
+  const bookedAppointments = await Appointment.find({
+    doctorId,
+    childId,
+  }).select("date time");
+
+  const child = await Child.findById(childId);
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -192,13 +222,14 @@ const getSingleDoctor = asyncWrapper(async (req, res, next) => {
         date: appointment.date,
         time: appointment.time,
       })),
+      isFavorite: child ? child.favorite.includes(doctor._id) : false, // إضافة حالة إن الدكتور مفضل عند الطفل
     },
   });
 });
 
-// ✅ حجز موعد مع دكتور
+// ✅ حجز موعد مع دكتور (مع childId في الـ Path)
 const bookAppointment = asyncWrapper(async (req, res, next) => {
-  const { doctorId } = req.params;
+  const { doctorId, childId } = req.params;
   const { date, time, visitType } = req.body;
   const userId = req.user.id;
 
@@ -207,6 +238,17 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
       appError.create(
         "Date, time, and visit type are required",
         400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or not associated with this user",
+        404,
         httpStatusText.FAIL
       )
     );
@@ -253,7 +295,7 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
   }
 
   const requestedDay = moment(date).format("dddd");
-  const normalizedTime = time.trim().toUpperCase(); // Normalize the time
+  const normalizedTime = time.trim().toUpperCase();
   const isDayAvailable = doctor.availableDays.includes(requestedDay);
   const isTimeAvailable = doctor.availableTimes.includes(normalizedTime);
 
@@ -286,8 +328,9 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
   const newAppointment = new Appointment({
     userId,
     doctorId,
+    childId,
     date: moment(date).startOf("day").toDate(),
-    time: normalizedTime, // Save normalized time
+    time: normalizedTime,
     visitType,
   });
 
@@ -299,6 +342,7 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     data: {
       appointmentId: newAppointment._id,
       doctorId: doctor._id,
+      childId: newAppointment.childId,
       date: moment(newAppointment.date).format("YYYY-MM-DD"),
       time: newAppointment.time,
       visitType,
@@ -306,11 +350,11 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ جلب كل الحجوزات بتاعة اليوزر
+// ✅ جلب كل الحجوزات بتاعة اليوزر (مع childId في الـ Path)
 const getUserAppointments = asyncWrapper(async (req, res, next) => {
+  const { childId } = req.params;
   const userId = req.user.id;
 
-  // تحسين: التأكد إن اليوزر هو PATIENT
   if (req.user.role !== userRoles.PATIENT) {
     return next(
       appError.create(
@@ -321,9 +365,21 @@ const getUserAppointments = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  const appointments = await Appointment.find({ userId })
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or not associated with this user",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const appointments = await Appointment.find({ userId, childId })
     .populate("doctorId", "firstName lastName avatar address")
-    .select("doctorId date time visitType status created_at");
+    .populate("childId", "name")
+    .select("doctorId childId date time visitType status created_at");
 
   if (!appointments.length) {
     return next(
@@ -347,6 +403,8 @@ const getUserAppointments = asyncWrapper(async (req, res, next) => {
 
     acc[monthYear].push({
       appointmentId: appointment._id,
+      childId: appointment.childId._id,
+      childName: appointment.childId.name,
       doctorName: `${appointment.doctorId.firstName} ${appointment.doctorId.lastName}`,
       doctorAvatar: appointment.doctorId.avatar,
       doctorAddress: appointment.doctorId.address,
@@ -371,7 +429,6 @@ const updateAppointmentStatus = asyncWrapper(async (req, res, next) => {
   const { status } = req.body;
   const doctorId = req.user.id;
 
-  // تحسين: التأكد إن الدكتور هو اللي بيحدث الحالة
   if (req.user.role !== userRoles.DOCTOR) {
     return next(
       appError.create(
@@ -423,9 +480,9 @@ const updateAppointmentStatus = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ تعديل موعد الحجز (Reschedule)
+// ✅ تعديل موعد الحجز (Reschedule) (مع childId في الـ Path)
 const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
-  const { appointmentId } = req.params;
+  const { appointmentId, childId } = req.params;
   const { date, time } = req.body;
   const userId = req.user.id;
 
@@ -435,7 +492,6 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // تحسين: التحقق من إن التاريخ مش في الماضي
   const newDate = moment(date);
   if (newDate.isBefore(moment(), "day")) {
     return next(
@@ -447,7 +503,6 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // تحسين: التحقق من صيغة الوقت
   if (!/^(1[0-2]|0?[1-9]):([0-5][0-9]) (AM|PM)$/i.test(time)) {
     return next(
       appError.create(
@@ -476,6 +531,16 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
+  if (appointment.childId.toString() !== childId) {
+    return next(
+      appError.create(
+        "This appointment does not belong to the specified child",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
   if (appointment.status === "Accepted") {
     return next(
       appError.create(
@@ -486,7 +551,6 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // التحقق من إن اليوم والوقت الجديدين متاحين للدكتور
   const doctor = await Doctor.findById(appointment.doctorId);
   if (!doctor) {
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
@@ -506,7 +570,6 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // التحقق من إن نفس اليوم ونفس الوقت الجديدين مش محجوزين
   const existingAppointment = await Appointment.findOne({
     doctorId: appointment.doctorId,
     date: newDate.startOf("day").toDate(),
@@ -533,15 +596,16 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
     message: "Appointment rescheduled successfully",
     data: {
       appointmentId: appointment._id,
+      childId: appointment.childId,
       date: appointment.date,
       time: appointment.time,
     },
   });
 });
 
-// ✅ إلغاء الحجز
+// ✅ إلغاء الحجز (مع childId في الـ Path)
 const deleteAppointment = asyncWrapper(async (req, res, next) => {
-  const { appointmentId } = req.params;
+  const { appointmentId, childId } = req.params;
   const userId = req.user.id;
 
   const appointment = await Appointment.findById(appointmentId);
@@ -562,6 +626,16 @@ const deleteAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
+  if (appointment.childId.toString() !== childId) {
+    return next(
+      appError.create(
+        "This appointment does not belong to the specified child",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
   await Appointment.deleteOne({ _id: appointmentId });
 
   res.json({
@@ -569,11 +643,11 @@ const deleteAppointment = asyncWrapper(async (req, res, next) => {
     message: "Appointment deleted successfully",
   });
 });
+
 // ✅ جلب كل الحجوزات القادمة للدكتور
 const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
 
-  // تحسين: التأكد إن الدكتور هو اللي بيطلب
   if (req.user.role !== userRoles.DOCTOR) {
     return next(
       appError.create(
@@ -597,13 +671,15 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
     date: { $gte: today },
   })
     .populate("userId", "firstName lastName")
-    .select("userId date time visitType status");
+    .populate("childId", "name")
+    .select("userId childId date time visitType status");
 
   const upcomingCount = appointments.length;
 
   const upcomingAppointments = appointments.map((appointment) => ({
-    appointmentId: appointment._id, // إضافة الـ appointmentId
+    appointmentId: appointment._id,
     userName: `${appointment.userId.firstName} ${appointment.userId.lastName}`,
+    childName: appointment.childId.name,
     place: appointment.visitType,
     date: moment(appointment.date).format("YYYY-MM-DD"),
     time: appointment.time,
@@ -632,14 +708,12 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
 const getDoctorProfile = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
 
-  // التأكد إن req.user.id موجود
   if (!doctorId) {
     return next(
       appError.create("User ID not found in token", 401, httpStatusText.FAIL)
     );
   }
 
-  // التأكد إن المستخدم دكتور
   if (req.user.role !== userRoles.DOCTOR) {
     return next(
       appError.create(
@@ -692,7 +766,6 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
     availableTimes,
   } = req.body;
 
-  // تحسين: التأكد إن المستخدم دكتور
   if (req.user.role !== userRoles.DOCTOR) {
     return next(
       appError.create(
@@ -709,7 +782,6 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
   }
 
-  // تحسين: تحديث كل الحقول الممكنة
   if (firstName) doctor.firstName = firstName;
   if (lastName) doctor.lastName = lastName;
   if (email) doctor.email = email;
@@ -722,7 +794,6 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
 
   await doctor.save();
 
-  // تحسين: إرجاع كل البيانات المحدثة
   res.json({
     status: httpStatusText.SUCCESS,
     message: "Profile updated successfully",
@@ -749,7 +820,6 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
 const logoutDoctor = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
 
-  // تحسين: التأكد إن المستخدم دكتور
   if (req.user.role !== userRoles.DOCTOR) {
     return next(
       appError.create(
@@ -760,7 +830,6 @@ const logoutDoctor = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // تحسين: تنظيف الـ token من الدكتور
   const doctor = await Doctor.findById(doctorId);
   if (doctor) {
     doctor.token = null;
@@ -773,12 +842,11 @@ const logoutDoctor = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ إضافة دكتور للمفضلة
+// ✅ إضافة دكتور للمفضلة (مع childId في الـ Path)
 const addToFavorite = asyncWrapper(async (req, res, next) => {
-  const { doctorId } = req.params;
+  const { doctorId, childId } = req.params;
   const userId = req.user.id;
 
-  // تحسين: التأكد إن اليوزر هو PATIENT
   if (req.user.role !== userRoles.PATIENT) {
     return next(
       appError.create(
@@ -794,19 +862,25 @@ const addToFavorite = asyncWrapper(async (req, res, next) => {
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
   }
 
-  const user = await User.findById(userId);
-  if (!user) {
-    return next(appError.create("User not found", 404, httpStatusText.FAIL));
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or not associated with this user",
+        404,
+        httpStatusText.FAIL
+      )
+    );
   }
 
-  if (user.favorite.includes(doctorId)) {
+  if (child.favorite.includes(doctorId)) {
     return next(
       appError.create("Doctor already in favorites", 400, httpStatusText.FAIL)
     );
   }
 
-  user.favorite.push(doctorId);
-  await user.save();
+  child.favorite.push(doctorId);
+  await child.save();
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -814,12 +888,11 @@ const addToFavorite = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ إزالة دكتور من المفضلة
+// ✅ إزالة دكتور من المفضلة (مع childId في الـ Path)
 const removeFromFavorite = asyncWrapper(async (req, res, next) => {
-  const { doctorId } = req.params;
+  const { doctorId, childId } = req.params;
   const userId = req.user.id;
 
-  // تحسين: التأكد إن اليوزر هو PATIENT
   if (req.user.role !== userRoles.PATIENT) {
     return next(
       appError.create(
@@ -830,21 +903,27 @@ const removeFromFavorite = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  const user = await User.findById(userId);
-  if (!user) {
-    return next(appError.create("User not found", 404, httpStatusText.FAIL));
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or not associated with this user",
+        404,
+        httpStatusText.FAIL
+      )
+    );
   }
 
-  if (!user.favorite.includes(doctorId)) {
+  if (!child.favorite.includes(doctorId)) {
     return next(
       appError.create("Doctor not found in favorites", 400, httpStatusText.FAIL)
     );
   }
 
-  user.favorite = user.favorite.filter(
+  child.favorite = child.favorite.filter(
     (favId) => favId.toString() !== doctorId
   );
-  await user.save();
+  await child.save();
 
   res.json({
     status: httpStatusText.SUCCESS,

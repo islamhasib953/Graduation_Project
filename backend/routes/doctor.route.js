@@ -1,81 +1,24 @@
 const express = require("express");
 const router = express.Router();
-const doctorController = require("../controllers/doctor.controller");
+
 const verifyToken = require("../middlewares/virifyToken");
 const allowedTo = require("../middlewares/allowedTo");
 const userRoles = require("../utils/userRoles");
+const doctorController = require("../controllers/doctor.controller");
 
-// Route لجلب الـ Profile بتاع الدكتور (نحطه الأول عشان يتفحص قبل /:doctorId)
-router.get(
-  "/profile",
-  verifyToken,
-  allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
-  doctorController.getDoctorProfile
-);
-
-// Route لتعديل الـ Profile بتاع الدكتور
-router.patch(
-  "/profile",
-  verifyToken,
-  allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
-  doctorController.updateDoctorProfile
-);
-
-// باقي الـ Routes
-router.get(
-  "/",
-  verifyToken,
-  allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-  doctorController.getAllDoctors
-);
-
-// Route لجلب تفاصيل دكتور معين (نحطه بعد /profile عشان ما يتعارضش)
-router.get(
-  "/:doctorId",
-  verifyToken,
-  allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-  doctorController.getSingleDoctor
-);
-
-router.post(
-  "/:doctorId/book",
-  verifyToken,
-  allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-  doctorController.bookAppointment
-);
-
-router.get(
-  "/appointments/user",
-  verifyToken,
-  allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-  doctorController.getUserAppointments
-);
-
-router.patch(
-  "/appointments/:appointmentId/status",
-  verifyToken,
-  doctorController.updateAppointmentStatus
-);
-
-router.patch(
-  "/appointments/:appointmentId/reschedule",
-  verifyToken,
-  allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-  doctorController.rescheduleAppointment
-);
-
-router.delete(
-  "/appointments/:appointmentId",
-  verifyToken,
-  allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-  doctorController.deleteAppointment
-);
-
-router.get(
-  "/appointments/upcoming",
-  verifyToken,
-  doctorController.getUpcomingAppointments
-);
+// Routes للدكتور نفسه (Profile, Logout) - مش محتاج childId
+router
+  .route("/profile")
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+    doctorController.getDoctorProfile
+  )
+  .patch(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+    doctorController.updateDoctorProfile
+  );
 
 router.post(
   "/logout",
@@ -84,13 +27,80 @@ router.post(
   doctorController.logoutDoctor
 );
 
-router.post("/:doctorId/favorite", verifyToken, doctorController.addToFavorite);
+// Route لعرض كل الدكاترة مع childId في الـ Path
+router.get(
+  "/:childId",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+  doctorController.getAllDoctors
+);
 
-router.delete(
-  "/:doctorId/favorite",
+// Routes لتفاصيل دكتور معين مع childId في الـ Path
+router
+  .route("/:childId/:doctorId")
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    doctorController.getSingleDoctor
+  );
+
+// Route لحجز موعد مع childId في الـ Path
+router.post(
+  "/:childId/:doctorId/book",
   verifyToken,
   allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-  doctorController.removeFromFavorite
+  doctorController.bookAppointment
+);
+
+// Routes لإضافة وإزالة دكتور من المفضلة مع childId في الـ Path
+router
+  .route("/:childId/:doctorId/favorite")
+  .post(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+    doctorController.addToFavorite
+  )
+  .delete(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+    doctorController.removeFromFavorite
+  );
+
+// Route لجلب كل الحجوزات بتاعة اليوزر مع childId في الـ Path
+router.get(
+  "/appointments/user/:childId",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+  doctorController.getUserAppointments
+);
+
+// Route لجلب الحجوزات القادمة (مش محتاج childId)
+router.get(
+  "/appointments/upcoming",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+  doctorController.getUpcomingAppointments
+);
+
+// Routes لتعديل وإلغاء الحجز مع childId في الـ Path
+router
+  .route("/appointments/:childId/:appointmentId")
+  .patch(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+    doctorController.rescheduleAppointment
+  )
+  .delete(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+    doctorController.deleteAppointment
+  );
+
+router.patch(
+  "/appointments/:appointmentId/status",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+  doctorController.updateAppointmentStatus
 );
 
 module.exports = router;
