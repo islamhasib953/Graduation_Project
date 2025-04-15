@@ -569,7 +569,6 @@ const deleteAppointment = asyncWrapper(async (req, res, next) => {
     message: "Appointment deleted successfully",
   });
 });
-
 // ✅ جلب كل الحجوزات القادمة للدكتور
 const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
@@ -603,6 +602,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
   const upcomingCount = appointments.length;
 
   const upcomingAppointments = appointments.map((appointment) => ({
+    appointmentId: appointment._id, // إضافة الـ appointmentId
     userName: `${appointment.userId.firstName} ${appointment.userId.lastName}`,
     place: appointment.visitType,
     date: moment(appointment.date).format("YYYY-MM-DD"),
