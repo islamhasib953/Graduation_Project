@@ -286,53 +286,8 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  const bookedAppointments = await Appointment.find({
-    doctorId: doctor._id,
-    date: { $gte: moment().startOf("day").toDate() },
-  }).select("date time");
-
-  const bookedSlots = bookedAppointments.map((appointment) => ({
-    date: moment(appointment.date).format("YYYY-MM-DD"),
-    time: appointment.time,
-  }));
-
-  const availableSlots = [];
-  doctor.availableDays.forEach((day) => {
-    doctor.availableTimes.forEach((time) => {
-      for (let i = 0; i < 30; i++) {
-        const futureDate = moment().add(i, "days");
-        if (futureDate.format("dddd") === day) {
-          availableSlots.push({
-            date: futureDate.format("YYYY-MM-DD"),
-            time: time,
-          });
-        }
-      }
-    });
-  });
-
-  let hasAvailableSlot = false;
-  for (const slot of availableSlots) {
-    const isBooked = bookedSlots.some(
-      (booked) => booked.date === slot.date && booked.time === slot.time
-    );
-    if (!isBooked) {
-      hasAvailableSlot = true;
-      break;
-    }
-  }
-
-  if (!hasAvailableSlot) {
-    return next(
-      appError.create(
-        "No available slots for booking with this doctor",
-        400,
-        httpStatusText.FAIL
-      )
-    );
-  }
-
-  const requestedDay = moment(date).format("dddd");
+  // التحقق من إن اليوم والوقت المطلوبين متاحين بناءً على availableDays و availableTimes
+  const requestedDay = moment(date).format("dddd"); // بنجيب اسم اليوم (Monday, Tuesday, ...)
   const isDayAvailable = doctor.availableDays.includes(requestedDay);
   const isTimeAvailable = doctor.availableTimes.includes(time);
 
@@ -346,6 +301,7 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
+  // التحقق من إن الموعد مش محجوز في التاريخ المحدد
   const existingAppointment = await Appointment.findOne({
     doctorId,
     date: moment(date).startOf("day").toDate(),
@@ -565,24 +521,7 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  const existingAppointment = await Appointment.findOne({
-    doctorId: appointment.doctorId,
-    date: newDate.startOf("day").toDate(),
-    time,
-    _id: { $ne: appointmentId },
-  });
-
-  if (existingAppointment) {
-    return next(
-      appError.create(
-        "This new time slot is already booked",
-        400,
-        httpStatusText.FAIL
-      )
-    );
-  }
-
-  // تحسين: التحقق من إن اليوم والوقت الجديدين متاحين للدكتور
+  // التحقق من إن اليوم والوقت الجديدين متاحين للدكتور
   const doctor = await Doctor.findById(appointment.doctorId);
   if (!doctor) {
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
@@ -596,6 +535,24 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
     return next(
       appError.create(
         "Doctor is not available at this new date or time",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  // التحقق من إن الموعد الجديد مش محجوز
+  const existingAppointment = await Appointment.findOne({
+    doctorId: appointment.doctorId,
+    date: newDate.startOf("day").toDate(),
+    time,
+    _id: { $ne: appointmentId },
+  });
+
+  if (existingAppointment) {
+    return next(
+      appError.create(
+        "This new time slot is already booked",
         400,
         httpStatusText.FAIL
       )
