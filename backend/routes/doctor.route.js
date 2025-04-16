@@ -90,6 +90,14 @@ router.get(
   doctorController.getUserAppointments
 );
 
+// Route لجلب الدكاترة المفضلين مع childId في الـ Path
+router.get(
+  "/favorites/:childId",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+  doctorController.getFavoriteDoctors
+);
+
 // Routes لتعديل وإلغاء الحجز مع childId في الـ Path
 router
   .route("/appointments/:childId/:appointmentId")
