@@ -27,7 +27,7 @@ router.post(
   doctorController.logoutDoctor
 );
 
-// Route لجلب الحجوزات القادمة (ثابت، لازم يكون الأول)
+// Route لجلب الحجوزات القادمة (ثابت)
 router.get(
   "/appointments/upcoming",
   verifyToken,
@@ -35,7 +35,7 @@ router.get(
   doctorController.getUpcomingAppointments
 );
 
-// Route لتحديث حالة الحجز (يحتوي على appointmentId، لازم يكون بعد الثابت)
+// Route لتحديث حالة الحجز (يحتوي على appointmentId)
 router.patch(
   "/appointments/:appointmentId/status",
   verifyToken,
@@ -43,7 +43,23 @@ router.patch(
   doctorController.updateAppointmentStatus
 );
 
-// Route لعرض كل الدكاترة مع childId في الـ Path
+// Route لجلب كل الحجوزات بتاعة اليوزر مع childId في الـ Path
+router.get(
+  "/appointments/user/:childId",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+  doctorController.getUserAppointments
+);
+
+// Route لجلب الدكاترة المفضلين مع childId في الـ Path (ثابت، لازم يكون قبل /:childId)
+router.get(
+  "/favorites/:childId",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+  doctorController.getFavoriteDoctors
+);
+
+// Route لعرض كل الدكاترة مع childId في الـ Path (ديناميكي، لازم يكون الأخير)
 router.get(
   "/:childId",
   verifyToken,
@@ -81,22 +97,6 @@ router
     allowedTo(userRoles.ADMIN, userRoles.PATIENT),
     doctorController.removeFromFavorite
   );
-
-// Route لجلب كل الحجوزات بتاعة اليوزر مع childId في الـ Path
-router.get(
-  "/appointments/user/:childId",
-  verifyToken,
-  allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-  doctorController.getUserAppointments
-);
-
-// Route لجلب الدكاترة المفضلين مع childId في الـ Path
-router.get(
-  "/favorites/:childId",
-  verifyToken,
-  allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-  doctorController.getFavoriteDoctors
-);
 
 // Routes لتعديل وإلغاء الحجز مع childId في الـ Path
 router
