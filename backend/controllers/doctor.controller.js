@@ -405,6 +405,7 @@ const getUserAppointments = asyncWrapper(async (req, res, next) => {
       appointmentId: appointment._id,
       childId: appointment.childId._id,
       childName: appointment.childId.name,
+      doctorId: appointment.doctorId._id, // إضافة doctorId هنا
       doctorName: `${appointment.doctorId.firstName} ${appointment.doctorId.lastName}`,
       doctorAvatar: appointment.doctorId.avatar,
       doctorAddress: appointment.doctorId.address,
