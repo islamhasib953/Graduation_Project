@@ -481,6 +481,143 @@ const updateAppointmentStatus = asyncWrapper(async (req, res, next) => {
   });
 });
 
+
+// ✅ جلب الدكاترة المفضلين مع childId في الـ Path
+const getFavoriteDoctors = asyncWrapper(async (req, res, next) => {
+  const { childId } = req.params;
+  const userId = req.user.id;
+
+  if (req.user.role !== userRoles.PATIENT) {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can view favorite doctors",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  // التحقق من إن الـ childId مرتبط باليوزر
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or not associated with this user",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  // جلب الدكاترة الموجودين في قائمة favorite بتاعة الطفل
+  const favoriteDoctorIds = child.favorite;
+  if (!favoriteDoctorIds || favoriteDoctorIds.length === 0) {
+    return next(
+      appError.create("No favorite doctors found", 404, httpStatusText.FAIL)
+    );
+  }
+
+  const doctors = await Doctor.find({
+    _id: { $in: favoriteDoctorIds },
+  }).select(
+    "firstName lastName phone availableTimes availableDays created_at address avatar specialise about rate"
+  );
+
+  if (!doctors.length) {
+    return next(
+      appError.create("No favorite doctors found", 404, httpStatusText.FAIL)
+    );
+  }
+
+  const currentDay = moment().format("dddd");
+  const today = moment().startOf("day").toDate();
+
+  const doctorsWithStatus = await Promise.all(
+    doctors.map(async (doctor) => {
+      const hasAvailableDays =
+        doctor.availableDays && doctor.availableDays.length > 0;
+      const hasAvailableTimes =
+        doctor.availableTimes && doctor.availableTimes.length > 0;
+
+      if (!hasAvailableDays || !hasAvailableTimes) {
+        return {
+          _id: doctor._id,
+          firstName: doctor.firstName,
+          lastName: doctor.lastName,
+          phone: doctor.phone,
+          availableTimes: doctor.availableTimes,
+          availableDays: doctor.availableDays,
+          created_at: doctor.created_at,
+          address: doctor.address,
+          avatar: doctor.avatar,
+          specialise: doctor.specialise,
+          about: doctor.about,
+          rate: doctor.rate,
+          status: "Closed",
+          isFavorite: true, // الدكتور بالفعل في المفضلة
+        };
+      }
+
+      const isDayAvailable = doctor.availableDays.includes(currentDay);
+      if (!isDayAvailable) {
+        return {
+          _id: doctor._id,
+          firstName: doctor.firstName,
+          lastName: doctor.lastName,
+          phone: doctor.phone,
+          availableTimes: doctor.availableTimes,
+          availableDays: doctor.availableDays,
+          created_at: doctor.created_at,
+          address: doctor.address,
+          avatar: doctor.avatar,
+          specialise: doctor.specialise,
+          about: doctor.about,
+          rate: doctor.rate,
+          status: "Closed",
+          isFavorite: true,
+        };
+      }
+
+      const bookedAppointments = await Appointment.find({
+        doctorId: doctor._id,
+        date: today,
+      }).select("time");
+
+      const bookedTimes = bookedAppointments.map(
+        (appointment) => appointment.time
+      );
+
+      const hasAvailableTimeToday = doctor.availableTimes.some(
+        (time) => !bookedTimes.includes(time)
+      );
+
+      const status = hasAvailableTimeToday ? "Open" : "Closed";
+
+      return {
+        _id: doctor._id,
+        firstName: doctor.firstName,
+        lastName: doctor.lastName,
+        phone: doctor.phone,
+        availableTimes: doctor.availableTimes,
+        availableDays: doctor.availableDays,
+        created_at: doctor.created_at,
+        address: doctor.address,
+        avatar: doctor.avatar,
+        specialise: doctor.specialise,
+        about: doctor.about,
+        rate: doctor.rate,
+        status,
+        isFavorite: true,
+      };
+    })
+  );
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: doctorsWithStatus,
+  });
+});
+
 // ✅ تعديل موعد الحجز (Reschedule) (مع childId في الـ Path)
 const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
   const { appointmentId, childId } = req.params;
@@ -968,4 +1105,5 @@ module.exports = {
   logoutDoctor,
   addToFavorite,
   removeFromFavorite,
+  getFavoriteDoctors,
 };
