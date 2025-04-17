@@ -1041,13 +1041,12 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
 // ✅ حذف الأكونت بتاع الدكتور (مع مسح الـ Token)
 const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
-  const doctorEmail = req.user.email; // بنستخدم الإيميل من الـ Token عشان نتأكد
+  const doctorEmail = req.user.email;
 
   console.log("Starting deleteDoctorProfile...");
   console.log("Doctor ID from token:", doctorId);
   console.log("Doctor Email from token:", doctorEmail);
 
-  // التحقق من وجود doctorId
   if (!doctorId) {
     console.log("No doctorId found in token");
     return next(
@@ -1055,7 +1054,6 @@ const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // التحقق من إن doctorId صالح كـ ObjectId
   if (!mongoose.Types.ObjectId.isValid(doctorId)) {
     console.log("Invalid doctorId format:", doctorId);
     return next(
@@ -1063,7 +1061,6 @@ const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // التحقق من إن المستخدم دكتور
   if (req.user.role !== userRoles.DOCTOR) {
     console.log("User is not a doctor, role:", req.user.role);
     return next(
@@ -1075,7 +1072,20 @@ const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // جلب الدكتور بناءً على الـ ID
+  // التأكد من الاتصال بقاعدة البيانات
+  console.log("Checking database connection...");
+  const dbConnection = mongoose.connection;
+  if (dbConnection.readyState !== 1) {
+    console.log(
+      "Database connection is not ready, state:",
+      dbConnection.readyState
+    );
+    return next(
+      appError.create("Database connection error", 500, httpStatusText.ERROR)
+    );
+  }
+  console.log("Database connection is ready");
+
   const doctor = await Doctor.findById(doctorId);
   if (!doctor) {
     console.log("Doctor not found in database with ID:", doctorId);
@@ -1084,7 +1094,6 @@ const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
 
   console.log("Doctor found:", doctor.email);
 
-  // التحقق من إن الإيميل في الـ Token مطابق للإيميل بتاع الدكتور
   if (doctor.email !== doctorEmail) {
     console.log(
       "Email mismatch! Token email:",
@@ -1097,65 +1106,88 @@ const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // مسح الـ Token
-  console.log("Clearing doctor token...");
-  doctor.token = null;
-  await doctor.save();
-  console.log("Token cleared successfully");
+  // استخدام Transaction للتأكد من إن كل العمليات بتتم مع بعض
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  // حذف أي مواعيد مرتبطة بالدكتور
-  console.log("Deleting appointments for doctorId:", doctorId);
-  const appointmentDeleteResult = await Appointment.deleteMany({ doctorId });
-  console.log(
-    "Appointments deleted:",
-    appointmentDeleteResult.deletedCount,
-    "appointments"
-  );
+  try {
+    console.log("Clearing doctor token...");
+    doctor.token = null;
+    await doctor.save({ session });
+    console.log("Token cleared successfully");
 
-  // حذف الدكتور باستخدام findByIdAndDelete
-  console.log("Deleting doctor with ID:", doctorId);
-  const deletedDoctor = await Doctor.findByIdAndDelete(doctorId);
-  if (!deletedDoctor) {
-    console.log("Failed to delete doctor: No doctor found during deletion");
+    console.log("Deleting appointments for doctorId:", doctorId);
+    const appointmentDeleteResult = await Appointment.deleteMany(
+      { doctorId },
+      { session }
+    );
+    console.log(
+      "Appointments deleted:",
+      appointmentDeleteResult.deletedCount,
+      "appointments"
+    );
+
+    console.log("Deleting doctor with ID:", doctorId);
+    const deleteResult = await Doctor.deleteOne({ _id: doctorId }, { session });
+    if (deleteResult.deletedCount === 0) {
+      console.log("Failed to delete doctor: No doctor found during deletion");
+      throw new Error("Failed to delete doctor account");
+    }
+
+    const doctorAfterDelete = await Doctor.findById(doctorId).session(session);
+    if (doctorAfterDelete) {
+      console.log("Doctor still exists after deletion:", doctorAfterDelete);
+      throw new Error("Doctor account was not deleted from the database");
+    }
+
+    console.log("Doctor deleted successfully");
+
+    console.log("Removing doctor from favorites...");
+    const favoriteUpdateResult = await Child.updateMany(
+      { favorite: doctorId },
+      { $pull: { favorite: doctorId } },
+      { session }
+    );
+    console.log(
+      "Favorites updated, modified documents:",
+      favoriteUpdateResult.modifiedCount
+    );
+
+    // حذف الدكتور من جدول User (لو موجود)
+    console.log("Deleting doctor from User collection...");
+    const userDeleteResult = await User.deleteOne(
+      { email: doctorEmail },
+      { session }
+    );
+    console.log(
+      "User deleted from User collection:",
+      userDeleteResult.deletedCount,
+      "users"
+    );
+
+    // Commit الـ Transaction
+    await session.commitTransaction();
+    console.log("Transaction committed successfully");
+
+    res.json({
+      status: httpStatusText.SUCCESS,
+      message:
+        "Doctor account, appointments, favorites, and user entry deleted successfully",
+    });
+  } catch (error) {
+    // Rollback الـ Transaction لو حصل أي خطأ
+    await session.abortTransaction();
+    console.log("Transaction aborted due to error:", error.message);
     return next(
       appError.create(
-        "Failed to delete doctor account",
+        error.message || "Failed to delete doctor account",
         500,
         httpStatusText.ERROR
       )
     );
+  } finally {
+    session.endSession();
   }
-
-  // التحقق من إن الدكتور فعلاً اتمسح
-  const doctorAfterDelete = await Doctor.findById(doctorId);
-  if (doctorAfterDelete) {
-    console.log("Doctor still exists after deletion:", doctorAfterDelete);
-    return next(
-      appError.create(
-        "Doctor account was not deleted from the database",
-        500,
-        httpStatusText.ERROR
-      )
-    );
-  }
-
-  console.log("Doctor deleted successfully");
-
-  // حذف الدكتور من قوائم المفضلين (اختياري)
-  console.log("Removing doctor from favorites...");
-  const favoriteUpdateResult = await Child.updateMany(
-    { favorite: doctorId },
-    { $pull: { favorite: doctorId } }
-  );
-  console.log(
-    "Favorites updated, modified documents:",
-    favoriteUpdateResult.modifiedCount
-  );
-
-  res.json({
-    status: httpStatusText.SUCCESS,
-    message: "Doctor account, appointments, and favorites deleted successfully",
-  });
 });
 
 // ✅ تسجيل الخروج للدكتور
@@ -1273,6 +1305,122 @@ const removeFromFavorite = asyncWrapper(async (req, res, next) => {
   });
 });
 
+// ✅ تعديل الأيام والأوقات المتاحة للدكتور
+const updateAvailability = asyncWrapper(async (req, res, next) => {
+  const doctorId = req.user.id;
+  const { availableDays, availableTimes } = req.body;
+
+  if (req.user.role !== userRoles.DOCTOR) {
+    return next(
+      appError.create(
+        "Unauthorized: Only doctors can update their availability",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  if (!availableDays && !availableTimes) {
+    return next(
+      appError.create(
+        "At least one of availableDays or availableTimes is required",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const doctor = await Doctor.findById(doctorId);
+  if (!doctor) {
+    return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
+  }
+
+  // التحقق من الأيام
+  const validDays = [
+    "Saturday",
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+  ];
+  if (availableDays) {
+    if (!Array.isArray(availableDays)) {
+      return next(
+        appError.create(
+          "availableDays must be an array",
+          400,
+          httpStatusText.FAIL
+        )
+      );
+    }
+    // التحقق من إن مفيش أيام فاضية أو مكررة
+    const trimmedDays = availableDays.map((day) => day.trim());
+    const uniqueDays = [...new Set(trimmedDays)];
+    const invalidDays = uniqueDays.filter(
+      (day) => !validDays.includes(day) || day === ""
+    );
+    if (invalidDays.length > 0) {
+      return next(
+        appError.create(
+          `Invalid days: ${invalidDays.join(
+            ", "
+          )}. Days must be one of: ${validDays.join(", ")}`,
+          400,
+          httpStatusText.FAIL
+        )
+      );
+    }
+    doctor.availableDays = uniqueDays;
+  }
+
+  // التحقق من الأوقات
+  if (availableTimes) {
+    if (!Array.isArray(availableTimes)) {
+      return next(
+        appError.create(
+          "availableTimes must be an array",
+          400,
+          httpStatusText.FAIL
+        )
+      );
+    }
+    const timeFormatRegex = /^(1[0-2]|0?[1-9]):([0-5][0-9]) (AM|PM)$/i;
+    // التحقق من إن مفيش أوقات فاضية أو مكررة
+    const trimmedTimes = availableTimes.map((time) =>
+      time.trim().toUpperCase()
+    );
+    const uniqueTimes = [...new Set(trimmedTimes)];
+    const invalidTimes = uniqueTimes.filter(
+      (time) => !timeFormatRegex.test(time) || time === ""
+    );
+    if (invalidTimes.length > 0) {
+      return next(
+        appError.create(
+          `Invalid times: ${invalidTimes.join(
+            ", "
+          )}. Times must be in the format HH:MM AM/PM (e.g., 9:00 AM)`,
+          400,
+          httpStatusText.FAIL
+        )
+      );
+    }
+    doctor.availableTimes = uniqueTimes;
+  }
+
+  await doctor.save();
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    message: "Availability updated successfully",
+    data: {
+      availableDays: doctor.availableDays,
+      availableTimes: doctor.availableTimes,
+    },
+  });
+});
+
 module.exports = {
   getAllDoctors,
   getSingleDoctor,
@@ -1290,4 +1438,5 @@ module.exports = {
   removeFromFavorite,
   getFavoriteDoctors,
   getChildRecords,
+  updateAvailability,
 };
