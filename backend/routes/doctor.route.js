@@ -149,6 +149,14 @@ router.post(
   doctorController.logoutDoctor
 );
 
+// Route لتعديل الأيام والأوقات المتاحة (جديد)
+router.patch(
+  "/availability",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+  doctorController.updateAvailability
+);
+
 // Route لجلب الحجوزات القادمة (ثابت)
 router.get(
   "/appointments/upcoming",
