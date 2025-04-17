@@ -16,7 +16,6 @@ const getAllDoctors = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
   const userId = req.user.id;
 
-  // التحقق من إن الـ childId مرتبط باليوزر
   const child = await Child.findOne({ _id: childId, parentId: userId });
   if (!child) {
     return next(
@@ -143,7 +142,6 @@ const getSingleDoctor = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // التحقق من إن الـ childId مرتبط باليوزر (إذا كان المستخدم ليس دكتور)
   if (req.user.role !== userRoles.DOCTOR) {
     const child = await Child.findOne({ _id: childId, parentId: userId });
     if (!child) {
@@ -498,7 +496,6 @@ const getFavoriteDoctors = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // التحقق من إن الـ childId مرتبط باليوزر
   const child = await Child.findOne({ _id: childId, parentId: userId });
   if (!child) {
     return next(
@@ -510,7 +507,6 @@ const getFavoriteDoctors = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // جلب الدكاترة الموجودين في قائمة favorite بتاعة الطفل
   const favoriteDoctorIds = child.favorite;
   if (!favoriteDoctorIds || favoriteDoctorIds.length === 0) {
     return next(
@@ -864,7 +860,6 @@ const getChildRecords = asyncWrapper(async (req, res, next) => {
   const { childId } = req.body;
   const doctorId = req.user.id;
 
-  // التحقق من وجود req.user و req.user.id
   if (!req.user || !req.user.id) {
     return next(
       appError.create(
@@ -875,7 +870,6 @@ const getChildRecords = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // التحقق من إن المستخدم دكتور
   if (req.user.role !== userRoles.DOCTOR) {
     return next(
       appError.create(
@@ -886,14 +880,12 @@ const getChildRecords = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // التحقق من إن doctorId صالح كـ ObjectId
   if (!mongoose.Types.ObjectId.isValid(doctorId)) {
     return next(
       appError.create("Invalid Doctor ID in token", 400, httpStatusText.FAIL)
     );
   }
 
-  // التحقق من إن childId موجود في الـ Body
   if (!childId) {
     return next(
       appError.create(
@@ -904,25 +896,21 @@ const getChildRecords = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // التحقق من إن childId صالح كـ ObjectId
   if (!mongoose.Types.ObjectId.isValid(childId)) {
     return next(appError.create("Invalid Child ID", 400, httpStatusText.FAIL));
   }
 
-  // التحقق من إن الطفل موجود
   const child = await Child.findById(childId);
   if (!child) {
     return next(appError.create("Child not found", 404, httpStatusText.FAIL));
   }
 
-  // جلب السجل الطبي (History)
   const medicalHistory = await History.find({ childId })
     .select(
       "diagnosis disease treatment notes date time doctorName notesImage createdAt updatedAt"
     )
     .sort({ date: -1 });
 
-  // جلب بيانات النمو (Growth)
   const growthRecords = await Growth.find({ childId })
     .select(
       "weight height headCircumference date time notes notesImage ageInMonths createdAt updatedAt"
@@ -1053,14 +1041,31 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
 // ✅ حذف الأكونت بتاع الدكتور (مع مسح الـ Token)
 const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
+  const doctorEmail = req.user.email; // بنستخدم الإيميل من الـ Token عشان نتأكد
 
+  console.log("Starting deleteDoctorProfile...");
+  console.log("Doctor ID from token:", doctorId);
+  console.log("Doctor Email from token:", doctorEmail);
+
+  // التحقق من وجود doctorId
   if (!doctorId) {
+    console.log("No doctorId found in token");
     return next(
       appError.create("User ID not found in token", 401, httpStatusText.FAIL)
     );
   }
 
+  // التحقق من إن doctorId صالح كـ ObjectId
+  if (!mongoose.Types.ObjectId.isValid(doctorId)) {
+    console.log("Invalid doctorId format:", doctorId);
+    return next(
+      appError.create("Invalid Doctor ID in token", 400, httpStatusText.FAIL)
+    );
+  }
+
+  // التحقق من إن المستخدم دكتور
   if (req.user.role !== userRoles.DOCTOR) {
+    console.log("User is not a doctor, role:", req.user.role);
     return next(
       appError.create(
         "Unauthorized: Only doctors can delete their profile",
@@ -1070,21 +1075,86 @@ const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
     );
   }
 
+  // جلب الدكتور بناءً على الـ ID
   const doctor = await Doctor.findById(doctorId);
   if (!doctor) {
+    console.log("Doctor not found in database with ID:", doctorId);
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
   }
 
-  // مسح الـ Token قبل الحذف
+  console.log("Doctor found:", doctor.email);
+
+  // التحقق من إن الإيميل في الـ Token مطابق للإيميل بتاع الدكتور
+  if (doctor.email !== doctorEmail) {
+    console.log(
+      "Email mismatch! Token email:",
+      doctorEmail,
+      "Doctor email:",
+      doctor.email
+    );
+    return next(
+      appError.create("Unauthorized: Email mismatch", 403, httpStatusText.FAIL)
+    );
+  }
+
+  // مسح الـ Token
+  console.log("Clearing doctor token...");
   doctor.token = null;
   await doctor.save();
+  console.log("Token cleared successfully");
 
-  // حذف الأكونت
-  await Doctor.deleteOne({ _id: doctorId });
+  // حذف أي مواعيد مرتبطة بالدكتور
+  console.log("Deleting appointments for doctorId:", doctorId);
+  const appointmentDeleteResult = await Appointment.deleteMany({ doctorId });
+  console.log(
+    "Appointments deleted:",
+    appointmentDeleteResult.deletedCount,
+    "appointments"
+  );
+
+  // حذف الدكتور باستخدام findByIdAndDelete
+  console.log("Deleting doctor with ID:", doctorId);
+  const deletedDoctor = await Doctor.findByIdAndDelete(doctorId);
+  if (!deletedDoctor) {
+    console.log("Failed to delete doctor: No doctor found during deletion");
+    return next(
+      appError.create(
+        "Failed to delete doctor account",
+        500,
+        httpStatusText.ERROR
+      )
+    );
+  }
+
+  // التحقق من إن الدكتور فعلاً اتمسح
+  const doctorAfterDelete = await Doctor.findById(doctorId);
+  if (doctorAfterDelete) {
+    console.log("Doctor still exists after deletion:", doctorAfterDelete);
+    return next(
+      appError.create(
+        "Doctor account was not deleted from the database",
+        500,
+        httpStatusText.ERROR
+      )
+    );
+  }
+
+  console.log("Doctor deleted successfully");
+
+  // حذف الدكتور من قوائم المفضلين (اختياري)
+  console.log("Removing doctor from favorites...");
+  const favoriteUpdateResult = await Child.updateMany(
+    { favorite: doctorId },
+    { $pull: { favorite: doctorId } }
+  );
+  console.log(
+    "Favorites updated, modified documents:",
+    favoriteUpdateResult.modifiedCount
+  );
 
   res.json({
     status: httpStatusText.SUCCESS,
-    message: "Doctor account deleted successfully",
+    message: "Doctor account, appointments, and favorites deleted successfully",
   });
 });
 
