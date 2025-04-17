@@ -2,8 +2,8 @@ const Doctor = require("../models/doctor.model");
 const User = require("../models/user.model");
 const Appointment = require("../models/appointment.model");
 const Child = require("../models/child.model");
-const History = require("../models/history.model"); // إضافة موديل الـ History
-const Growth = require("../models/growth.model"); // إضافة موديل الـ Growth
+const History = require("../models/history.model");
+const Growth = require("../models/growth.model");
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
@@ -61,7 +61,7 @@ const getAllDoctors = asyncWrapper(async (req, res, next) => {
           about: doctor.about,
           rate: doctor.rate,
           status: "Closed",
-          isFavorite: child.favorite.includes(doctor._id), // إضافة حالة إن الدكتور ده مفضل عند الطفل
+          isFavorite: child.favorite.includes(doctor._id),
         };
       }
 
@@ -224,7 +224,7 @@ const getSingleDoctor = asyncWrapper(async (req, res, next) => {
         date: appointment.date,
         time: appointment.time,
       })),
-      isFavorite: child ? child.favorite.includes(doctor._id) : false, // إضافة حالة إن الدكتور مفضل عند الطفل
+      isFavorite: child ? child.favorite.includes(doctor._id) : false,
     },
   });
 });
@@ -407,7 +407,7 @@ const getUserAppointments = asyncWrapper(async (req, res, next) => {
       appointmentId: appointment._id,
       childId: appointment.childId._id,
       childName: appointment.childId.name,
-      doctorId: appointment.doctorId._id, // إضافة doctorId هنا
+      doctorId: appointment.doctorId._id,
       doctorName: `${appointment.doctorId.firstName} ${appointment.doctorId.lastName}`,
       doctorAvatar: appointment.doctorId.avatar,
       doctorAddress: appointment.doctorId.address,
@@ -555,7 +555,7 @@ const getFavoriteDoctors = asyncWrapper(async (req, res, next) => {
           about: doctor.about,
           rate: doctor.rate,
           status: "Closed",
-          isFavorite: true, // الدكتور بالفعل في المفضلة
+          isFavorite: true,
         };
       }
 
@@ -785,7 +785,6 @@ const deleteAppointment = asyncWrapper(async (req, res, next) => {
 
 // ✅ جلب كل الحجوزات القادمة للدكتور
 const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
-  // التحقق من وجود req.user و req.user.id
   if (!req.user || !req.user.id) {
     return next(
       appError.create(
@@ -798,7 +797,6 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
 
   const doctorId = req.user.id;
 
-  // التحقق من إن doctorId صالح كـ ObjectId
   if (!mongoose.Types.ObjectId.isValid(doctorId)) {
     return next(
       appError.create("Invalid Doctor ID in token", 400, httpStatusText.FAIL)
@@ -917,35 +915,19 @@ const getChildRecords = asyncWrapper(async (req, res, next) => {
     return next(appError.create("Child not found", 404, httpStatusText.FAIL));
   }
 
-  // التحقق من إن الدكتور ليه صلاحية يشوف بيانات الطفل (لازم يكون عنده موعد مع الطفل)
-  const appointment = await Appointment.findOne({
-    doctorId,
-    childId,
-  });
-
-  if (!appointment) {
-    return next(
-      appError.create(
-        "Unauthorized: No appointment found for this child with this doctor",
-        403,
-        httpStatusText.FAIL
-      )
-    );
-  }
-
   // جلب السجل الطبي (History)
   const medicalHistory = await History.find({ childId })
     .select(
       "diagnosis disease treatment notes date time doctorName notesImage createdAt updatedAt"
     )
-    .sort({ date: -1 }); // ترتيب السجل الطبي حسب التاريخ (الأحدث أولاً)
+    .sort({ date: -1 });
 
   // جلب بيانات النمو (Growth)
   const growthRecords = await Growth.find({ childId })
     .select(
       "weight height headCircumference date time notes notesImage ageInMonths createdAt updatedAt"
     )
-    .sort({ date: -1 }); // ترتيب بيانات النمو حسب التاريخ (الأحدث أولاً)
+    .sort({ date: -1 });
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -1065,6 +1047,44 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
       availableTimes: doctor.availableTimes,
       created_at: doctor.created_at,
     },
+  });
+});
+
+// ✅ حذف الأكونت بتاع الدكتور (مع مسح الـ Token)
+const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
+  const doctorId = req.user.id;
+
+  if (!doctorId) {
+    return next(
+      appError.create("User ID not found in token", 401, httpStatusText.FAIL)
+    );
+  }
+
+  if (req.user.role !== userRoles.DOCTOR) {
+    return next(
+      appError.create(
+        "Unauthorized: Only doctors can delete their profile",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const doctor = await Doctor.findById(doctorId);
+  if (!doctor) {
+    return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
+  }
+
+  // مسح الـ Token قبل الحذف
+  doctor.token = null;
+  await doctor.save();
+
+  // حذف الأكونت
+  await Doctor.deleteOne({ _id: doctorId });
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    message: "Doctor account deleted successfully",
   });
 });
 
@@ -1194,9 +1214,10 @@ module.exports = {
   getUpcomingAppointments,
   getDoctorProfile,
   updateDoctorProfile,
+  deleteDoctorProfile,
   logoutDoctor,
   addToFavorite,
   removeFromFavorite,
   getFavoriteDoctors,
-  getChildRecords, // إضافة الدالة الجديدة للـ exports
+  getChildRecords,
 };
