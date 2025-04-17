@@ -1,7 +1,9 @@
 const Doctor = require("../models/doctor.model");
 const User = require("../models/user.model");
 const Appointment = require("../models/appointment.model");
-const Child = require("../models/child.model"); // إضافة موديل الـ Child
+const Child = require("../models/child.model");
+const History = require("../models/history.model"); // إضافة موديل الـ History
+const Growth = require("../models/growth.model"); // إضافة موديل الـ Growth
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
@@ -481,7 +483,6 @@ const updateAppointmentStatus = asyncWrapper(async (req, res, next) => {
   });
 });
 
-
 // ✅ جلب الدكاترة المفضلين مع childId في الـ Path
 const getFavoriteDoctors = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
@@ -800,11 +801,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
   // التحقق من إن doctorId صالح كـ ObjectId
   if (!mongoose.Types.ObjectId.isValid(doctorId)) {
     return next(
-      appError.create(
-        "Invalid Doctor ID in token",
-        400,
-        httpStatusText.FAIL
-      )
+      appError.create("Invalid Doctor ID in token", 400, httpStatusText.FAIL)
     );
   }
 
@@ -860,6 +857,101 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
         upcomingCount: upcomingCount,
       },
       appointments: upcomingAppointments,
+    },
+  });
+});
+
+// ✅ جلب السجل الطبي وبيانات النمو بتاعة الطفل (بياخد childId من الـ Body)
+const getChildRecords = asyncWrapper(async (req, res, next) => {
+  const { childId } = req.body;
+  const doctorId = req.user.id;
+
+  // التحقق من وجود req.user و req.user.id
+  if (!req.user || !req.user.id) {
+    return next(
+      appError.create(
+        "Unauthorized: User ID not found in token",
+        401,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  // التحقق من إن المستخدم دكتور
+  if (req.user.role !== userRoles.DOCTOR) {
+    return next(
+      appError.create(
+        "Unauthorized: Only doctors can access child records",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  // التحقق من إن doctorId صالح كـ ObjectId
+  if (!mongoose.Types.ObjectId.isValid(doctorId)) {
+    return next(
+      appError.create("Invalid Doctor ID in token", 400, httpStatusText.FAIL)
+    );
+  }
+
+  // التحقق من إن childId موجود في الـ Body
+  if (!childId) {
+    return next(
+      appError.create(
+        "Child ID is required in the body",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  // التحقق من إن childId صالح كـ ObjectId
+  if (!mongoose.Types.ObjectId.isValid(childId)) {
+    return next(appError.create("Invalid Child ID", 400, httpStatusText.FAIL));
+  }
+
+  // التحقق من إن الطفل موجود
+  const child = await Child.findById(childId);
+  if (!child) {
+    return next(appError.create("Child not found", 404, httpStatusText.FAIL));
+  }
+
+  // التحقق من إن الدكتور ليه صلاحية يشوف بيانات الطفل (لازم يكون عنده موعد مع الطفل)
+  const appointment = await Appointment.findOne({
+    doctorId,
+    childId,
+  });
+
+  if (!appointment) {
+    return next(
+      appError.create(
+        "Unauthorized: No appointment found for this child with this doctor",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  // جلب السجل الطبي (History)
+  const medicalHistory = await History.find({ childId })
+    .select(
+      "diagnosis disease treatment notes date time doctorName notesImage createdAt updatedAt"
+    )
+    .sort({ date: -1 }); // ترتيب السجل الطبي حسب التاريخ (الأحدث أولاً)
+
+  // جلب بيانات النمو (Growth)
+  const growthRecords = await Growth.find({ childId })
+    .select(
+      "weight height headCircumference date time notes notesImage ageInMonths createdAt updatedAt"
+    )
+    .sort({ date: -1 }); // ترتيب بيانات النمو حسب التاريخ (الأحدث أولاً)
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: {
+      medicalHistory,
+      growthRecords,
     },
   });
 });
@@ -1106,4 +1198,5 @@ module.exports = {
   addToFavorite,
   removeFromFavorite,
   getFavoriteDoctors,
+  getChildRecords, // إضافة الدالة الجديدة للـ exports
 };
