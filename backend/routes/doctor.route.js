@@ -35,6 +35,14 @@ router.get(
   doctorController.getUpcomingAppointments
 );
 
+// Route لجلب السجل الطبي وبيانات النمو بتاعة الطفل (ثابت، بياخد childId من الـ Body)
+router.post(
+  "/child/records",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+  doctorController.getChildRecords
+);
+
 // Route لتحديث حالة الحجز (يحتوي على appointmentId)
 router.patch(
   "/appointments/:appointmentId/status",
