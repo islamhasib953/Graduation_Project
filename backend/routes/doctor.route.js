@@ -135,6 +135,11 @@ router
     verifyToken,
     allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
     doctorController.updateDoctorProfile
+  )
+  .delete(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+    doctorController.deleteDoctorProfile
   );
 
 router.post(
