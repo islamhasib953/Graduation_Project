@@ -78,15 +78,15 @@ router.post(
   usersController.logoutUser
 );
 
-router
-  .route("/:userId")
-  .get(verifyToken, checkOwnership, usersController.getUserById)
-  .patch(
-    verifyToken,
-    checkOwnership,
-    validateUpdateUser,
-    usersController.updateUser
-  )
-  .delete(verifyToken, checkOwnership, usersController.deleteUser);
+// router
+//   .route("/:userId")
+//   .get(verifyToken, checkOwnership, usersController.getUserById)
+//   .patch(
+//     verifyToken,
+//     checkOwnership,
+//     validateUpdateUser,
+//     usersController.updateUser
+//   )
+//   .delete(verifyToken, checkOwnership, usersController.deleteUser);
 
 module.exports = router;

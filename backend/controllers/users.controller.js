@@ -14,18 +14,19 @@ const getAllUsers = asyncWrapper(async (req, res) => {
   res.json({ status: httpStatusText.SUCCESS, data: { users } });
 });
 
-// Get a single user by ID
-const getUserById = asyncWrapper(async (req, res, next) => {
-  const { userId } = req.params;
 
-  const user = await User.findById(userId);
+// // Get a single user by ID
+// const getUserById = asyncWrapper(async (req, res, next) => {
+//   const { userId } = req.params;
 
-  if (!user) {
-    return next(appError.create("User not found", 404, httpStatusText.FAIL));
-  }
+//   const user = await User.findById(userId);
 
-  res.json({ status: httpStatusText.SUCCESS, data: { user } });
-});
+//   if (!user) {
+//     return next(appError.create("User not found", 404, httpStatusText.FAIL));
+//   }
+
+//   res.json({ status: httpStatusText.SUCCESS, data: { user } });
+// });
 
 // ✅ جلب بيانات اليوزر (Profile)
 const getUserProfile = asyncWrapper(async (req, res, next) => {
@@ -409,55 +410,55 @@ const loginUser = asyncWrapper(async (req, res, next) => {
 });
 
 // Update user details
-const updateUser = asyncWrapper(async (req, res, next) => {
-  const { userId } = req.params;
-  const { firstName, lastName, gender, phone, address, password, avatar } =
-    req.body;
+// const updateUser = asyncWrapper(async (req, res, next) => {
+//   const { userId } = req.params;
+//   const { firstName, lastName, gender, phone, address, password, avatar } =
+//     req.body;
 
-  let updateData = { firstName, lastName, gender, phone, address };
+//   let updateData = { firstName, lastName, gender, phone, address };
 
-  if (password) {
-    const hashedPassword = await bcrypt.hash(password, 12);
-    updateData.password = hashedPassword;
-  }
+//   if (password) {
+//     const hashedPassword = await bcrypt.hash(password, 12);
+//     updateData.password = hashedPassword;
+//   }
 
-  if (req.file) {
-    updateData.avatar = req.file.filename;
-  }
+//   if (req.file) {
+//     updateData.avatar = req.file.filename;
+//   }
 
-  const updatedUser = await User.findByIdAndUpdate(userId, updateData, {
-    new: true,
-  });
+//   const updatedUser = await User.findByIdAndUpdate(userId, updateData, {
+//     new: true,
+//   });
 
-  if (!updatedUser) {
-    return next(appError.create("User not found", 404, httpStatusText.FAIL));
-  }
+//   if (!updatedUser) {
+//     return next(appError.create("User not found", 404, httpStatusText.FAIL));
+//   }
 
-  res.json({ status: httpStatusText.SUCCESS, data: { user: updatedUser } });
-});
+//   res.json({ status: httpStatusText.SUCCESS, data: { user: updatedUser } });
+// });
 
-// Delete a user
-const deleteUser = asyncWrapper(async (req, res, next) => {
-  const { userId } = req.params;
-  const deletedUser = await User.findByIdAndDelete(userId);
+// // Delete a user
+// const deleteUser = asyncWrapper(async (req, res, next) => {
+//   const { userId } = req.params;
+//   const deletedUser = await User.findByIdAndDelete(userId);
 
-  if (!deletedUser) {
-    return next(appError.create("User not found", 404, httpStatusText.FAIL));
-  }
+//   if (!deletedUser) {
+//     return next(appError.create("User not found", 404, httpStatusText.FAIL));
+//   }
 
-  res.json({
-    status: httpStatusText.SUCCESS,
-    message: "User deleted successfully",
-  });
-});
+//   res.json({
+//     status: httpStatusText.SUCCESS,
+//     message: "User deleted successfully",
+//   });
+// });
 
 module.exports = {
   getAllUsers,
   registerUser,
   loginUser,
-  getUserById,
-  updateUser,
-  deleteUser,
+  // getUserById,
+  // updateUser,
+  // deleteUser,
   getUserProfile,
   updateUserProfile,
   deleteUserProfile,
