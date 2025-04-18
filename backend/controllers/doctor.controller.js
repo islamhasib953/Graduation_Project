@@ -227,6 +227,7 @@ const getSingleDoctor = asyncWrapper(async (req, res, next) => {
   });
 });
 
+
 // ✅ حجز موعد مع دكتور (مع childId في الـ Path)
 const bookAppointment = asyncWrapper(async (req, res, next) => {
   const { doctorId, childId } = req.params;
@@ -779,6 +780,7 @@ const deleteAppointment = asyncWrapper(async (req, res, next) => {
   });
 });
 
+
 // ✅ جلب كل الحجوزات القادمة للدكتور
 const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
   if (!req.user || !req.user.id) {
@@ -817,19 +819,88 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
   }
 
   const today = moment().startOf("day").toDate();
-  const appointments = await Appointment.find({
-    doctorId,
-    date: { $gte: today },
-    status: { $ne: "Closed" }, // استبعاد المواعيد اللي status بتاعها REFUSED (Closed)
-  })
-    .populate("userId", "firstName lastName")
-    .populate("childId", "name")
-    .select("userId childId date time visitType status")
-    .sort({ 
-      // ترتيب المواعيد
-      status: 1, // PENDING (0) قبل ACCEPTED (1)
-      date: 1 // ترتيب حسب التاريخ تصاعدي
-    });
+
+  // استخدام Aggregation Pipeline للترتيب المطلوب
+  const appointments = await Appointment.aggregate([
+    // الشرط الأساسي: doctorId، التاريخ من اليوم وما بعد، واستبعاد Closed
+    {
+      $match: {
+        doctorId: mongoose.Types.ObjectId(doctorId),
+        date: { $gte: today },
+        status: { $ne: "Closed" },
+      },
+    },
+    // Populate userId و childId
+    {
+      $lookup: {
+        from: "users",
+        localField: "userId",
+        foreignField: "_id",
+        as: "userId",
+      },
+    },
+    {
+      $unwind: "$userId",
+    },
+    {
+      $lookup: {
+        from: "children",
+        localField: "childId",
+        foreignField: "_id",
+        as: "childId",
+      },
+    },
+    {
+      $unwind: "$childId",
+    },
+    // إنشاء حقل مؤقت لتحويل date و time إلى تاريخ كامل للـ Accepted
+    {
+      $addFields: {
+        appointmentDateTime: {
+          $cond: {
+            if: { $eq: ["$status", "Accepted"] },
+            then: {
+              $dateFromString: {
+                dateString: {
+                  $concat: [
+                    { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
+                    "T",
+                    "$time",
+                  ],
+                },
+                format: "%Y-%m-%dT%H:%M %p",
+              },
+            },
+            else: "$created_at", // للـ Pending، استخدم created_at
+          },
+        },
+      },
+    },
+    // الترتيب
+    {
+      $sort: {
+        status: 1, // Pending قبل Accepted
+        appointmentDateTime: 1, // Pending حسب created_at، Accepted حسب date+time
+      },
+    },
+    // اختيار الحقول المطلوبة
+    {
+      $project: {
+        userId: {
+          firstName: "$userId.firstName",
+          lastName: "$userId.lastName",
+        },
+        childId: {
+          name: "$childId.name",
+        },
+        date: 1,
+        time: 1,
+        visitType: 1,
+        status: 1,
+        _id: 1,
+      },
+    },
+  ]);
 
   const upcomingCount = appointments.length;
 
