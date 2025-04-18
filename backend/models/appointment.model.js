@@ -33,6 +33,10 @@ const appointmentSchema = new mongoose.Schema({
     enum: ["Pending", "Accepted", "Closed"],
     default: "Pending",
   },
+    created_at: {
+    type: Date,
+    default: Date.now,
+  }
 });
 
 module.exports = mongoose.model("Appointment", appointmentSchema);
