@@ -26,7 +26,7 @@ const memoryRoutes = require("./routes/memory.route");
 const vaccinationRoutes = require("./routes/vaccination.route");
 const growthRoutes = require("./routes/growth.route");
 const doctorRoutes = require("./routes/doctor.route"); // أضفنا الـ doctorRoutes
-
+const predictRoutes = require("./routes/predict.route");
 // 2. إعدادات أساسية
 dotenv.config({ path: "./.env" });
 const app = express();
@@ -71,6 +71,8 @@ app.use("/api/vaccinations", vaccinationRoutes);
 app.use("/api/growth", growthRoutes);
 app.use("/api/doctors", doctorRoutes); // أضفنا الـ doctorRoutes هنا
 
+app.use("/api/predict", predictRoutes); // إضافة predict route
+
 // 6. Middleware للـ Routes الغير موجودة (Not Found)
 app.all("*", (req, res) => {
   return res.status(404).json({
@@ -91,3 +93,8 @@ app.use((error, req, res, next) => {
 
 // 8. تصدير الـ App
 module.exports = app;
+
+//ai, community, sensors, الحاجات التعلقة باليوزر وى ال logout
+//تعديلات اللى عند عبيد
+//user
+// استخدم ال api بتاع logout عند عبيد 

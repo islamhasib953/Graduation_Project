@@ -1,11 +1,12 @@
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const User = require("../models/user.model");
-const Doctor = require("../models/doctor.model"); // أضفنا موديل الدكتور
+const Doctor = require("../models/doctor.model");
 const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
 const bcrypt = require("bcryptjs");
 const genrateJWT = require("../utils/genrate.JWT");
-const userRoles = require("../utils/userRoles"); // أضفنا userRoles
+const userRoles = require("../utils/userRoles");
+const mongoose = require("mongoose");
 
 // Get all users
 const getAllUsers = asyncWrapper(async (req, res) => {
@@ -13,9 +14,77 @@ const getAllUsers = asyncWrapper(async (req, res) => {
   res.json({ status: httpStatusText.SUCCESS, data: { users } });
 });
 
-// Get a single user by ID
-const getUserById = asyncWrapper(async (req, res, next) => {
-  const { userId } = req.params;
+
+// // Get a single user by ID
+// const getUserById = asyncWrapper(async (req, res, next) => {
+//   const { userId } = req.params;
+
+//   const user = await User.findById(userId);
+
+//   if (!user) {
+//     return next(appError.create("User not found", 404, httpStatusText.FAIL));
+//   }
+
+//   res.json({ status: httpStatusText.SUCCESS, data: { user } });
+// });
+
+// ✅ جلب بيانات اليوزر (Profile)
+const getUserProfile = asyncWrapper(async (req, res, next) => {
+  const userId = req.user.id;
+
+  if (!userId) {
+    return next(
+      appError.create("User ID not found in token", 401, httpStatusText.FAIL)
+    );
+  }
+
+  if (req.user.role !== userRoles.PATIENT) {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can view their profile",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const user = await User.findById(userId).select("-password -token");
+
+  if (!user) {
+    return next(appError.create("User not found", 404, httpStatusText.FAIL));
+  }
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: {
+      firstName: user.firstName,
+      lastName: user.lastName,
+      gender: user.gender,
+      phone: user.phone,
+      address: user.address,
+      email: user.email,
+      role: user.role,
+      avatar: user.avatar,
+      favorite: user.favorite,
+      created_at: user.created_at,
+    },
+  });
+});
+
+// ✅ تعديل بيانات اليوزر (Profile)
+const updateUserProfile = asyncWrapper(async (req, res, next) => {
+  const userId = req.user.id;
+  const { firstName, lastName, email, phone, address } = req.body;
+
+  if (req.user.role !== userRoles.PATIENT) {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can update their profile",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
 
   const user = await User.findById(userId);
 
@@ -23,9 +92,132 @@ const getUserById = asyncWrapper(async (req, res, next) => {
     return next(appError.create("User not found", 404, httpStatusText.FAIL));
   }
 
-  res.json({ status: httpStatusText.SUCCESS, data: { user } });
+  if (firstName) user.firstName = firstName;
+  if (lastName) user.lastName = lastName;
+  if (email) user.email = email;
+  if (phone) user.phone = phone;
+  if (address) user.address = address;
+
+  await user.save();
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    message: "Profile updated successfully",
+    data: {
+      firstName: user.firstName,
+      lastName: user.lastName,
+      gender: user.gender,
+      phone: user.phone,
+      address: user.address,
+      email: user.email,
+      role: user.role,
+      avatar: user.avatar,
+      favorite: user.favorite,
+      created_at: user.created_at,
+    },
+  });
 });
 
+// ✅ حذف الأكونت بتاع اليوزر (مع مسح الـ Token)
+const deleteUserProfile = asyncWrapper(async (req, res, next) => {
+  const userId = req.user.id;
+  const userEmail = req.user.email;
+
+  if (!userId) {
+    return next(
+      appError.create("User ID not found in token", 401, httpStatusText.FAIL)
+    );
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    return next(
+      appError.create("Invalid User ID in token", 400, httpStatusText.FAIL)
+    );
+  }
+
+  if (req.user.role !== userRoles.PATIENT) {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can delete their profile",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    return next(appError.create("User not found", 404, httpStatusText.FAIL));
+  }
+
+  if (user.email !== userEmail) {
+    return next(
+      appError.create("Unauthorized: Email mismatch", 403, httpStatusText.FAIL)
+    );
+  }
+
+  // استخدام Transaction للتأكد من إن كل العمليات بتتم مع بعض
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    user.token = null;
+    await user.save({ session });
+
+    const deleteResult = await User.deleteOne({ _id: userId }, { session });
+    if (deleteResult.deletedCount === 0) {
+      throw new Error("Failed to delete user account");
+    }
+
+    // Commit الـ Transaction
+    await session.commitTransaction();
+
+    res.json({
+      status: httpStatusText.SUCCESS,
+      message: "User account deleted successfully",
+    });
+  } catch (error) {
+    // Rollback الـ Transaction لو حصل أي خطأ
+    await session.abortTransaction();
+    return next(
+      appError.create(
+        error.message || "Failed to delete user account",
+        500,
+        httpStatusText.ERROR
+      )
+    );
+  } finally {
+    session.endSession();
+  }
+});
+
+// ✅ تسجيل الخروج لليوزر
+const logoutUser = asyncWrapper(async (req, res, next) => {
+  const userId = req.user.id;
+
+  if (req.user.role !== userRoles.PATIENT) {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can logout",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    return next(appError.create("User not found", 404, httpStatusText.FAIL));
+  }
+
+  user.token = null;
+  await user.save();
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    message: "Logged out successfully",
+  });
+});
 
 // Register New User or Doctor
 const registerUser = asyncWrapper(async (req, res, next) => {
@@ -37,7 +229,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
     address,
     email,
     password,
-    role, // استخدمنا role بدل accountType
+    role,
     specialise,
     about,
     rate,
@@ -45,7 +237,6 @@ const registerUser = asyncWrapper(async (req, res, next) => {
     availableTimes,
   } = req.body;
 
-  // التحقق إن الإيميل مش مستخدم قبل كده في أي موديل (User أو Doctor)
   const oldUser = await User.findOne({ email });
   const oldDoctor = await Doctor.findOne({ email });
   if (oldUser || oldDoctor) {
@@ -57,10 +248,8 @@ const registerUser = asyncWrapper(async (req, res, next) => {
     return next(error);
   }
 
-  // هاش الباسورد
   const hashedPassword = await bcrypt.hash(password, 12);
 
-  // بناءً على role، هنحدد الموديل اللي هنستخدمه
   if (role === userRoles.DOCTOR) {
     const newDoctor = new Doctor({
       firstName,
@@ -70,7 +259,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       address,
       email,
       password: hashedPassword,
-      role: userRoles.DOCTOR, // التأكد إن الـ role بيتحدد هنا
+      role: userRoles.DOCTOR,
       specialise,
       about,
       rate,
@@ -79,7 +268,6 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       avatar: req.file ? req.file.filename : "uploads/doctor.jpg",
     });
 
-    // إنشاء توكن للدكتور
     const token = await genrateJWT(
       {
         email: newDoctor.email,
@@ -90,10 +278,8 @@ const registerUser = asyncWrapper(async (req, res, next) => {
     );
     newDoctor.token = token;
 
-    // حفظ الدكتور
     await newDoctor.save();
 
-    // تنظيم الـ Response عشان يرجع البيانات المطلوبة فقط
     const doctorData = {
       _id: newDoctor._id,
       firstName: newDoctor.firstName,
@@ -102,7 +288,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       phone: newDoctor.phone,
       address: newDoctor.address,
       email: newDoctor.email,
-      role: newDoctor.role, // التأكد إن الـ role بيترجع هنا
+      role: newDoctor.role,
       specialise: newDoctor.specialise,
       about: newDoctor.about,
       rate: newDoctor.rate,
@@ -127,11 +313,10 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       address,
       email,
       password: hashedPassword,
-      role: userRoles.PATIENT, // التأكد إن الـ role بيتحدد هنا
+      role: userRoles.PATIENT,
       avatar: req.file ? req.file.filename : "uploads/profile.jpg",
     });
 
-    // إنشاء توكن لليوزر
     const token = await genrateJWT(
       {
         email: newUser.email,
@@ -142,10 +327,8 @@ const registerUser = asyncWrapper(async (req, res, next) => {
     );
     newUser.token = token;
 
-    // حفظ اليوزر
     await newUser.save();
 
-    // تنظيم الـ Response عشان يرجع البيانات المطلوبة فقط
     const userData = {
       _id: newUser._id,
       firstName: newUser.firstName,
@@ -154,7 +337,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       phone: newUser.phone,
       address: newUser.address,
       email: newUser.email,
-      role: newUser.role, // التأكد إن الـ role بيترجع هنا
+      role: newUser.role,
       avatar: newUser.avatar,
       favorite: newUser.favorite,
       created_at: newUser.created_at,
@@ -181,16 +364,15 @@ const loginUser = asyncWrapper(async (req, res, next) => {
     return next(error);
   }
 
-  // التحقق من الإيميل في موديل اليوزر أو الدكتور
   let user = await User.findOne({ email });
   let role;
 
   if (user) {
-    role = user.role; // جلب الـ role من الـ Schema مباشرة
+    role = user.role;
   } else {
     user = await Doctor.findOne({ email });
     if (user) {
-      role = user.role; // جلب الـ role من الـ Schema مباشرة
+      role = user.role;
     }
   }
 
@@ -201,7 +383,6 @@ const loginUser = asyncWrapper(async (req, res, next) => {
 
   const isPasswordCorrect = await bcrypt.compare(password, user.password);
   if (isPasswordCorrect && user) {
-    // إنشاء توكن
     const token = await genrateJWT(
       {
         email: user.email,
@@ -215,7 +396,7 @@ const loginUser = asyncWrapper(async (req, res, next) => {
       status: httpStatusText.SUCCESS,
       data: {
         token: token,
-        role: role, // التأكد إن الـ role بيترجع هنا
+        role: role,
       },
     });
   } else {
@@ -228,58 +409,58 @@ const loginUser = asyncWrapper(async (req, res, next) => {
   }
 });
 
-
 // Update user details
-const updateUser = asyncWrapper(async (req, res, next) => {
-  const { userId } = req.params;
-  const { firstName, lastName, gender, phone, address, password, avatar } =
-    req.body;
+// const updateUser = asyncWrapper(async (req, res, next) => {
+//   const { userId } = req.params;
+//   const { firstName, lastName, gender, phone, address, password, avatar } =
+//     req.body;
 
-  let updateData = { firstName, lastName, gender, phone, address };
+//   let updateData = { firstName, lastName, gender, phone, address };
 
-  // If a new password is provided, hash it before updating
-  if (password) {
-    const hashedPassword = await bcrypt.hash(password, 12);
-    updateData.password = hashedPassword;
-  }
+//   if (password) {
+//     const hashedPassword = await bcrypt.hash(password, 12);
+//     updateData.password = hashedPassword;
+//   }
 
-  // Handle avatar update if a file is uploaded
-  if (req.file) {
-    updateData.avatar = req.file.filename;
-  }
+//   if (req.file) {
+//     updateData.avatar = req.file.filename;
+//   }
 
-  const updatedUser = await User.findByIdAndUpdate(userId, updateData, {
-    new: true,
-  });
+//   const updatedUser = await User.findByIdAndUpdate(userId, updateData, {
+//     new: true,
+//   });
 
-  if (!updatedUser) {
-    return next(appError.create("User not found", 404, httpStatusText.FAIL));
-  }
+//   if (!updatedUser) {
+//     return next(appError.create("User not found", 404, httpStatusText.FAIL));
+//   }
 
-  res.json({ status: httpStatusText.SUCCESS, data: { user: updatedUser } });
-});
+//   res.json({ status: httpStatusText.SUCCESS, data: { user: updatedUser } });
+// });
 
-// Delete a user
-const deleteUser = asyncWrapper(async (req, res, next) => {
-  const { userId } = req.params;
-  const deletedUser = await User.findByIdAndDelete(userId);
+// // Delete a user
+// const deleteUser = asyncWrapper(async (req, res, next) => {
+//   const { userId } = req.params;
+//   const deletedUser = await User.findByIdAndDelete(userId);
 
-  if (!deletedUser) {
-    return next(appError.create("User not found", 404, httpStatusText.FAIL));
-  }
+//   if (!deletedUser) {
+//     return next(appError.create("User not found", 404, httpStatusText.FAIL));
+//   }
 
-  res.json({
-    status: httpStatusText.SUCCESS,
-    message: "User deleted successfully",
-  });
-});
+//   res.json({
+//     status: httpStatusText.SUCCESS,
+//     message: "User deleted successfully",
+//   });
+// });
 
 module.exports = {
   getAllUsers,
   registerUser,
   loginUser,
-  getUserById,
-  updateUser,
-  deleteUser,
+  // getUserById,
+  // updateUser,
+  // deleteUser,
+  getUserProfile,
+  updateUserProfile,
+  deleteUserProfile,
+  logoutUser,
 };
-//***** */
