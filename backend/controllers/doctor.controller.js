@@ -825,7 +825,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
     // الشرط الأساسي: doctorId، التاريخ من اليوم وما بعد، واستبعاد Closed
     {
       $match: {
-        doctorId: new mongoose.Types.ObjectId(doctorId), // إصلاح الخطأ باستخدام new
+        doctorId: new mongoose.Types.ObjectId(doctorId),
         date: { $gte: today },
         status: { $ne: "Closed" },
       },
@@ -842,7 +842,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
             $project: {
               firstName: 1,
               lastName: 1,
-              address: 1, // جلب حقل address من User
+              address: 1,
             },
           },
         ],
@@ -877,7 +877,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
                     "$time",
                   ],
                 },
-                format: "%Y-%m-%dT%H:%M %p",
+                format: "%Y-%m-%dT%H:%M", // تعديل الـ format لصيغة 24 ساعة
               },
             },
             else: "$created_at", // للـ Pending، استخدم created_at
@@ -898,10 +898,10 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
         userId: {
           firstName: "$userId.firstName",
           lastName: "$userId.lastName",
-          address: "$userId.address", // إضافة address
+          address: "$userId.address",
         },
         childId: {
-          name: "$childId.name",
+          name: "$userId.name",
         },
         date: 1,
         time: 1,
