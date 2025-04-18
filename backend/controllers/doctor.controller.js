@@ -913,6 +913,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
       $addFields: {
         time24: {
           $concat: [
+            { $cond: { if: { $lt: ["$hour24", 10] }, then: "0", else: "" } },
             { $toString: "$hour24" },
             ":",
             { $cond: { if: { $lt: ["$minute", 10] }, then: "0", else: "" } },
@@ -921,19 +922,25 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
         },
       },
     },
-    // إنشاء حقل مؤقت لتحويل date و time إلى تاريخ كامل
+    // إنشاء حقل مؤقت لتحويل date و time إلى تاريخ كامل للـ Accepted فقط
     {
       $addFields: {
         appointmentDateTime: {
-          $dateFromString: {
-            dateString: {
-              $concat: [
-                { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
-                "T",
-                "$time24",
-              ],
+          $cond: {
+            if: { $eq: ["$status", "Accepted"] },
+            then: {
+              $dateFromString: {
+                dateString: {
+                  $concat: [
+                    { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
+                    "T",
+                    "$time24",
+                  ],
+                },
+                format: "%Y-%m-%dT%H:%M",
+              },
             },
-            format: "%Y-%m-%dT%H:%M",
+            else: null, // للـ Pending، لا حاجة لـ appointmentDateTime
           },
         },
       },
