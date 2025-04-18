@@ -17,7 +17,7 @@ const path = require("path");
 
 const diskStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, "..", "uploads");
+    const uploadPath = path.join(__dirname, "..", "Uploads");
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }
@@ -54,6 +54,31 @@ router
 router.route("/login").post(validateLogin, usersController.loginUser);
 
 router
+  .route("/profile")
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+    usersController.getUserProfile
+  )
+  .patch(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+    usersController.updateUserProfile
+  )
+  .delete(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+    usersController.deleteUserProfile
+  );
+
+router.post(
+  "/logout",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+  usersController.logoutUser
+);
+
+router
   .route("/:userId")
   .get(verifyToken, checkOwnership, usersController.getUserById)
   .patch(
@@ -65,5 +90,3 @@ router
   .delete(verifyToken, checkOwnership, usersController.deleteUser);
 
 module.exports = router;
-
-//***** */

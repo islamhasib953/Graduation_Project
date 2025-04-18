@@ -1204,12 +1204,17 @@ const logoutDoctor = asyncWrapper(async (req, res, next) => {
     );
   }
 
+  // البحث عن الدكتور
   const doctor = await Doctor.findById(doctorId);
-  if (doctor) {
-    doctor.token = null;
-    await doctor.save();
+  if (!doctor) {
+    return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
   }
 
+  // حذف الـ token
+  doctor.token = null;
+  await doctor.save();
+
+  // الرد بنجاح
   res.json({
     status: httpStatusText.SUCCESS,
     message: "Logged out successfully",
@@ -1430,10 +1435,10 @@ module.exports = {
   rescheduleAppointment,
   deleteAppointment,
   getUpcomingAppointments,
-  getDoctorProfile,
-  updateDoctorProfile,
-  deleteDoctorProfile,
-  logoutDoctor,
+  getDoctorProfile,//
+  updateDoctorProfile,//
+  deleteDoctorProfile,//
+  logoutDoctor,//
   addToFavorite,
   removeFromFavorite,
   getFavoriteDoctors,
