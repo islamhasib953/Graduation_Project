@@ -820,10 +820,16 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
   const appointments = await Appointment.find({
     doctorId,
     date: { $gte: today },
+    status: { $ne: "Closed" }, // استبعاد المواعيد اللي status بتاعها REFUSED (Closed)
   })
     .populate("userId", "firstName lastName")
     .populate("childId", "name")
-    .select("userId childId date time visitType status");
+    .select("userId childId date time visitType status")
+    .sort({ 
+      // ترتيب المواعيد
+      status: 1, // PENDING (0) قبل ACCEPTED (1)
+      date: 1 // ترتيب حسب التاريخ تصاعدي
+    });
 
   const upcomingCount = appointments.length;
 
