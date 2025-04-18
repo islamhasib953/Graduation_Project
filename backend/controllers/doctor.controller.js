@@ -825,7 +825,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
     // الشرط الأساسي: doctorId، التاريخ من اليوم وما بعد، واستبعاد Closed
     {
       $match: {
-        doctorId: mongoose.Types.ObjectId(doctorId),
+        doctorId: mongoose.Types.ObjectId(doctorId), // تمرير doctorId كـ ObjectId
         date: { $gte: today },
         status: { $ne: "Closed" },
       },
