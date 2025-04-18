@@ -921,25 +921,19 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
         },
       },
     },
-    // إنشاء حقل مؤقت لتحويل date و time إلى تاريخ كامل للـ Accepted
+    // إنشاء حقل مؤقت لتحويل date و time إلى تاريخ كامل
     {
       $addFields: {
         appointmentDateTime: {
-          $cond: {
-            if: { $eq: ["$status", "Accepted"] },
-            then: {
-              $dateFromString: {
-                dateString: {
-                  $concat: [
-                    { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
-                    "T",
-                    "$time24",
-                  ],
-                },
-                format: "%Y-%m-%dT%H:%M", // صيغة 24 ساعة متوافقة
-              },
+          $dateFromString: {
+            dateString: {
+              $concat: [
+                { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
+                "T",
+                "$time24",
+              ],
             },
-            else: "$created_at", // للـ Pending، استخدم created_at
+            format: "%Y-%m-%dT%H:%M",
           },
         },
       },
@@ -947,8 +941,9 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
     // الترتيب
     {
       $sort: {
-        status: 1, // Pending قبل Accepted
-        appointmentDateTime: 1, // Pending حسب created_at، Accepted حسب date+time
+        status: 1, // Pending (1) قبل Accepted (2)
+        created_at: 1, // Pending حسب created_at
+        appointmentDateTime: 1, // Accepted حسب التاريخ والوقت (الأقرب أولاً)
       },
     },
     // اختيار الحقول المطلوبة
@@ -966,6 +961,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
         time: 1,
         visitType: 1,
         status: 1,
+        created_at: 1, // إضافة created_at
         _id: 1,
       },
     },
@@ -987,6 +983,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
           : appointment.status === "Closed"
           ? "REFUSED"
           : "PENDING",
+      created_at: moment(appointment.created_at).format("YYYY-MM-DD HH:mm:ss"), // إضافة created_at
     };
 
     // إضافة address لو visitType هو In-Person
