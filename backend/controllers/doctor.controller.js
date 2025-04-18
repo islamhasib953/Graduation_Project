@@ -938,12 +938,35 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
         },
       },
     },
+    // إضافة حقل sortStatus للتحكم في ترتيب Pending و Accepted
+    {
+      $addFields: {
+        sortStatus: {
+          $cond: {
+            if: { $eq: ["$status", "Pending"] },
+            then: 1,
+            else: 2,
+          },
+        },
+      },
+    },
+    // إضافة حقل sortKey للترتيب بناءً على created_at لـ Pending و appointmentDateTime لـ Accepted
+    {
+      $addFields: {
+        sortKey: {
+          $cond: {
+            if: { $eq: ["$status", "Pending"] },
+            then: "$created_at",
+            else: "$appointmentDateTime",
+          },
+        },
+      },
+    },
     // الترتيب
     {
       $sort: {
-        status: 1, // Pending (1) قبل Accepted (2)
-        created_at: 1, // Pending حسب created_at
-        appointmentDateTime: 1, // Accepted حسب التاريخ والوقت (الأقرب أولاً)
+        sortStatus: 1, // Pending (1) قبل Accepted (2)
+        sortKey: 1, // Pending حسب created_at, Accepted حسب appointmentDateTime
       },
     },
     // اختيار الحقول المطلوبة
@@ -961,7 +984,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
         time: 1,
         visitType: 1,
         status: 1,
-        created_at: 1, // إضافة created_at
+        created_at: 1,
         _id: 1,
       },
     },
@@ -983,7 +1006,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
           : appointment.status === "Closed"
           ? "REFUSED"
           : "PENDING",
-      created_at: moment(appointment.created_at).format("YYYY-MM-DD HH:mm:ss"), // إضافة created_at
+      created_at: moment(appointment.created_at).format("YYYY-MM-DD HH:mm:ss"),
     };
 
     // إضافة address لو visitType هو In-Person
