@@ -825,7 +825,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
     // الشرط الأساسي: doctorId، التاريخ من اليوم وما بعد، واستبعاد Closed
     {
       $match: {
-        doctorId: mongoose.Types.ObjectId(doctorId), // تمرير doctorId كـ ObjectId
+        doctorId: new mongoose.Types.ObjectId(doctorId), // إصلاح الخطأ باستخدام new
         date: { $gte: today },
         status: { $ne: "Closed" },
       },
@@ -837,6 +837,15 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
         localField: "userId",
         foreignField: "_id",
         as: "userId",
+        pipeline: [
+          {
+            $project: {
+              firstName: 1,
+              lastName: 1,
+              address: 1, // جلب حقل address من User
+            },
+          },
+        ],
       },
     },
     {
@@ -889,6 +898,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
         userId: {
           firstName: "$userId.firstName",
           lastName: "$userId.lastName",
+          address: "$userId.address", // إضافة address
         },
         childId: {
           name: "$childId.name",
@@ -904,20 +914,29 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
 
   const upcomingCount = appointments.length;
 
-  const upcomingAppointments = appointments.map((appointment) => ({
-    appointmentId: appointment._id,
-    userName: `${appointment.userId.firstName} ${appointment.userId.lastName}`,
-    childName: appointment.childId.name,
-    place: appointment.visitType,
-    date: moment(appointment.date).format("YYYY-MM-DD"),
-    time: appointment.time,
-    status:
-      appointment.status === "Accepted"
-        ? "ACCEPTED"
-        : appointment.status === "Closed"
-        ? "REFUSED"
-        : "PENDING",
-  }));
+  const upcomingAppointments = appointments.map((appointment) => {
+    const appointmentData = {
+      appointmentId: appointment._id,
+      userName: `${appointment.userId.firstName} ${appointment.userId.lastName}`,
+      childName: appointment.childId.name,
+      place: appointment.visitType,
+      date: moment(appointment.date).format("YYYY-MM-DD"),
+      time: appointment.time,
+      status:
+        appointment.status === "Accepted"
+          ? "ACCEPTED"
+          : appointment.status === "Closed"
+          ? "REFUSED"
+          : "PENDING",
+    };
+
+    // إضافة address لو visitType هو In-Person
+    if (appointment.visitType === "In-Person") {
+      appointmentData.address = appointment.userId.address;
+    }
+
+    return appointmentData;
+  });
 
   res.json({
     status: httpStatusText.SUCCESS,
