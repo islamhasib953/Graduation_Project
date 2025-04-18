@@ -862,6 +862,65 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
     {
       $unwind: "$childId",
     },
+    // تحويل time من صيغة 12 ساعة (مثل "8:00 PM") إلى 24 ساعة (مثل "20:00")
+    {
+      $addFields: {
+        trimmedTime: { $trim: { input: "$time" } }, // إزالة المسافات
+      },
+    },
+    {
+      $addFields: {
+        timeParts: {
+          $regexMatch: {
+            input: "$trimmedTime",
+            regex: "^(\\d{1,2}):(\\d{2})\\s*(AM|PM)$",
+            options: "i",
+          },
+        },
+      },
+    },
+    {
+      $addFields: {
+        hour: { $toInt: { $arrayElemAt: ["$timeParts.captures", 0] } },
+        minute: { $arrayElemAt: ["$timeParts.captures", 1] },
+        period: { $arrayElemAt: ["$timeParts.captures", 2] },
+      },
+    },
+    {
+      $addFields: {
+        hour24: {
+          $cond: {
+            if: { $eq: [{ $toUpper: "$period" }, "PM"] },
+            then: {
+              $cond: {
+                if: { $eq: ["$hour", 12] },
+                then: 12,
+                else: { $add: ["$hour", 12] },
+              },
+            },
+            else: {
+              $cond: {
+                if: { $eq: ["$hour", 12] },
+                then: 0,
+                else: "$hour",
+              },
+            },
+          },
+        },
+      },
+    },
+    {
+      $addFields: {
+        time24: {
+          $concat: [
+            { $toString: "$hour24" },
+            ":",
+            { $cond: { if: { $lt: ["$minute", 10] }, then: "0", else: "" } },
+            "$minute",
+          ],
+        },
+      },
+    },
     // إنشاء حقل مؤقت لتحويل date و time إلى تاريخ كامل للـ Accepted
     {
       $addFields: {
@@ -874,10 +933,10 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
                   $concat: [
                     { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
                     "T",
-                    { $trim: { input: "$time" } }, // إزالة المسافات الزيادة
+                    "$time24",
                   ],
                 },
-                format: "%Y-%m-%dT%I:%M %p", // صيغة 12 ساعة مع AM/PM
+                format: "%Y-%m-%dT%H:%M", // صيغة 24 ساعة متوافقة
               },
             },
             else: "$created_at", // للـ Pending، استخدم created_at
