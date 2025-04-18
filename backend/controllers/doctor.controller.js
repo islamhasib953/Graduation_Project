@@ -874,10 +874,10 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
                   $concat: [
                     { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
                     "T",
-                    "$time",
+                    { $trim: { input: "$time" } }, // إزالة المسافات الزيادة
                   ],
                 },
-                format: "%Y-%m-%dT%H:%M", // تعديل الـ format لصيغة 24 ساعة
+                format: "%Y-%m-%dT%I:%M %p", // صيغة 12 ساعة مع AM/PM
               },
             },
             else: "$created_at", // للـ Pending، استخدم created_at
@@ -901,7 +901,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
           address: "$userId.address",
         },
         childId: {
-          name: "$userId.name",
+          name: "$childId.name",
         },
         date: 1,
         time: 1,
