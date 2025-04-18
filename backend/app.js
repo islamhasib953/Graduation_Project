@@ -94,7 +94,11 @@ app.use((error, req, res, next) => {
 // 8. تصدير الـ App
 module.exports = app;
 
-//ai, community, sensors, الحاجات التعلقة باليوزر وى ال logout
+//ai, community, sensors
 //تعديلات اللى عند عبيد
-//user
 // استخدم ال api بتاع logout عند عبيد 
+
+////////////////////
+//موديل ال activation
+//اشوف حوار الاشعارات
+//اكمل الاسكرينات فى الدكتور واليوزر
