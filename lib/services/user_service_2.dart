@@ -6,13 +6,13 @@
 // import 'package:segma/services/auth_service.dart';
 // import 'package:shared_preferences/shared_preferences.dart';
 
-// class UserService {
+// class UserService2 {
 //   static Future<Map<String, dynamic>> login(
 //       String email, String password, BuildContext context) async {
 //     try {
 //       final url = Uri.parse('${AuthService.baseUrl}/users/login');
 
-//       print('\n📤 Login Request:');
+//       print('\n📤 Login Request (UserService2):');
 //       print('├─ URL: $url');
 //       print('└─ Body: ${jsonEncode({'email': email, 'password': password})}');
 
@@ -22,7 +22,7 @@
 //         body: jsonEncode({'email': email, 'password': password}),
 //       );
 
-//       print('\n📥 Login Response:');
+//       print('\n📥 Login Response (UserService2):');
 //       print('├─ Status: ${response.statusCode}');
 //       print('└─ Body: ${response.body}');
 
@@ -46,7 +46,7 @@
 //               userId = payloadMap['id'];
 //             }
 //           } catch (e) {
-//             print('🔥 Error decoding JWT token: $e');
+//             print('🔥 Error decoding JWT token (UserService2): $e');
 //           }
 //         }
 
@@ -56,12 +56,12 @@
 //             userId: userId,
 //             accountType: role,
 //           );
-//           print('\n🔑 Successfully Saved Token: $token');
+//           print('\n🔑 Successfully Saved Token (UserService2): $token');
 //           print('├─ User ID: $userId');
 //           print('├─ Role: $role');
 //           if (childId != null) {
 //             context.read<SelectedChildCubit>().selectChild(childId);
-//             print('🔑 Set childId in Cubit: $childId');
+//             print('🔑 Set childId in Cubit (UserService2): $childId');
 //           }
 
 //           final isTokenValid = await _verifyToken(token);
@@ -95,7 +95,7 @@
 //         };
 //       }
 //     } catch (e) {
-//       print('\n🔥 Login Error: $e');
+//       print('\n🔥 Login Error (UserService2): $e');
 //       return {'status': 'error', 'message': 'خطأ في الاتصال: $e'};
 //     }
 //   }
@@ -130,7 +130,7 @@
 //           'about': about.toString(),
 //       };
 
-//       print('\n📤 Register Request:');
+//       print('\n📤 Register Request (UserService2):');
 //       print('├─ URL: $url');
 //       print('├─ Headers: ${await AuthService.getHeaders()}');
 //       print('└─ Body: ${jsonEncode(requestBody)}');
@@ -141,7 +141,7 @@
 //         body: jsonEncode(requestBody),
 //       );
 
-//       print('\n📥 Register Response:');
+//       print('\n📥 Register Response (UserService2):');
 //       print('├─ Status: ${response.statusCode}');
 //       print('└─ Body: ${response.body}');
 
@@ -159,7 +159,7 @@
 //             userId: userId,
 //             accountType: role,
 //           );
-//           print('\n✅ Successfully Saved Token: $token');
+//           print('\n✅ Successfully Saved Token (UserService2): $token');
 //           print('├─ User ID: $userId');
 //           print('├─ Role: $role');
 
@@ -171,15 +171,15 @@
 //             };
 //           }
 //         } else {
-//           print('\n❌ Failed to Save Auth Data: Missing userId or token');
+//           print('\n❌ Failed to Save Auth Data (UserService2): Missing userId or token');
 //         }
 
 //         if (childId != null) {
 //           context.read<SelectedChildCubit>().selectChild(childId);
-//           print('🔑 Set childId in Cubit: $childId');
+//           print('🔑 Set childId in Cubit (UserService2): $childId');
 //         }
 
-//         print('\n✅ Register Success:');
+//         print('\n✅ Register Success (UserService2):');
 //         print('├─ User ID: $userId');
 //         print('├─ Token: $token');
 //         print('├─ Role: $role');
@@ -192,7 +192,7 @@
 //         };
 //       } else {
 //         final errorMessage = _handleRegisterError(response.statusCode, data);
-//         print('\n❌ Register Error: $errorMessage');
+//         print('\n❌ Register Error (UserService2): $errorMessage');
 //         return {
 //           'status': 'error',
 //           'message': 'فشل التسجيل (الكود: ${response.statusCode}): $errorMessage',
@@ -200,7 +200,7 @@
 //         };
 //       }
 //     } catch (e) {
-//       print('\n🔥 Register Error: $e');
+//       print('\n🔥 Register Error (UserService2): $e');
 //       return {
 //         'status': 'error',
 //         'message': 'خطأ تقني: ${e.toString()}',
@@ -213,13 +213,13 @@
 //       final prefs = await SharedPreferences.getInstance();
 //       final token = prefs.getString('token');
 //       if (token == null || token.isEmpty) {
-//         print('❌ No Token Found in SharedPreferences');
+//         print('❌ No Token Found in SharedPreferences (UserService2)');
 //         return null;
 //       }
-//       print('✅ Retrieved Token: $token');
+//       print('✅ Retrieved Token (UserService2): $token');
 //       return token;
 //     } catch (e) {
-//       print('🔥 Error retrieving token: $e');
+//       print('🔥 Error retrieving token (UserService2): $e');
 //       return null;
 //     }
 //   }
@@ -229,19 +229,19 @@
 //       final prefs = await SharedPreferences.getInstance();
 //       final savedToken = prefs.getString('token');
 //       if (savedToken == null || savedToken.isEmpty) {
-//         print('❌ No Token Found in SharedPreferences');
+//         print('❌ No Token Found in SharedPreferences (UserService2)');
 //         return false;
 //       }
 
 //       if (savedToken != token) {
-//         print('❌ Token Mismatch: Saved Token does not match provided Token');
+//         print('❌ Token Mismatch (UserService2): Saved Token does not match provided Token');
 //         return false;
 //       }
 
-//       print('✅ Token Verified: $savedToken');
+//       print('✅ Token Verified (UserService2): $savedToken');
 //       return true;
 //     } catch (e) {
-//       print('🔥 Error verifying token: $e');
+//       print('🔥 Error verifying token (UserService2): $e');
 //       return false;
 //     }
 //   }
@@ -254,10 +254,10 @@
 //         return {'status': 'error', 'message': 'يجب تسجيل الدخول'};
 //       }
 
-//       final url = Uri.parse('${AuthService.baseUrl}/users/profile');
+//       final url = Uri.parse('${AuthService.baseUrl}/api/users/profile');
 
 //       final headers = await AuthService.getHeaders(token);
-//       print('\n📤 Get User Profile Request:');
+//       print('\n📤 Get User Profile Request (UserService2):');
 //       print('├─ URL: $url');
 //       print('└─ Headers: $headers');
 
@@ -266,7 +266,7 @@
 //         headers: headers,
 //       );
 
-//       print('\n📥 Get User Profile Response:');
+//       print('\n📥 Get User Profile Response (UserService2):');
 //       print('├─ Status: ${response.statusCode}');
 //       print('└─ Body: ${response.body}');
 
@@ -288,7 +288,7 @@
 //         'message': data['message'] ?? 'فشل في جلب بيانات المستخدم (الكود: ${response.statusCode})',
 //       };
 //     } catch (e) {
-//       print('\n🔥 Get User Profile Error: $e');
+//       print('\n🔥 Get User Profile Error (UserService2): $e');
 //       return {'status': 'error', 'message': 'خطأ تقني: ${e.toString()}'};
 //     }
 //   }
@@ -301,7 +301,7 @@
 //       }
 
 //       final url = Uri.parse('${AuthService.baseUrl}/api/users/logout');
-//       print('UserService: Logging out user at: $url');
+//       print('UserService2: Logging out user at: $url');
 //       final response = await http.post(
 //         url,
 //         headers: await AuthService.getHeaders(token),
@@ -309,8 +309,8 @@
 //         throw Exception('Request timed out after 10 seconds');
 //       });
 
-//       print('UserService: logoutUser response status: ${response.statusCode}');
-//       print('UserService: logoutUser response body: ${response.body}');
+//       print('UserService2: logoutUser response status: ${response.statusCode}');
+//       print('UserService2: logoutUser response body: ${response.body}');
 
 //       final Map<String, dynamic> data = jsonDecode(response.body);
 
@@ -328,7 +328,7 @@
 //         };
 //       }
 //     } catch (e) {
-//       print('UserService: Error in logoutUser: $e');
+//       print('UserService2: Error in logoutUser: $e');
 //       return {'status': 'error', 'message': 'Error: $e'};
 //     }
 //   }
@@ -341,7 +341,7 @@
 //       }
 
 //       final url = Uri.parse('${AuthService.baseUrl}/api/users/profile');
-//       print('UserService: Deleting user account at: $url');
+//       print('UserService2: Deleting user account at: $url');
 //       final response = await http.delete(
 //         url,
 //         headers: await AuthService.getHeaders(token),
@@ -349,8 +349,8 @@
 //         throw Exception('Request timed out after 10 seconds');
 //       });
 
-//       print('UserService: deleteUserAccount response status: ${response.statusCode}');
-//       print('UserService: deleteUserAccount response body: ${response.body}');
+//       print('UserService2: deleteUserAccount response status: ${response.statusCode}');
+//       print('UserService2: deleteUserAccount response body: ${response.body}');
 
 //       final Map<String, dynamic> data = jsonDecode(response.body);
 
@@ -368,7 +368,7 @@
 //         };
 //       }
 //     } catch (e) {
-//       print('UserService: Error in deleteUserAccount: $e');
+//       print('UserService2: Error in deleteUserAccount: $e');
 //       return {'status': 'error', 'message': 'Error: $e'};
 //     }
 //   }
@@ -381,8 +381,8 @@
 //       }
 
 //       final url = Uri.parse('${AuthService.baseUrl}/api/users/profile');
-//       print('UserService: Updating user profile at: $url');
-//       print('UserService: Request body: ${jsonEncode(data)}');
+//       print('UserService2: Updating user profile at: $url');
+//       print('UserService2: Request body: ${jsonEncode(data)}');
 //       final response = await http.patch(
 //         url,
 //         headers: await AuthService.getHeaders(token),
@@ -391,8 +391,8 @@
 //         throw Exception('Request timed out after 10 seconds');
 //       });
 
-//       print('UserService: updateUserProfile response status: ${response.statusCode}');
-//       print('UserService: updateUserProfile response body: ${response.body}');
+//       print('UserService2: updateUserProfile response status: ${response.statusCode}');
+//       print('UserService2: updateUserProfile response body: ${response.body}');
 
 //       final Map<String, dynamic> responseData = jsonDecode(response.body);
 
@@ -409,7 +409,69 @@
 //         };
 //       }
 //     } catch (e) {
-//       print('UserService: Error in updateUserProfile: $e');
+//       print('UserService2: Error in updateUserProfile: $e');
+//       return {'status': 'error', 'message': 'Error: $e'};
+//     }
+//   }
+
+//   static Future<Map<String, dynamic>> getChildRecords(String childId) async {
+//     try {
+//       final String? token = await AuthService.getToken();
+//       if (token == null) {
+//         return {'status': 'error', 'message': 'No token found'};
+//       }
+
+//       final url = Uri.parse('${AuthService.baseUrl}/api/users/child/records');
+//       print('UserService2: Fetching child records from: $url');
+//       print('UserService2: Request body: ${jsonEncode({'childId': childId})}');
+//       final response = await http.post(
+//         url,
+//         headers: await AuthService.getHeaders(token),
+//         body: jsonEncode({'childId': childId}),
+//       ).timeout(const Duration(seconds: 10), onTimeout: () {
+//         throw Exception('Request timed out after 10 seconds');
+//       });
+
+//       print('UserService2: getChildRecords response status: ${response.statusCode}');
+//       print('UserService2: getChildRecords response body: ${response.body}');
+
+//       final Map<String, dynamic> data = jsonDecode(response.body);
+
+//       if (response.statusCode == 200) {
+//         final growthRecords = data['data']?['growthRecords'] ?? [];
+//         final medicalHistory = data['data']?['medicalHistory'] ?? [];
+
+//         return {
+//           'status': 'success',
+//           'data': {
+//             'growthRecords': growthRecords,
+//             'medicalHistory': medicalHistory,
+//           },
+//         };
+//       } else if (response.statusCode == 404) {
+//         return {
+//           'status': 'error',
+//           'message': 'No records found for this child',
+//           'data': {'growthRecords': [], 'medicalHistory': []},
+//         };
+//       } else if (response.statusCode == 401) {
+//         return {
+//           'status': 'error',
+//           'message': 'Unauthorized: Invalid or expired token',
+//         };
+//       } else if (response.statusCode == 400) {
+//         return {
+//           'status': 'error',
+//           'message': 'Bad request: Invalid childId',
+//         };
+//       } else {
+//         return {
+//           'status': 'error',
+//           'message': data['message'] ?? 'Failed to load child records: ${response.statusCode}',
+//         };
+//       }
+//     } catch (e) {
+//       print('UserService2: Error in getChildRecords: $e');
 //       return {'status': 'error', 'message': 'Error: $e'};
 //     }
 //   }

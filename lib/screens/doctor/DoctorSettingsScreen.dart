@@ -2,12 +2,38 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:segma/services/doctor_service.dart';
+import 'package:segma/services/user_service.dart';
 import 'package:segma/screens/login_screen.dart';
 import 'package:segma/utils/colors.dart';
 import 'package:segma/utils/providers.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class DoctorSettingsScreen extends StatelessWidget {
-  const DoctorSettingsScreen({Key? key}) : super(key: key);
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({Key? key}) : super(key: key);
+
+  @override
+  _SettingsScreenState createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  String? _role;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRole();
+  }
+
+  Future<void> _loadRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _role = prefs.getString('role')?.toLowerCase();
+      print('SettingsScreen: Loaded role: $_role');
+    });
+    // Update the ThemeProvider with the role
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    await themeProvider.updateRole(_role);
+  }
 
   void _showDeleteAccountDialog(BuildContext context) {
     final TextEditingController deleteController = TextEditingController();
@@ -89,7 +115,14 @@ class DoctorSettingsScreen extends StatelessWidget {
 
   Future<void> _deleteAccount(BuildContext context, ScaffoldMessengerState scaffoldMessenger) async {
     try {
-      final response = await DoctorService.deleteDoctorAccount();
+      Map<String, dynamic> response;
+      print('SettingsScreen: Attempting to delete account for role: $_role');
+      if (_role == 'doctor') {
+        response = await DoctorService.deleteDoctorAccount();
+      } else {
+        response = await UserService.deleteUserAccount();
+      }
+      print('SettingsScreen: Delete account response: $response');
       if (response['status'] == 'success') {
         if (context.mounted) {
           Navigator.pushAndRemoveUntil(
@@ -105,9 +138,10 @@ class DoctorSettingsScreen extends StatelessWidget {
           );
         }
       } else {
-        throw Exception(response['message'] ?? 'Error');
+        throw Exception(response['message'] ?? 'Unknown error');
       }
     } catch (e) {
+      print('SettingsScreen: Error deleting account: $e');
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text('Error: $e'),
@@ -117,25 +151,73 @@ class DoctorSettingsScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _logout(BuildContext context) async {
+    try {
+      Map<String, dynamic> response;
+      print('SettingsScreen: Attempting to logout for role: $_role');
+      if (_role == 'doctor') {
+        response = await DoctorService.logoutDoctor();
+      } else {
+        response = await UserService.logoutUser();
+      }
+      print('SettingsScreen: Logout response: $response');
+      if (response['status'] == 'success' && context.mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => LoginScreen()),
+          (route) => false,
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Logged out successfully'),
+            backgroundColor: AppColors.statusUpcoming,
+          ),
+        );
+      } else {
+        throw Exception(response['message'] ?? 'Logout failed');
+      }
+    } catch (e) {
+      print('SettingsScreen: Error logging out: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Logout failed: $e'),
+            backgroundColor: AppColors.statusOverdue,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Settings',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: EdgeInsets.all(16.r),
-          child: ListView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSectionTitle('My Profile', context),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Settings',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontSize: 24.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  Icon(
+                    Icons.settings,
+                    size: 24.sp,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ],
+              ),
+              SizedBox(height: 24.h),
+              _buildSectionTitle('Profile', context),
               _buildSettingsItem(
                 context,
                 icon: Icons.person,
@@ -159,7 +241,7 @@ class DoctorSettingsScreen extends StatelessWidget {
                 },
               ),
               SizedBox(height: 24.h),
-              _buildSectionTitle('Theme', context),
+              _buildSectionTitle('Appearance', context),
               Consumer<ThemeProvider>(
                 builder: (context, themeProvider, child) {
                   return Column(
@@ -171,6 +253,7 @@ class DoctorSettingsScreen extends StatelessWidget {
                         groupValue: themeProvider.themeMode,
                         onChanged: (ThemeMode? value) {
                           if (value != null) {
+                            print('SettingsScreen: Switching to Light Mode');
                             themeProvider.toggleTheme(false);
                           }
                         },
@@ -182,6 +265,7 @@ class DoctorSettingsScreen extends StatelessWidget {
                         groupValue: themeProvider.themeMode,
                         onChanged: (ThemeMode? value) {
                           if (value != null) {
+                            print('SettingsScreen: Switching to Dark Mode');
                             themeProvider.toggleTheme(true);
                           }
                         },
@@ -193,6 +277,7 @@ class DoctorSettingsScreen extends StatelessWidget {
                         groupValue: themeProvider.themeMode,
                         onChanged: (ThemeMode? value) {
                           if (value != null) {
+                            print('SettingsScreen: Switching to System Default');
                             themeProvider.setSystemTheme();
                           }
                         },
@@ -202,7 +287,7 @@ class DoctorSettingsScreen extends StatelessWidget {
                 },
               ),
               SizedBox(height: 24.h),
-              _buildSectionTitle('Help', context),
+              _buildSectionTitle('Support', context),
               _buildSettingsItem(
                 context,
                 icon: Icons.help,
@@ -261,29 +346,7 @@ class DoctorSettingsScreen extends StatelessWidget {
                 icon: Icons.logout,
                 title: 'Log Out',
                 titleColor: AppColors.statusOverdue,
-                onTap: () async {
-                  try {
-                    final response = await DoctorService.logoutDoctor();
-                    if (response['status'] == 'success' && context.mounted) {
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(builder: (context) => LoginScreen()),
-                        (route) => false,
-                      );
-                    } else {
-                      throw Exception(response['message'] ?? 'Failed to log out');
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Failed to log out: $e'),
-                          backgroundColor: AppColors.statusOverdue,
-                        ),
-                      );
-                    }
-                  }
-                },
+                onTap: () => _logout(context),
               ),
             ],
           ),
@@ -294,10 +357,14 @@ class DoctorSettingsScreen extends StatelessWidget {
 
   Widget _buildSectionTitle(String title, BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: 16.h),
+      padding: EdgeInsets.only(bottom: 12.h),
       child: Text(
         title,
-        style: Theme.of(context).textTheme.titleLarge,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontSize: 18.sp,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.primary,
+            ),
       ),
     );
   }
@@ -323,24 +390,45 @@ class DoctorSettingsScreen extends StatelessWidget {
           child: AnimatedScale(
             scale: isPressed ? 0.95 : 1.0,
             duration: const Duration(milliseconds: 200),
-            child: ListTile(
-              leading: Icon(
-                icon,
-                color: titleColor ?? Theme.of(context).iconTheme.color,
-                size: 24.sp,
-              ),
-              title: Text(
-                title,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: titleColor ?? Theme.of(context).textTheme.bodyLarge?.color,
-                    ),
-              ),
-              trailing: trailing ??
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    color: Theme.of(context).textTheme.bodyMedium?.color,
-                    size: 16.sp,
+            child: Container(
+              margin: EdgeInsets.symmetric(vertical: 4.h),
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(12.r),
+                boxShadow: [
+                  BoxShadow(
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
+                    blurRadius: 4.r,
+                    offset: const Offset(0, 2),
                   ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    icon,
+                    color: titleColor ?? Theme.of(context).iconTheme.color,
+                    size: 24.sp,
+                  ),
+                  SizedBox(width: 16.w),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: titleColor ?? Theme.of(context).textTheme.bodyLarge?.color,
+                            fontSize: 16.sp,
+                          ),
+                    ),
+                  ),
+                  trailing ??
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        color: Theme.of(context).textTheme.bodyMedium?.color,
+                        size: 16.sp,
+                      ),
+                ],
+              ),
             ),
           ),
         );
@@ -361,13 +449,13 @@ class DoctorSettingsScreen extends StatelessWidget {
       child: RadioListTile<T>(
         title: Text(
           title,
-          style: Theme.of(context).textTheme.bodyLarge,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontSize: 16.sp),
         ),
         value: value,
         groupValue: groupValue,
         onChanged: onChanged,
         activeColor: Theme.of(context).primaryColor,
-        contentPadding: EdgeInsets.symmetric(horizontal: 8.w),
+        contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
       ),
     );
   }
@@ -381,7 +469,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  late Future<Map<String, dynamic>> _doctorProfileFuture;
+  late Future<Map<String, dynamic>> _profileFuture;
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _firstNameController;
   late TextEditingController _lastNameController;
@@ -394,6 +482,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _avatarUrl;
   bool _isLoading = false;
   bool _isButtonPressed = false;
+  String? _role;
 
   @override
   void initState() {
@@ -406,29 +495,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _addressController = TextEditingController();
     _specialiseController = TextEditingController();
     _aboutController = TextEditingController();
-    _doctorProfileFuture = DoctorService.getDoctorProfile();
-    _loadDoctorProfile();
+    _loadRole();
   }
 
-  Future<void> _loadDoctorProfile() async {
+  Future<void> _loadRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _role = prefs.getString('role')?.toLowerCase();
+      print('ProfileScreen: Loaded role: $_role');
+      _profileFuture = _role == 'doctor'
+          ? DoctorService.getDoctorProfile()
+          : UserService.getUserProfile();
+    });
+    await _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
     try {
-      final response = await _doctorProfileFuture;
+      final response = await _profileFuture;
+      print('ProfileScreen: Load profile response: $response');
       if (response['status'] == 'success' && response['data'] != null) {
-        final doctorData = response['data'];
+        final profileData = response['data'];
         setState(() {
-          _firstNameController.text = doctorData['firstName'] ?? '';
-          _lastNameController.text = doctorData['lastName'] ?? '';
-          _genderController.text = doctorData['gender'] ?? '';
-          _phoneController.text = doctorData['phone'] ?? '';
-          _emailController.text = doctorData['email'] ?? '';
-          _addressController.text = doctorData['address'] ?? '';
-          _avatarUrl = doctorData['avatar'] ?? 'https://example.com/avatar.jpg';
-          _specialiseController.text = doctorData['specialise'] ?? '';
-          _aboutController.text = doctorData['about'] ?? '';
+          _firstNameController.text = profileData['firstName'] ?? '';
+          _lastNameController.text = profileData['lastName'] ?? '';
+          _genderController.text = profileData['gender'] ?? '';
+          _phoneController.text = profileData['phone'] ?? '';
+          _emailController.text = profileData['email'] ?? '';
+          _addressController.text = profileData['address'] ?? '';
+          _avatarUrl = profileData['avatar'] ?? 'https://example.com/avatar.jpg';
+          if (_role == 'doctor') {
+            _specialiseController.text = profileData['specialise'] ?? '';
+            _aboutController.text = profileData['about'] ?? '';
+          }
         });
+      } else {
+        throw Exception(response['message'] ?? 'Failed to load profile');
       }
     } catch (e) {
-      print('ProfileScreen: Error loading doctor profile: $e');
+      print('ProfileScreen: Error loading profile: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading profile: $e'),
+          backgroundColor: AppColors.statusOverdue,
+        ),
+      );
     }
   }
 
@@ -436,15 +547,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       try {
-        final response = await DoctorService.updateDoctorProfile({
+        Map<String, dynamic> response;
+        final data = {
           'firstName': _firstNameController.text,
           'lastName': _lastNameController.text,
           'gender': _genderController.text,
           'phone': _phoneController.text,
           'address': _addressController.text,
-          'specialise': _specialiseController.text,
-          'about': _aboutController.text,
-        });
+        };
+        print('ProfileScreen: Updating profile for role: $_role');
+        print('ProfileScreen: Update profile data: $data');
+        if (_role == 'doctor') {
+          data['specialise'] = _specialiseController.text;
+          data['about'] = _aboutController.text;
+          response = await DoctorService.updateDoctorProfile(data);
+        } else {
+          response = await UserService.updateUserProfile(data);
+        }
+        print('ProfileScreen: Update profile response: $response');
         if (response['status'] == 'success') {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -453,13 +573,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           );
           setState(() {
-            _doctorProfileFuture = DoctorService.getDoctorProfile();
+            _profileFuture = _role == 'doctor'
+                ? DoctorService.getDoctorProfile()
+                : UserService.getUserProfile();
           });
-          await _loadDoctorProfile();
+          await _loadProfile();
         } else {
           throw Exception('Error: ${response['message']}');
         }
       } catch (e) {
+        print('ProfileScreen: Error updating profile: $e');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
@@ -500,7 +623,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: SafeArea(
         child: FutureBuilder<Map<String, dynamic>>(
-          future: _doctorProfileFuture,
+          future: _profileFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return Center(
@@ -568,7 +691,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       SizedBox(height: 16.h),
                       _buildTextField(
                         controller: _phoneController,
-                        label: 'Phone',
+                        label: 'Phone Number',
                         icon: Icons.phone,
                         isPhone: true,
                         context: context,
@@ -588,21 +711,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         icon: Icons.location_on,
                         context: context,
                       ),
-                      SizedBox(height: 16.h),
-                      _buildTextField(
-                        controller: _specialiseController,
-                        label: 'Specialization',
-                        icon: Icons.medical_services,
-                        context: context,
-                      ),
-                      SizedBox(height: 16.h),
-                      _buildTextField(
-                        controller: _aboutController,
-                        label: 'About',
-                        icon: Icons.info,
-                        maxLines: 3,
-                        context: context,
-                      ),
+                      if (_role == 'doctor') ...[
+                        SizedBox(height: 16.h),
+                        _buildTextField(
+                          controller: _specialiseController,
+                          label: 'Specialization',
+                          icon: Icons.medical_services,
+                          context: context,
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildTextField(
+                          controller: _aboutController,
+                          label: 'About Me',
+                          icon: Icons.info,
+                          maxLines: 3,
+                          context: context,
+                        ),
+                      ],
                       SizedBox(height: 24.h),
                       _isLoading
                           ? Center(
@@ -622,7 +747,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 duration: const Duration(milliseconds: 200),
                                 child: ElevatedButton(
                                   onPressed: _updateProfile,
-                                  child: Text('Update Profile'),
+                                  style: ElevatedButton.styleFrom(
+                                    padding: EdgeInsets.symmetric(horizontal: 32.w, vertical: 12.h),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12.r),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'Update Profile',
+                                    style: TextStyle(fontSize: 16.sp),
+                                  ),
                                 ),
                               ),
                             ),
@@ -706,7 +840,7 @@ class AboutUsScreen extends StatelessWidget {
           padding: EdgeInsets.all(16.r),
           child: Text(
             'Our mission is to provide high-quality healthcare services through a seamless digital platform. '
-            'We connect patients with certified doctors to ensure accessible and reliable medical care.',
+            'We connect patients with certified doctors to ensure reliable and accessible medical care.',
             style: Theme.of(context).textTheme.bodyMedium,
             textAlign: TextAlign.justify,
           ),

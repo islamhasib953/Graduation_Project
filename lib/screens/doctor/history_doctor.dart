@@ -446,17 +446,17 @@
 //   }
 // }
 
-
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:segma/cubits/growth_cubit.dart';
 import 'package:segma/cubits/history_cubit.dart';
 import 'package:segma/models/history_model.dart';
 import 'package:segma/screens/growth_user/GrowthScreen.dart';
 import 'package:segma/screens/doctor/history_details_doctor.dart';
 import 'package:segma/screens/doctor/log_diagnosis.dart';
 import 'package:segma/services/doctor_service.dart';
+import 'package:segma/services/child_service.dart';
 import 'package:segma/utils/colors.dart';
 import 'package:intl/intl.dart';
 
@@ -704,10 +704,16 @@ class GrowthTab extends StatelessWidget {
                 ),
                 trailing: ElevatedButton(
                   onPressed: () {
+                    // تهيئة GrowthCubit بالطفل المختار
+                    context.read<GrowthCubit>().initialize(
+                          childId: childId,
+                        );
                     Navigator.push(
                       context,
                       PageRouteBuilder(
-                        pageBuilder: (context, animation, secondaryAnimation) => GrowthScreen(childId: childId),
+                        pageBuilder: (context, animation, secondaryAnimation) => GrowthScreen2(
+                          childId: childId,
+                        ),
                         transitionsBuilder: (context, animation, secondaryAnimation, child) {
                           return FadeTransition(
                             opacity: animation,

@@ -115,16 +115,23 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
             content: Text(
               isCurrentlyFavorite ? 'Removed from Favorites' : 'Added to Favorites',
             ),
+            backgroundColor: Theme.of(context).colorScheme.secondary, // لون النجاح
           ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update favorites')),
+          SnackBar(
+            content: const Text('Failed to update favorites'),
+            backgroundColor: Theme.of(context).colorScheme.error, // لون الخطأ
+          ),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error, // لون الخطأ
+        ),
       );
     }
   }
@@ -241,7 +248,7 @@ class _DoctorCardState extends State<DoctorCard> with SingleTickerProviderStateM
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                 decoration: BoxDecoration(
-                  color: widget.doctor.status == 'Open' ? Colors.green : Theme.of(context).colorScheme.error,
+                  color: widget.doctor.status == 'Open' ? Theme.of(context).colorScheme.secondary : Theme.of(context).colorScheme.error,
                   borderRadius: BorderRadius.circular(8.r),
                 ),
                 child: Text(

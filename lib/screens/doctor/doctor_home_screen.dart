@@ -79,7 +79,7 @@ class _DoctorHomeScreenState extends State<DoctorHomeScreen> {
         Navigator.push(
           context,
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => const DoctorSettingsScreen(),
+            pageBuilder: (context, animation, secondaryAnimation) => const SettingsScreen(),
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               return FadeTransition(
                 opacity: animation,
@@ -114,7 +114,7 @@ class _DoctorHomeScreenState extends State<DoctorHomeScreen> {
               Navigator.push(
                 context,
                 PageRouteBuilder(
-                  pageBuilder: (context, animation, secondaryAnimation) => const DoctorSettingsScreen(),
+                  pageBuilder: (context, animation, secondaryAnimation) => const SettingsScreen(),
                   transitionsBuilder: (context, animation, secondaryAnimation, child) {
                     return FadeTransition(
                       opacity: animation,

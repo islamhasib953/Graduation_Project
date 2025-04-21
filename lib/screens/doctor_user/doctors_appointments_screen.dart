@@ -44,29 +44,38 @@ class _DoctorsAppointmentsScreenState extends State<DoctorsAppointmentsScreen>
         print('DoctorsAppointmentsScreen: SelectedChildCubit state - childId: $childId');
         if (childId == null) {
           return Scaffold(
-            backgroundColor: Colors.black,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             body: Center(
               child: Text(
                 'Please select a child',
-                style: TextStyle(color: Colors.white, fontSize: 16.sp),
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 16.sp,
+                    ),
               ),
             ),
           );
         }
         return Scaffold(
-          backgroundColor: Colors.black,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: AppBar(
-            backgroundColor: Colors.black,
-            title: const Text('Doctors', style: TextStyle(color: Colors.white)),
+            backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+            title: Text(
+              'Doctors',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Theme.of(context).appBarTheme.foregroundColor,
+                  ),
+            ),
             bottom: TabBar(
               controller: _tabController,
               tabs: const [
                 Tab(text: 'Top Doctors'),
                 Tab(text: 'Appointments'),
               ],
-              indicatorColor: Colors.blue,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.grey,
+              indicatorColor: Theme.of(context).colorScheme.primary,
+              labelColor: Theme.of(context).colorScheme.onSurface,
+              unselectedLabelColor:
+                  Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
             ),
           ),
           body: TabBarView(
@@ -86,9 +95,12 @@ class _DoctorsAppointmentsScreenState extends State<DoctorsAppointmentsScreen>
     return FutureBuilder<Map<String, dynamic>>(
       future: DoctorService.getDoctors(childId),
       builder: (context, snapshot) {
-        print('DoctorsAppointmentsScreen: FutureBuilder state for doctors list - connectionState: ${snapshot.connectionState}');
+        print(
+            'DoctorsAppointmentsScreen: FutureBuilder state for doctors list - connectionState: ${snapshot.connectionState}');
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(
+              child: CircularProgressIndicator(
+                  color: Theme.of(context).colorScheme.primary));
         }
         if (snapshot.hasError) {
           final error = snapshot.error.toString();
@@ -100,15 +112,23 @@ class _DoctorsAppointmentsScreenState extends State<DoctorsAppointmentsScreen>
                 children: [
                   Text(
                     'Please log in to view doctors.',
-                    style: TextStyle(color: Colors.white, fontSize: 16.sp),
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 16.sp,
+                        ),
                   ),
                   SizedBox(height: 16.h),
                   ElevatedButton(
                     onPressed: () {
-                      print('DoctorsAppointmentsScreen: Navigating to login screen');
+                      print(
+                          'DoctorsAppointmentsScreen: Navigating to login screen');
                       Navigator.pushNamed(context, '/login');
                     },
-                    child: Text('Log In', style: TextStyle(fontSize: 14.sp)),
+                    child: Text('Log In',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(fontSize: 14.sp)),
                   ),
                 ],
               ),
@@ -120,49 +140,70 @@ class _DoctorsAppointmentsScreenState extends State<DoctorsAppointmentsScreen>
               children: [
                 Text(
                   'Error loading doctors: $error',
-                  style: TextStyle(color: Colors.white, fontSize: 14.sp),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 14.sp,
+                      ),
                   textAlign: TextAlign.center,
                 ),
                 SizedBox(height: 16.h),
                 ElevatedButton(
                   onPressed: () {
-                    print('DoctorsAppointmentsScreen: Retry button pressed for doctors list');
+                    print(
+                        'DoctorsAppointmentsScreen: Retry button pressed for doctors list');
                     setState(() {});
                   },
-                  child: Text('Retry', style: TextStyle(fontSize: 14.sp)),
+                  child: Text('Retry',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(fontSize: 14.sp)),
                 ),
               ],
             ),
           );
         }
         if (!snapshot.hasData) {
-          print('DoctorsAppointmentsScreen: No data returned for doctors list');
+          print(
+              'DoctorsAppointmentsScreen: No data returned for doctors list');
           return Center(
             child: Text(
               'No data available',
-              style: TextStyle(color: Colors.white, fontSize: 16.sp),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 16.sp,
+                  ),
             ),
           );
         }
         final response = snapshot.data!;
         if (response['status'] != 'success') {
-          print('DoctorsAppointmentsScreen: Failed to load doctors - Response: $response');
+          print(
+              'DoctorsAppointmentsScreen: Failed to load doctors - Response: $response');
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   response['message'] ?? 'No doctors found',
-                  style: TextStyle(color: Colors.white, fontSize: 14.sp),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 14.sp,
+                      ),
                   textAlign: TextAlign.center,
                 ),
                 SizedBox(height: 16.h),
                 ElevatedButton(
                   onPressed: () {
-                    print('DoctorsAppointmentsScreen: Retry button pressed for doctors list');
+                    print(
+                        'DoctorsAppointmentsScreen: Retry button pressed for doctors list');
                     setState(() {});
                   },
-                  child: Text('Retry', style: TextStyle(fontSize: 14.sp)),
+                  child: Text('Retry',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(fontSize: 14.sp)),
                 ),
               ],
             ),
@@ -176,7 +217,10 @@ class _DoctorsAppointmentsScreenState extends State<DoctorsAppointmentsScreen>
           return Center(
             child: Text(
               'No doctors found',
-              style: TextStyle(color: Colors.white, fontSize: 16.sp),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 16.sp,
+                  ),
             ),
           );
         }
@@ -187,7 +231,8 @@ class _DoctorsAppointmentsScreenState extends State<DoctorsAppointmentsScreen>
             final doctor = doctors[index];
             return Builder(
               builder: (BuildContext context) {
-                print('DoctorsAppointmentsScreen: Building DoctorCard for doctor: ${doctor.firstName} ${doctor.lastName}');
+                print(
+                    'DoctorsAppointmentsScreen: Building DoctorCard for doctor: ${doctor.firstName} ${doctor.lastName}');
                 return _DoctorCard(
                   name: '${doctor.firstName} ${doctor.lastName}',
                   specialty: doctor.specialise,
@@ -195,20 +240,26 @@ class _DoctorsAppointmentsScreenState extends State<DoctorsAppointmentsScreen>
                   rating: doctor.rate,
                   isOpen: doctor.status == 'Open',
                   onTap: () {
-                    print('DoctorsAppointmentsScreen: Tapped on doctor: ${doctor.id} - ${doctor.firstName} ${doctor.lastName}');
-                    print('DoctorsAppointmentsScreen: Doctor details - Specialty: ${doctor.specialise}, Address: ${doctor.address}, Rating: ${doctor.rate}, Status: ${doctor.status}');
+                    print(
+                        'DoctorsAppointmentsScreen: Tapped on doctor: ${doctor.id} - ${doctor.firstName} ${doctor.lastName}');
+                    print(
+                        'DoctorsAppointmentsScreen: Doctor details - Specialty: ${doctor.specialise}, Address: ${doctor.address}, Rating: ${doctor.rate}, Status: ${doctor.status}');
                     context.read<SelectedDoctorCubit>().selectDoctor(doctor.id);
-                    print('DoctorsAppointmentsScreen: SelectedDoctorCubit updated with doctorId: ${doctor.id}');
+                    print(
+                        'DoctorsAppointmentsScreen: SelectedDoctorCubit updated with doctorId: ${doctor.id}');
                     try {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => DoctorDetailsScreen(doctorId: doctor.id),
+                          builder: (context) =>
+                              DoctorDetailsScreen(doctorId: doctor.id),
                         ),
                       );
-                      print('DoctorsAppointmentsScreen: Navigated to DoctorDetailsScreen for doctor: ${doctor.id}');
+                      print(
+                          'DoctorsAppointmentsScreen: Navigated to DoctorDetailsScreen for doctor: ${doctor.id}');
                     } catch (e) {
-                      print('DoctorsAppointmentsScreen: Navigation error: $e');
+                      print(
+                          'DoctorsAppointmentsScreen: Navigation error: $e');
                     }
                   },
                 );
@@ -221,17 +272,22 @@ class _DoctorsAppointmentsScreenState extends State<DoctorsAppointmentsScreen>
   }
 
   Widget _buildAppointmentsList(String childId) {
-    print('DoctorsAppointmentsScreen: Building appointments list for childId: $childId');
+    print(
+        'DoctorsAppointmentsScreen: Building appointments list for childId: $childId');
     return FutureBuilder<Map<String, dynamic>>(
       future: DoctorService.getUserAppointments(childId),
       builder: (context, snapshot) {
-        print('DoctorsAppointmentsScreen: FutureBuilder state for appointments list - connectionState: ${snapshot.connectionState}');
+        print(
+            'DoctorsAppointmentsScreen: FutureBuilder state for appointments list - connectionState: ${snapshot.connectionState}');
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(
+              child: CircularProgressIndicator(
+                  color: Theme.of(context).colorScheme.primary));
         }
         if (snapshot.hasError) {
           final error = snapshot.error.toString();
-          print('DoctorsAppointmentsScreen: Error loading appointments: $error');
+          print(
+              'DoctorsAppointmentsScreen: Error loading appointments: $error');
           if (error.contains('Authentication token is missing')) {
             return Center(
               child: Column(
@@ -239,15 +295,23 @@ class _DoctorsAppointmentsScreenState extends State<DoctorsAppointmentsScreen>
                 children: [
                   Text(
                     'Please log in to view appointments.',
-                    style: TextStyle(color: Colors.white, fontSize: 16.sp),
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 16.sp,
+                        ),
                   ),
                   SizedBox(height: 16.h),
                   ElevatedButton(
                     onPressed: () {
-                      print('DoctorsAppointmentsScreen: Navigating to login screen');
+                      print(
+                          'DoctorsAppointmentsScreen: Navigating to login screen');
                       Navigator.pushNamed(context, '/login');
                     },
-                    child: Text('Log In', style: TextStyle(fontSize: 14.sp)),
+                    child: Text('Log In',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(fontSize: 14.sp)),
                   ),
                 ],
               ),
@@ -259,37 +323,53 @@ class _DoctorsAppointmentsScreenState extends State<DoctorsAppointmentsScreen>
               children: [
                 Text(
                   'Error loading appointments: $error',
-                  style: TextStyle(color: Colors.white, fontSize: 14.sp),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 14.sp,
+                      ),
                   textAlign: TextAlign.center,
                 ),
                 SizedBox(height: 16.h),
                 ElevatedButton(
                   onPressed: () {
-                    print('DoctorsAppointmentsScreen: Retry button pressed for appointments list');
+                    print(
+                        'DoctorsAppointmentsScreen: Retry button pressed for appointments list');
                     setState(() {});
                   },
-                  child: Text('Retry', style: TextStyle(fontSize: 14.sp)),
+                  child: Text('Retry',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(fontSize: 14.sp)),
                 ),
               ],
             ),
           );
         }
         if (!snapshot.hasData) {
-          print('DoctorsAppointmentsScreen: No data returned for appointments list');
+          print(
+              'DoctorsAppointmentsScreen: No data returned for appointments list');
           return Center(
             child: Text(
               'No data available',
-              style: TextStyle(color: Colors.white, fontSize: 16.sp),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 16.sp,
+                  ),
             ),
           );
         }
         final response = snapshot.data!;
         if (response['status'] != 'success') {
-          print('DoctorsAppointmentsScreen: Failed to load appointments - Response: $response');
+          print(
+              'DoctorsAppointmentsScreen: Failed to load appointments - Response: $response');
           return Center(
             child: Text(
               response['message'] ?? 'No appointments found',
-              style: TextStyle(color: Colors.white, fontSize: 16.sp),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 16.sp,
+                  ),
             ),
           );
         }
@@ -299,12 +379,16 @@ class _DoctorsAppointmentsScreenState extends State<DoctorsAppointmentsScreen>
               .map((appointment) => UserAppointment.fromJson(appointment))
               .toList();
         });
-        print('DoctorsAppointmentsScreen: Loaded ${appointmentsData.length} months of appointments');
+        print(
+            'DoctorsAppointmentsScreen: Loaded ${appointmentsData.length} months of appointments');
         if (appointmentsData.isEmpty) {
           return Center(
             child: Text(
               'No appointments found',
-              style: TextStyle(color: Colors.white, fontSize: 16.sp),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 16.sp,
+                  ),
             ),
           );
         }
@@ -314,7 +398,8 @@ class _DoctorsAppointmentsScreenState extends State<DoctorsAppointmentsScreen>
           itemBuilder: (context, index) {
             final month = appointmentsData.keys.elementAt(index);
             final appointments = appointmentsData[month]!;
-            print('DoctorsAppointmentsScreen: Building appointments for month: $month');
+            print(
+                'DoctorsAppointmentsScreen: Building appointments for month: $month');
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -322,39 +407,57 @@ class _DoctorsAppointmentsScreenState extends State<DoctorsAppointmentsScreen>
                   padding: EdgeInsets.symmetric(vertical: 8.h),
                   child: Text(
                     month,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                 ),
                 ...appointments.map((appointment) {
                   return Builder(
                     builder: (BuildContext context) {
-                      print('DoctorsAppointmentsScreen: Building AppointmentCard for appointment: ${appointment.appointmentId}');
+                      print(
+                          'DoctorsAppointmentsScreen: Building AppointmentCard for appointment: ${appointment.appointmentId}');
                       return _AppointmentCard(
                         appointment: appointment,
                         onCancel: () {
-                          print('DoctorsAppointmentsScreen: Tapped on cancel for appointment: ${appointment.appointmentId}');
-                          print('DoctorsAppointmentsScreen: Appointment details - Doctor: ${appointment.doctorName}, Date: ${appointment.date}, Time: ${appointment.time}, Status: ${appointment.status}');
+                          print(
+                              'DoctorsAppointmentsScreen: Tapped on cancel for appointment: ${appointment.appointmentId}');
+                          print(
+                              'DoctorsAppointmentsScreen: Appointment details - Doctor: ${appointment.doctorName}, Date: ${appointment.date}, Time: ${appointment.time}, Status: ${appointment.status}');
                           showDialog(
                             context: context,
                             builder: (context) => CancelDialog(
                               onConfirm: () async {
                                 try {
-                                  print('DoctorsAppointmentsScreen: Confirming cancellation for appointment: ${appointment.appointmentId}');
-                                  await DoctorService.cancelAppointment(childId, appointment.appointmentId);
-                                  print('DoctorsAppointmentsScreen: Appointment cancelled successfully');
+                                  print(
+                                      'DoctorsAppointmentsScreen: Confirming cancellation for appointment: ${appointment.appointmentId}');
+                                  await DoctorService.cancelAppointment(
+                                      childId, appointment.appointmentId);
+                                  print(
+                                      'DoctorsAppointmentsScreen: Appointment cancelled successfully');
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Appointment cancelled successfully')),
+                                    SnackBar(
+                                      content: const Text(
+                                          'Appointment cancelled successfully'),
+                                      backgroundColor: Theme.of(context)
+                                          .colorScheme
+                                          .secondary,
+                                    ),
                                   );
                                   Navigator.pop(context);
                                   setState(() {});
                                 } catch (e) {
-                                  print('DoctorsAppointmentsScreen: Error cancelling appointment: $e');
+                                  print(
+                                      'DoctorsAppointmentsScreen: Error cancelling appointment: $e');
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Error: $e')),
+                                    SnackBar(
+                                      content: Text('Error: $e'),
+                                      backgroundColor: Theme.of(context)
+                                          .colorScheme
+                                          .error,
+                                    ),
                                   );
                                 }
                               },
@@ -362,9 +465,13 @@ class _DoctorsAppointmentsScreenState extends State<DoctorsAppointmentsScreen>
                           );
                         },
                         onReschedule: () {
-                          print('DoctorsAppointmentsScreen: Tapped on reschedule for appointment: ${appointment.appointmentId}');
-                          print('DoctorsAppointmentsScreen: Appointment details - Doctor: ${appointment.doctorName}, Date: ${appointment.date}, Time: ${appointment.time}, Status: ${appointment.status}');
-                          context.read<SelectedDoctorCubit>().selectDoctor(appointment.doctorId);
+                          print(
+                              'DoctorsAppointmentsScreen: Tapped on reschedule for appointment: ${appointment.appointmentId}');
+                          print(
+                              'DoctorsAppointmentsScreen: Appointment details - Doctor: ${appointment.doctorName}, Date: ${appointment.date}, Time: ${appointment.time}, Status: ${appointment.status}');
+                          context
+                              .read<SelectedDoctorCubit>()
+                              .selectDoctor(appointment.doctorId);
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -376,7 +483,8 @@ class _DoctorsAppointmentsScreenState extends State<DoctorsAppointmentsScreen>
                               ),
                             ),
                           );
-                          print('DoctorsAppointmentsScreen: Navigated to DoctorDetailsScreen for rescheduling appointment: ${appointment.appointmentId}');
+                          print(
+                              'DoctorsAppointmentsScreen: Navigated to DoctorDetailsScreen for rescheduling appointment: ${appointment.appointmentId}');
                         },
                       );
                     },
@@ -414,20 +522,25 @@ class _DoctorCard extends StatelessWidget {
     print('DoctorsAppointmentsScreen: Building _DoctorCard for doctor: $name');
     return InkWell(
       onTap: () {
-        print('DoctorsAppointmentsScreen: InkWell onTap triggered for doctor: $name');
+        print(
+            'DoctorsAppointmentsScreen: InkWell onTap triggered for doctor: $name');
         onTap();
       },
       child: Card(
-        color: Colors.grey[900],
+        color: Theme.of(context).cardColor,
         margin: EdgeInsets.symmetric(vertical: 8.h),
         child: Padding(
           padding: EdgeInsets.all(16.w),
           child: Row(
             children: [
-              const CircleAvatar(
+              CircleAvatar(
                 radius: 30,
-                backgroundColor: Colors.blue,
-                child: Icon(Icons.person, color: Colors.white, size: 30),
+                backgroundColor: Theme.of(context).colorScheme.secondary,
+                child: Icon(
+                  Icons.person,
+                  color: Theme.of(context).colorScheme.onSecondary,
+                  size: 30,
+                ),
               ),
               SizedBox(width: 16.w),
               Expanded(
@@ -436,28 +549,61 @@ class _DoctorCard extends StatelessWidget {
                   children: [
                     Text(
                       name,
-                      style: TextStyle(color: Colors.white, fontSize: 16.sp, fontWeight: FontWeight.bold),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurface,
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
                     SizedBox(height: 4.h),
                     Text(
                       specialty,
-                      style: TextStyle(color: Colors.grey, fontSize: 14.sp),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withOpacity(0.6),
+                            fontSize: 14.sp,
+                          ),
                     ),
                     SizedBox(height: 4.h),
                     Row(
                       children: [
-                        Icon(Icons.location_on, color: Colors.grey, size: 16.sp),
+                        Icon(
+                          Icons.location_on,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.6),
+                          size: 16.sp,
+                        ),
                         SizedBox(width: 4.w),
                         Text(
                           distance,
-                          style: TextStyle(color: Colors.grey, fontSize: 14.sp),
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withOpacity(0.6),
+                                fontSize: 14.sp,
+                              ),
                         ),
                         SizedBox(width: 8.w),
-                        Icon(Icons.star, color: Colors.yellow, size: 16.sp),
+                        Icon(
+                          Icons.star,
+                          color: Theme.of(context).colorScheme.secondary,
+                          size: 16.sp,
+                        ),
                         SizedBox(width: 4.w),
                         Text(
                           rating.toString(),
-                          style: TextStyle(color: Colors.grey, fontSize: 14.sp),
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withOpacity(0.6),
+                                fontSize: 14.sp,
+                              ),
                         ),
                       ],
                     ),
@@ -467,12 +613,19 @@ class _DoctorCard extends StatelessWidget {
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                 decoration: BoxDecoration(
-                  color: isOpen ? Colors.green : Colors.red,
+                  color: isOpen
+                      ? Theme.of(context).colorScheme.secondary
+                      : Theme.of(context).colorScheme.error,
                   borderRadius: BorderRadius.circular(12.r),
                 ),
                 child: Text(
                   isOpen ? 'Open' : 'Closed',
-                  style: TextStyle(color: Colors.white, fontSize: 12.sp),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: isOpen
+                            ? Theme.of(context).colorScheme.onSecondary
+                            : Theme.of(context).colorScheme.onError,
+                        fontSize: 12.sp,
+                      ),
                 ),
               ),
             ],
@@ -500,7 +653,7 @@ class _AppointmentCard extends StatelessWidget {
     final DateTime date = DateTime.parse(appointment.date);
     final String formattedDate = DateFormat('MMM d, yyyy').format(date);
     return Card(
-      color: Colors.grey[900],
+      color: Theme.of(context).cardColor,
       margin: EdgeInsets.symmetric(vertical: 8.h),
       child: Padding(
         padding: EdgeInsets.all(16.w),
@@ -515,30 +668,55 @@ class _AppointmentCard extends StatelessWidget {
                     children: [
                       Text(
                         appointment.doctorName,
-                        style: TextStyle(color: Colors.white, fontSize: 16.sp, fontWeight: FontWeight.bold),
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                  fontSize: 16.sp,
+                                  fontWeight: FontWeight.bold,
+                                ),
                       ),
                       SizedBox(height: 4.h),
                       Text(
                         'Date: $formattedDate',
-                        style: TextStyle(color: Colors.grey, fontSize: 14.sp),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withOpacity(0.6),
+                              fontSize: 14.sp,
+                            ),
                       ),
                       SizedBox(height: 4.h),
                       Text(
                         'Time: ${appointment.time}',
-                        style: TextStyle(color: Colors.grey, fontSize: 14.sp),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withOpacity(0.6),
+                              fontSize: 14.sp,
+                            ),
                       ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                   decoration: BoxDecoration(
-                    color: appointment.status == 'Scheduled' ? Colors.blue : Colors.grey,
+                    color: appointment.status == 'Scheduled'
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                     borderRadius: BorderRadius.circular(12.r),
                   ),
                   child: Text(
                     appointment.status,
-                    style: TextStyle(color: Colors.white, fontSize: 12.sp),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: appointment.status == 'Scheduled'
+                              ? Theme.of(context).colorScheme.onPrimary
+                              : Theme.of(context).colorScheme.onSurface,
+                          fontSize: 12.sp,
+                        ),
                   ),
                 ),
               ],
@@ -549,12 +727,22 @@ class _AppointmentCard extends StatelessWidget {
               children: [
                 TextButton(
                   onPressed: onCancel,
-                  child: const Text('Cancel', style: TextStyle(color: Colors.red)),
+                  child: Text(
+                    'Cancel',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                  ),
                 ),
                 SizedBox(width: 8.w),
                 TextButton(
                   onPressed: onReschedule,
-                  child: const Text('Reschedule', style: TextStyle(color: Colors.blue)),
+                  child: Text(
+                    'Reschedule',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                  ),
                 ),
               ],
             ),

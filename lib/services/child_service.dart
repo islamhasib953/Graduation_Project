@@ -14,14 +14,14 @@ class ChildService {
       final String? userId = await AuthService.getUserId();
 
       if (token == null || userId == null) {
-        return {'status': 'error', 'message': 'يجب تسجيل الدخول'};
+        return {'status': 'error', 'message': 'You must be logged in'};
       }
 
       final url = Uri.parse('${AuthService.baseUrl}/children?userId=$userId');
 
-      final headers = await AuthService.getHeaders(token); // تعديل: استخدام await
+      final headers = await AuthService.getHeaders(token);
       print('\n📤 Get Children Request:');
-      print('├─ URL: $url');
+      print('├─ URL:-; $url');
       print('└─ Headers: $headers');
 
       final response = await http.get(
@@ -44,11 +44,11 @@ class ChildService {
       }
       return {
         'status': 'error',
-        'message': 'فشل في جلب الأطفال',
+        'message': 'Failed to fetch children',
       };
     } catch (e) {
       print('\n🔥 Get Children Error: $e');
-      return {'status': 'error', 'message': 'خطأ تقني: ${e.toString()}'};
+      return {'status': 'error', 'message': 'Technical error: ${e.toString()}'};
     }
   }
 
@@ -61,7 +61,7 @@ class ChildService {
         print('❌ Missing Auth Data:');
         print('├─ User ID: $userId');
         print('└─ Token: $token');
-        return {'status': 'error', 'message': 'يجب تسجيل الدخول'};
+        return {'status': 'error', 'message': 'You must be logged in'};
       }
 
       final url = Uri.parse('${AuthService.baseUrl}/children');
@@ -72,11 +72,13 @@ class ChildService {
         'birthDate': DateFormat('yyyy-MM-dd').format(child.birthDate),
         'heightAtBirth': child.heightAtBirth,
         'weightAtBirth': child.weightAtBirth,
+        'headCircumferenceAtBirth': child.headCircumferenceAtBirth,
         'bloodType': child.bloodType,
         'photo': null,
+        'parentPhone': child.parentPhone,
       };
 
-      final headers = await AuthService.getHeaders(token); // تعديل: استخدام await
+      final headers = await AuthService.getHeaders(token);
       print('\n📤 Add Child Request:');
       print('├─ URL: $url');
       print('├─ Headers: $headers');
@@ -97,7 +99,6 @@ class ChildService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final String? childId = data['data']?['child']?['_id'];
         if (childId != null) {
-          // Set the newly added child as the default selected child
           context.read<SelectedChildCubit>().selectChild(childId);
           print('🔑 Set childId in Cubit: $childId');
           print('🎉 Successfully added child with ID: $childId');
@@ -106,7 +107,7 @@ class ChildService {
         }
         return {
           'status': 'success',
-          'message': 'تم إضافة الطفل بنجاح',
+          'message': 'Child added successfully',
           'data': data['data'],
         };
       }
@@ -116,25 +117,131 @@ class ChildService {
       };
     } catch (e) {
       print('\n🔥 Add Child Error: $e');
-      return {'status': 'error', 'message': 'خطأ تقني: ${e.toString()}'};
+      return {'status': 'error', 'message': 'Technical error: ${e.toString()}'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateChild(Child child, BuildContext context) async {
+    try {
+      final String? userId = await AuthService.getUserId();
+      final String? token = await AuthService.getToken();
+
+      if (userId == null || token == null) {
+        print('❌ Missing Auth Data:');
+        print('├─ User ID: $userId');
+        print('└─ Token: $token');
+        return {'status': 'error', 'message': 'You must be logged in'};
+      }
+
+      final url = Uri.parse('${AuthService.baseUrl}/children/${child.id}');
+      final body = {
+        'userId': userId,
+        'name': child.name,
+        'gender': child.gender,
+        'birthDate': DateFormat('yyyy-MM-dd').format(child.birthDate),
+        'heightAtBirth': child.heightAtBirth,
+        'weightAtBirth': child.weightAtBirth,
+        'headCircumferenceAtBirth': child.headCircumferenceAtBirth,
+        'bloodType': child.bloodType,
+        'photo': child.photo,
+        'parentPhone': child.parentPhone,
+      };
+
+      final headers = await AuthService.getHeaders(token);
+      print('\n📤 Update Child Request:');
+      print('├─ URL: $url');
+      print('├─ Headers: $headers');
+      print('└─ Body: ${jsonEncode(body)}');
+
+      final response = await http.patch(
+        url,
+        headers: headers,
+        body: jsonEncode(body),
+      );
+
+      print('\n📥 Update Child Response:');
+      print('├─ Status: ${response.statusCode}');
+      print('└─ Body: ${response.body}');
+
+      final Map<String, dynamic> data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {
+          'status': 'success',
+          'message': 'Child updated successfully',
+          'data': data['data'],
+        };
+      }
+      return {
+        'status': 'error',
+        'message': _handleError(response.statusCode, data),
+      };
+    } catch (e) {
+      print('\n🔥 Update Child Error: $e');
+      return {'status': 'error', 'message': 'Technical error: ${e.toString()}'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> deleteChild(String childId, BuildContext context) async {
+    try {
+      final String? token = await AuthService.getToken();
+
+      if (token == null) {
+        return {'status': 'error', 'message': 'You must be logged in'};
+      }
+
+      final url = Uri.parse('${AuthService.baseUrl}/children/$childId');
+
+      final headers = await AuthService.getHeaders(token);
+      print('\n📤 Delete Child Request:');
+      print('├─ URL: $url');
+      print('└─ Headers: $headers');
+
+      final response = await http.delete(
+        url,
+        headers: headers,
+      );
+
+      print('\n📥 Delete Child Response:');
+      print('├─ Status: ${response.statusCode}');
+      print('└─ Body: ${response.body}');
+
+      final Map<String, dynamic> data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        // Clear the selected child if it was the one deleted
+        final currentSelectedChildId = context.read<SelectedChildCubit>().state;
+        if (currentSelectedChildId == childId) {
+          context.read<SelectedChildCubit>().selectChild('');
+        }
+        return {
+          'status': 'success',
+          'message': 'Child deleted successfully',
+        };
+      }
+      return {
+        'status': 'error',
+        'message': _handleError(response.statusCode, data),
+      };
+    } catch (e) {
+      print('\n🔥 Delete Child Error: $e');
+      return {'status': 'error', 'message': 'Technical error: ${e.toString()}'};
     }
   }
 
   static String _handleError(int statusCode, Map<String, dynamic> data) {
-    final serverMessage = data['message'] ?? 'لا توجد رسالة خطأ';
+    final serverMessage = data['message'] ?? 'No error message available';
     switch (statusCode) {
       case 400:
-        return 'بيانات غير صالحة: $serverMessage';
+        return 'Invalid data: $serverMessage';
       case 401:
-        return 'انتهت الجلسة، من فضلك سجل الدخول مرة أخرى';
+        return 'Session expired, please log in again';
       case 404:
-        return 'المورد غير موجود';
+        return 'Resource not found';
       case 500:
-        return 'خطأ في الخادم: $serverMessage';
+        return 'Server error: $serverMessage';
       default:
-        return 'فشل العملية (الكود: $statusCode): $serverMessage';
+        return 'Operation failed (Code: $statusCode): $serverMessage';
     }
   }
 }
-
-

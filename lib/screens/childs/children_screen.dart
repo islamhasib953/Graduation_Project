@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:segma/cubits/selected_child_cubit.dart';
 import 'package:segma/models/child_model.dart';
 import 'package:segma/screens/childs/add_child_screen.dart';
+import 'package:segma/screens/childs/child_details_screen.dart';
 import 'package:segma/services/child_service.dart';
 import 'package:segma/utils/colors.dart';
 
@@ -24,9 +25,149 @@ class _ChildrenScreenState extends State<ChildrenScreen> {
   }
 
   void _refreshChildren() {
-    setState(() {
-      _childrenFuture = ChildService.getChildren();
-    });
+    if (mounted) {
+      setState(() {
+        _childrenFuture = ChildService.getChildren();
+      });
+    }
+  }
+
+  void _showDeleteConfirmationDialog(Child child) {
+    // Save a reference to the context before the async operation
+    final BuildContext dialogContext = context;
+
+    showDialog(
+      context: dialogContext,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Delete Child',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontFamily: 'Roboto',
+              ),
+        ),
+        content: Text(
+          'Are you sure you want to delete ${child.name}?',
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                fontFamily: 'Roboto',
+              ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context), // Cancel
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                color: Theme.of(context).brightness == Brightness.light
+                    ? AppColors.lightButtonPrimary
+                    : AppColors.darkButtonPrimary,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context); // Close the confirmation dialog
+              final response = await ChildService.deleteChild(child.id, dialogContext);
+              // Check if the widget is still mounted before using context
+              if (!mounted) return;
+              if (response['status'] == 'success') {
+                _refreshChildren(); // Refresh the children list
+                _showSuccessDialog(child.name);
+              } else {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  SnackBar(
+                    content: Text(response['message'] ?? 'Failed to delete child'),
+                    backgroundColor: AppColors.statusOverdue,
+                  ),
+                );
+              }
+            },
+            child: Text(
+              'Confirm',
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                color: AppColors.statusOverdue,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String childName) {
+    // Use context directly since this is called synchronously after checking mounted
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Prevent dismissing by tapping outside
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.r),
+        ),
+        backgroundColor: Theme.of(context).cardColor,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: EdgeInsets.all(16.w),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+                border: Border.all(
+                  color: Theme.of(context).brightness == Brightness.light
+                      ? AppColors.lightButtonPrimary
+                      : AppColors.darkButtonPrimary,
+                  width: 2,
+                ),
+              ),
+              child: Icon(
+                Icons.check,
+                size: 40.sp,
+                color: Theme.of(context).brightness == Brightness.light
+                    ? AppColors.lightButtonPrimary
+                    : AppColors.darkButtonPrimary,
+              ),
+            ),
+            SizedBox(height: 16.h),
+            Text(
+              'Child Deleted',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontFamily: 'Roboto',
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              '$childName has been deleted successfully',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontFamily: 'Roboto',
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 16.h),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context); // Close the success dialog
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).brightness == Brightness.light
+                    ? AppColors.lightButtonPrimary
+                    : AppColors.darkButtonPrimary,
+                padding: EdgeInsets.symmetric(horizontal: 32.w, vertical: 12.h),
+              ),
+              child: Text(
+                'Back to Home',
+                style: TextStyle(
+                  fontSize: 16.sp,
+                  fontFamily: 'Roboto',
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -35,7 +176,9 @@ class _ChildrenScreenState extends State<ChildrenScreen> {
       appBar: AppBar(
         title: Text(
           'Select Child',
-          style: Theme.of(context).textTheme.titleLarge,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontFamily: 'Roboto',
+              ),
         ),
         actions: [
           Padding(
@@ -67,6 +210,7 @@ class _ChildrenScreenState extends State<ChildrenScreen> {
                           color: Theme.of(context).brightness == Brightness.light
                               ? AppColors.lightButtonPrimary
                               : AppColors.darkButtonPrimary,
+                          fontFamily: 'Roboto',
                         ),
                   ),
                 ],
@@ -93,6 +237,7 @@ class _ChildrenScreenState extends State<ChildrenScreen> {
                 'Error loading children',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: AppColors.statusOverdue,
+                      fontFamily: 'Roboto',
                     ),
                 textAlign: TextAlign.center,
               ),
@@ -103,7 +248,9 @@ class _ChildrenScreenState extends State<ChildrenScreen> {
             return Center(
               child: Text(
                 'No children found',
-                style: Theme.of(context).textTheme.bodyLarge,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontFamily: 'Roboto',
+                    ),
                 textAlign: TextAlign.center,
               ),
             );
@@ -126,8 +273,14 @@ class _ChildrenScreenState extends State<ChildrenScreen> {
                     onTapDown: (_) => setState(() => isPressed = true),
                     onTapUp: (_) {
                       setState(() => isPressed = false);
+                      // Tapping the box itself only selects the child
                       context.read<SelectedChildCubit>().selectChild(child.id);
-                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('${child.name} selected'),
+                          duration: const Duration(seconds: 1),
+                        ),
+                      );
                     },
                     onTapCancel: () => setState(() => isPressed = false),
                     child: AnimatedScale(
@@ -157,8 +310,58 @@ class _ChildrenScreenState extends State<ChildrenScreen> {
                             SizedBox(height: 10.h),
                             Text(
                               child.name,
-                              style: Theme.of(context).textTheme.bodyLarge,
+                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    fontFamily: 'Roboto',
+                                  ),
                               textAlign: TextAlign.center,
+                            ),
+                            SizedBox(height: 10.h),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // Details Button
+                                ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ChildDetailsScreen(child: child),
+                                      ),
+                                    );
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Theme.of(context).brightness == Brightness.light
+                                        ? AppColors.lightButtonPrimary
+                                        : AppColors.darkButtonPrimary,
+                                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                                  ),
+                                  child: Text(
+                                    'Details',
+                                    style: TextStyle(
+                                      fontSize: 14.sp,
+                                      fontFamily: 'Roboto',
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 8.w),
+                                // Delete Button
+                                ElevatedButton(
+                                  onPressed: () {
+                                    _showDeleteConfirmationDialog(child);
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.statusOverdue,
+                                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                                  ),
+                                  child: Text(
+                                    'Delete',
+                                    style: TextStyle(
+                                      fontSize: 14.sp,
+                                      fontFamily: 'Roboto',
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),

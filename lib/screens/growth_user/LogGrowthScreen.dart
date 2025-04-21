@@ -1,182 +1,283 @@
-// import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:intl/intl.dart';
+import 'package:segma/cubits/growth_cubit.dart';
 
-// import 'package:segma/screens/GrowthScreen.dart';
+class LogGrowthScreen extends StatefulWidget {
+  final String childId;
 
-// class LogGrowthScreen extends StatefulWidget {
-//   @override
-//   _LogGrowthScreenState createState() => _LogGrowthScreenState();
-// }
+  const LogGrowthScreen({Key? key, required this.childId}) : super(key: key);
 
-// class _LogGrowthScreenState extends State<LogGrowthScreen> {
-//   DateTime selectedDate = DateTime.now();
-//   TimeOfDay selectedTime = TimeOfDay.now();
-//   TextEditingController weightController = TextEditingController();
-//   TextEditingController heightController = TextEditingController();
-//   TextEditingController headCircumferenceController = TextEditingController();
-//   TextEditingController noteController = TextEditingController();
-// // Stores selected image
+  @override
+  _LogGrowthScreenState createState() => _LogGrowthScreenState();
+}
 
-//   // *Select Date*
-//   Future<void> _selectDate(BuildContext context) async {
-//     DateTime? picked = await showDatePicker(
-//       context: context,
-//       initialDate: selectedDate,
-//       firstDate: DateTime(2000),
-//       lastDate: DateTime.now(),
-//     );
-//     if (picked != null && picked != selectedDate) {
-//       setState(() {
-//         selectedDate = picked;
-//       });
-//     }
-//   }
+class _LogGrowthScreenState extends State<LogGrowthScreen> {
+  final _weightController = TextEditingController();
+  final _heightController = TextEditingController();
+  final _headCircumferenceController = TextEditingController();
+  final _notesController = TextEditingController();
+  String _notesImage = '';
+  bool _isLoading = false;
 
-//   // *Select Time*
-//   Future<void> _selectTime(BuildContext context) async {
-//     TimeOfDay? picked = await showTimePicker(
-//       context: context,
-//       initialTime: selectedTime,
-//     );
-//     if (picked != null && picked != selectedTime) {
-//       setState(() {
-//         selectedTime = picked;
-//       });
-//     }
-//   }
+  DateTime _selectedDate = DateTime.now(); // Store selected date
+  TimeOfDay _selectedTime = TimeOfDay.now(); // Store selected time
 
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       backgroundColor: Colors.black,
-//       appBar: AppBar(
-//         title: Text("Log Growth", style: TextStyle(color: Colors.white)),
-//         backgroundColor: Colors.black,
-//         leading: IconButton(
-//           icon: Icon(Icons.arrow_back_ios, color: Colors.white),
-//           onPressed: () {
-//             Navigator.pop(context);
-//           },
-//         ),
-//       ),
-//       body: Padding(
-//         padding: EdgeInsets.all(16),
-//         child: Column(
-//           children: [
-//             // *Date Picker*
-//             _buildEditableRow("Date", "${selectedDate.toLocal()}".split(' ')[0],
-//                 () => _selectDate(context)),
+  @override
+  void dispose() {
+    _weightController.dispose();
+    _heightController.dispose();
+    _headCircumferenceController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
 
-//             // *Time Picker*
-//             _buildEditableRow("Time", selectedTime.format(context),
-//                 () => _selectTime(context)),
+  // Show Date Picker
+  Future<void> _pickDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+      });
+    }
+  }
 
-//             SizedBox(height: 10),
+  // Show Time Picker
+  Future<void> _pickTime(BuildContext context) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: _selectedTime,
+    );
+    if (picked != null && picked != _selectedTime) {
+      setState(() {
+        _selectedTime = picked;
+      });
+    }
+  }
 
-//             // *Weight, Height, Head Circumference*
-//             _buildEditableTextField("Weight", weightController, "Kg"),
-//             _buildEditableTextField("Height", heightController, "Cm"),
-//             _buildEditableTextField(
-//                 "Head Circumference", headCircumferenceController, "Cm"),
+  void _saveGrowthRecord() async {
+    setState(() {
+      _isLoading = true;
+    });
 
-//             SizedBox(height: 10),
+    // Combine selected date and time into a single DateTime object
+    final DateTime combinedDateTime = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+      _selectedTime.hour,
+      _selectedTime.minute,
+    );
 
-//             // *Note Field*
-//             TextField(
-//               controller: noteController,
-//               style: TextStyle(color: Colors.white),
-//               decoration: InputDecoration(
-//                 hintText: "Add Note Here",
-//                 hintStyle: TextStyle(color: Colors.grey),
-//                 filled: true,
-//                 fillColor: Colors.grey[900],
-//                 border: OutlineInputBorder(
-//                   borderRadius: BorderRadius.circular(10),
-//                   borderSide: BorderSide.none,
-//                 ),
-//               ),
-//             ),
+    final data = {
+      'weight': double.tryParse(_weightController.text) ?? 0.0,
+      'height': double.tryParse(_heightController.text) ?? 0.0,
+      'headCircumference': double.tryParse(_headCircumferenceController.text) ?? 0.0,
+      'date': combinedDateTime.toIso8601String(),
+      'time': DateFormat('HH:mm').format(combinedDateTime),
+      'notes': _notesController.text,
+      'notesImage': _notesImage,
+    };
 
-//             SizedBox(height: 10),
+    try {
+      await context.read<GrowthCubit>().addGrowthRecord(data);
+      setState(() {
+        _isLoading = false;
+      });
 
-//             SizedBox(height: 20),
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          return AlertDialog(
+            title: const Icon(Icons.check_circle, color: Colors.blue, size: 50),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Growth Activity Added', style: TextStyle(fontSize: 18.sp)),
+                SizedBox(height: 8.h),
+                Text('Your growth activity added', style: TextStyle(fontSize: 14.sp)),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.pop(context);
+                },
+                child: Text('Back to Home', style: TextStyle(fontSize: 14.sp, color: Colors.blue)),
+              ),
+            ],
+          );
+        },
+      );
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to add growth record: $e')),
+      );
+    }
+  }
 
-//             // *Save Button*
-//             ElevatedButton(
-//               style: ElevatedButton.styleFrom(
-//                 backgroundColor: Colors.blue,
-//                 minimumSize: Size(double.infinity, 50),
-//                 shape: RoundedRectangleBorder(
-//                   borderRadius: BorderRadius.circular(10),
-//                 ),
-//               ),
-//               onPressed: () {
-//                 Navigator.push(
-//                   context,
-//                   MaterialPageRoute(
-//                       builder: (context) =>
-//                           GrowthScreen()), // Navigate to GrowthPage
-//                 );
-//               },
-//               child: Text("Save",
-//                   style: TextStyle(color: Colors.white, fontSize: 16)),
-//             ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-
-//   // *Editable Row for Date & Time*
-//   Widget _buildEditableRow(String label, String value, VoidCallback onTap) {
-//     return GestureDetector(
-//       onTap: onTap,
-//       child: Container(
-//         padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-//         margin: EdgeInsets.only(bottom: 10),
-//         decoration: BoxDecoration(
-//           border: Border(bottom: BorderSide(color: Colors.grey[700]!)),
-//         ),
-//         child: Row(
-//           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//           children: [
-//             Text(label, style: TextStyle(color: Colors.white)),
-//             Text(value, style: TextStyle(color: Colors.green)),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-
-//   // *Editable Text Fields*
-//   Widget _buildEditableTextField(
-//       String label, TextEditingController controller, String unit) {
-//     return Container(
-//       margin: EdgeInsets.only(bottom: 10),
-//       padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-//       decoration: BoxDecoration(
-//         color: Colors.grey[900],
-//         borderRadius: BorderRadius.circular(10),
-//       ),
-//       child: Row(
-//         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//         children: [
-//           Text(label, style: TextStyle(color: Colors.white)),
-//           Container(
-//             width: 80,
-//             child: TextField(
-//               controller: controller,
-//               keyboardType: TextInputType.number,
-//               style: TextStyle(color: Colors.green),
-//               decoration: InputDecoration(
-//                 border: InputBorder.none,
-//                 hintText: unit,
-//                 hintStyle: TextStyle(color: Colors.green),
-//               ),
-//               textAlign: TextAlign.right,
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Log Growth', style: TextStyle(fontSize: 18.sp)),
+      ),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(16.r),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Date', style: TextStyle(fontSize: 14.sp)),
+            SizedBox(height: 8.h),
+            GestureDetector(
+              onTap: () => _pickDate(context),
+              child: Container(
+                padding: EdgeInsets.all(12.r),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade800,
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                child: Text(
+                  DateFormat('dd-MMM-yyyy').format(_selectedDate),
+                  style: TextStyle(fontSize: 14.sp),
+                ),
+              ),
+            ),
+            SizedBox(height: 16.h),
+            Text('Time', style: TextStyle(fontSize: 14.sp)),
+            SizedBox(height: 8.h),
+            GestureDetector(
+              onTap: () => _pickTime(context),
+              child: Container(
+                padding: EdgeInsets.all(12.r),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade800,
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                child: Text(
+                  _selectedTime.format(context),
+                  style: TextStyle(fontSize: 14.sp),
+                ),
+              ),
+            ),
+            SizedBox(height: 16.h),
+            Text('Weight', style: TextStyle(fontSize: 14.sp)),
+            SizedBox(height: 8.h),
+            TextField(
+              controller: _weightController,
+              decoration: InputDecoration(
+                hintText: 'Enter weight in kg',
+                filled: true,
+                fillColor: Colors.grey.shade800,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.r),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            SizedBox(height: 16.h),
+            Text('Height', style: TextStyle(fontSize: 14.sp)),
+            SizedBox(height: 8.h),
+            TextField(
+              controller: _heightController,
+              decoration: InputDecoration(
+                hintText: 'Enter height in cm',
+                filled: true,
+                fillColor: Colors.grey.shade800,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.r),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            SizedBox(height: 16.h),
+            Text('Head Circumference', style: TextStyle(fontSize: 14.sp)),
+            SizedBox(height: 8.h),
+            TextField(
+              controller: _headCircumferenceController,
+              decoration: InputDecoration(
+                hintText: 'Enter head circumference in cm',
+                filled: true,
+                fillColor: Colors.grey.shade800,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.r),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            SizedBox(height: 16.h),
+            Text('Note', style: TextStyle(fontSize: 14.sp)),
+            SizedBox(height: 8.h),
+            TextField(
+              controller: _notesController,
+              decoration: InputDecoration(
+                hintText: 'Add Note Here',
+                filled: true,
+                fillColor: Colors.grey.shade800,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.r),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              maxLines: 3,
+            ),
+            SizedBox(height: 16.h),
+            Text('Add a photo', style: TextStyle(fontSize: 14.sp)),
+            SizedBox(height: 8.h),
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _notesImage = '';
+                });
+              },
+              child: Container(
+                padding: EdgeInsets.all(12.r),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade800,
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _notesImage.isEmpty ? 'Add a photo' : 'Photo Added',
+                      style: TextStyle(fontSize: 14.sp),
+                    ),
+                    Icon(Icons.add_circle, color: Colors.blue),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: 24.h),
+            Center(
+              child: _isLoading
+                  ? const CircularProgressIndicator()
+                  : ElevatedButton(
+                      onPressed: _saveGrowthRecord,
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(horizontal: 32.w, vertical: 12.h),
+                        backgroundColor: Colors.blue,
+                      ),
+                      child: Text('Save', style: TextStyle(fontSize: 16.sp)),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
