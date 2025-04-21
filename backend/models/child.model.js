@@ -11,6 +11,10 @@ const ChildSchema = new mongoose.Schema(
     birthDate: { type: Date, required: [true, "Birth date is required"] },
     heightAtBirth: { type: Number, min: [0, "Height must be positive"] },
     weightAtBirth: { type: Number, min: [0, "Weight must be positive"] },
+    headCircumferenceAtBirth: {
+      type: Number,
+      min: [0, "Head circumference must be positive"],
+    },
     bloodType: {
       type: String,
       match: [/^(A|B|AB|O)[+-]$/, "Invalid blood type"],
@@ -22,7 +26,7 @@ const ChildSchema = new mongoose.Schema(
     },
     photo: {
       type: String,
-      default: "uploads/vaccination.jpg",
+      default: "Uploads/vaccination.jpg",
       validate: {
         validator: function (value) {
           return /\.(jpg|jpeg|png|gif)$/i.test(value);

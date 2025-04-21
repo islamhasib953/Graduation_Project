@@ -85,9 +85,11 @@ const getAllGrowth = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  const growthRecords = await Growth.find({ childId, parentId: userId }).select(
-    "_id weight height headCircumference date time notes notesImage ageInMonths createdAt"
-  );
+  const growthRecords = await Growth.find({ childId, parentId: userId })
+    .sort({ createdAt: -1 }) // Sort from newest to oldest
+    .select(
+      "_id weight height headCircumference date time notes notesImage ageInMonths createdAt"
+    );
 
   if (!growthRecords.length) {
     return next(
@@ -151,7 +153,7 @@ const getSingleGrowth = asyncWrapper(async (req, res, next) => {
     status: httpStatusText.SUCCESS,
     data: {
       _id: growthRecord._id,
-      weight: growthRecord.weight,
+      weight: weightRecord.weight,
       height: growthRecord.height,
       headCircumference: growthRecord.headCircumference,
       date: growthRecord.date,
@@ -282,6 +284,8 @@ const getLastGrowthRecord = asyncWrapper(async (req, res, next) => {
     );
   }
 
+  console.log("Last growth record:", lastGrowthRecord); // Debugging log
+
   res.json({
     status: httpStatusText.SUCCESS,
     data: {
@@ -316,25 +320,107 @@ const getLastGrowthChange = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // Get the last two growth records sorted by createdAt
-  const lastTwoRecords = await Growth.find({ childId, parentId: userId })
-    .sort({ createdAt: -1 })
-    .limit(2)
+  // Get all growth records sorted by createdAt
+  const growthRecords = await Growth.find({ childId, parentId: userId })
+    .sort({ createdAt: -1 }) // Sort by createdAt in descending order
     .select(
       "_id weight height headCircumference date time ageInMonths createdAt"
     );
 
-  if (lastTwoRecords.length < 2) {
-    return next(
-      appError.create(
-        "At least two growth records are required to calculate changes",
-        400,
-        httpStatusText.FAIL
-      )
-    );
+  // Case 1: No growth records, use birth data as current and zeros as previous
+  if (!growthRecords.length) {
+    const birthData = {
+      weight: child.weightAtBirth,
+      height: child.heightAtBirth,
+      headCircumference: child.headCircumferenceAtBirth,
+      date: child.birthDate,
+      time: "00:00",
+      ageInMonths: 0,
+      createdAt: child.createdAt,
+    };
+
+    const zeroData = {
+      weight: 0,
+      height: 0,
+      headCircumference: 0,
+      date: child.birthDate, // Use birth date for consistency
+      time: "00:00",
+      ageInMonths: 0,
+      createdAt: child.createdAt,
+    };
+
+    const changes = {
+      weightChange: birthData.weight - zeroData.weight,
+      heightChange: birthData.height - zeroData.height,
+      headCircumferenceChange:
+        birthData.headCircumference - zeroData.headCircumference,
+      ageInMonthsDifference: birthData.ageInMonths - zeroData.ageInMonths,
+      timeIntervalDays: 0, // No time interval since it's the same date
+    };
+
+    console.log("No growth records, using birth data:", birthData); // Debugging log
+
+    return res.json({
+      status: httpStatusText.SUCCESS,
+      data: {
+        latestRecord: birthData,
+        previousRecord: zeroData,
+        changes,
+      },
+    });
   }
 
-  const [latest, previous] = lastTwoRecords;
+  // Case 2: One growth record, compare with birth data
+  if (growthRecords.length === 1) {
+    const latest = growthRecords[0];
+    const birthData = {
+      weight: child.weightAtBirth,
+      height: child.heightAtBirth,
+      headCircumference: child.headCircumferenceAtBirth,
+      date: child.birthDate,
+      time: "00:00",
+      ageInMonths: 0,
+      createdAt: child.createdAt,
+    };
+
+    const changes = {
+      weightChange: latest.weight - birthData.weight,
+      heightChange: latest.height - birthData.height,
+      headCircumferenceChange:
+        latest.headCircumference - birthData.headCircumference,
+      ageInMonthsDifference: latest.ageInMonths - birthData.ageInMonths,
+      timeIntervalDays: Math.round(
+        (new Date(latest.date) - new Date(birthData.date)) /
+          (1000 * 60 * 60 * 24)
+      ),
+    };
+
+    console.log("One growth record, comparing with birth data:", {
+      latest,
+      birthData,
+    }); // Debugging log
+
+    return res.json({
+      status: httpStatusText.SUCCESS,
+      data: {
+        latestRecord: {
+          _id: latest._id,
+          weight: latest.weight,
+          height: latest.height,
+          headCircumference: latest.headCircumference,
+          date: latest.date,
+          time: latest.time,
+          ageInMonths: latest.ageInMonths,
+          createdAt: latest.createdAt,
+        },
+        previousRecord: birthData,
+        changes,
+      },
+    });
+  }
+
+  // Case 3: Two or more growth records, compare the last two
+  const [latest, previous] = growthRecords;
   const changes = {
     weightChange: latest.weight - previous.weight,
     heightChange: latest.height - previous.height,
@@ -345,6 +431,8 @@ const getLastGrowthChange = asyncWrapper(async (req, res, next) => {
       (new Date(latest.date) - new Date(previous.date)) / (1000 * 60 * 60 * 24)
     ),
   };
+
+  console.log("Two or more growth records, comparing:", { latest, previous }); // Debugging log
 
   res.json({
     status: httpStatusText.SUCCESS,
