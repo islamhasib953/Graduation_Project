@@ -5,24 +5,20 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:segma/cubits/memory_cubit.dart';
 import 'package:segma/models/memory_model.dart';
-import 'package:segma/screens/memory_user/add_edit_memory_screen.dart';
-import 'package:segma/screens/memory_user/favorite_memories_screen.dart';
 import 'package:segma/screens/memory_user/memory_details_screen.dart';
 
-class MemoriesScreen extends StatefulWidget {
+class FavoriteMemoriesScreen extends StatefulWidget {
   final String childId;
 
-  const MemoriesScreen({Key? key, required this.childId}) : super(key: key);
+  const FavoriteMemoriesScreen({Key? key, required this.childId}) : super(key: key);
 
   @override
-  _MemoriesScreenState createState() => _MemoriesScreenState();
+  _FavoriteMemoriesScreenState createState() => _FavoriteMemoriesScreenState();
 }
 
-class _MemoriesScreenState extends State<MemoriesScreen> with SingleTickerProviderStateMixin {
+class _FavoriteMemoriesScreenState extends State<FavoriteMemoriesScreen> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-  final ScrollController _scrollController = ScrollController();
-  bool _isLoadingMore = false;
 
   @override
   void initState() {
@@ -36,27 +32,12 @@ class _MemoriesScreenState extends State<MemoriesScreen> with SingleTickerProvid
     );
     _animationController.forward();
 
-    context.read<MemoryCubit>().init(widget.childId);
-
-    // إضافة listener لتحميل المزيد لما نوصل لآخر الـ list
-    _scrollController.addListener(() {
-      if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent && !_isLoadingMore) {
-        setState(() {
-          _isLoadingMore = true;
-        });
-        context.read<MemoryCubit>().loadMoreMemories(widget.childId).then((_) {
-          setState(() {
-            _isLoadingMore = false;
-          });
-        });
-      }
-    });
+    context.read<MemoryCubit>().loadFavoriteMemories(widget.childId);
   }
 
   @override
   void dispose() {
     _animationController.dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 
@@ -82,34 +63,11 @@ class _MemoriesScreenState extends State<MemoriesScreen> with SingleTickerProvid
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Memories'),
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.favorite,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                _createSlideRoute(
-                  BlocProvider(
-                    create: (context) => MemoryCubit(),
-                    child: FavoriteMemoriesScreen(childId: widget.childId),
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
+        title: const Text('Favorite Memories'),
       ),
       body: BlocConsumer<MemoryCubit, MemoryState>(
         listener: (context, state) {
-          if (state is MemorySuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message)),
-            );
-          } else if (state is MemoryError) {
+          if (state is MemoryError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(state.message)),
             );
@@ -127,18 +85,18 @@ class _MemoriesScreenState extends State<MemoriesScreen> with SingleTickerProvid
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        Icons.sentiment_dissatisfied,
+                        Icons.favorite_border,
                         size: 60,
                         color: Theme.of(context).colorScheme.primary,
                       ),
                       SizedBox(height: 16.h),
                       Text(
-                        'No memories yet!',
+                        'No favorite memories yet!',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 20.sp),
                       ),
                       SizedBox(height: 8.h),
                       Text(
-                        'Start adding some special moments.',
+                        'Mark some memories as favorites to see them here.',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 16.sp),
                         textAlign: TextAlign.center,
                       ),
@@ -148,18 +106,13 @@ class _MemoriesScreenState extends State<MemoriesScreen> with SingleTickerProvid
               );
             }
             return ListView.builder(
-              controller: _scrollController,
               padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-              itemCount: state.memories.length + (_isLoadingMore ? 1 : 0),
+              itemCount: state.memories.length,
               itemBuilder: (context, index) {
-                if (index == state.memories.length) {
-                  // عرض مؤشر التحميل أثناء تحميل المزيد
-                  return const Center(child: CircularProgressIndicator());
-                }
                 final memory = state.memories[index];
                 return FadeTransition(
                   opacity: _fadeAnimation,
-                  child: MemoryCard(
+                  child: FavoriteMemoryCard(
                     memory: memory,
                     onTap: () {
                       Navigator.push(
@@ -174,9 +127,6 @@ class _MemoriesScreenState extends State<MemoriesScreen> with SingleTickerProvid
                           ),
                         ),
                       );
-                    },
-                    onToggleFavorite: () {
-                      context.read<MemoryCubit>().toggleFavorite(widget.childId, memory.id);
                     },
                   ),
                 );
@@ -194,7 +144,7 @@ class _MemoriesScreenState extends State<MemoriesScreen> with SingleTickerProvid
                   ),
                   SizedBox(height: 16.h),
                   Text(
-                    'Error loading memories',
+                    'Error loading favorite memories',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 20.sp),
                   ),
                   SizedBox(height: 8.h),
@@ -206,7 +156,7 @@ class _MemoriesScreenState extends State<MemoriesScreen> with SingleTickerProvid
                   SizedBox(height: 16.h),
                   ElevatedButton(
                     onPressed: () {
-                      context.read<MemoryCubit>().init(widget.childId);
+                      context.read<MemoryCubit>().loadFavoriteMemories(widget.childId);
                     },
                     child: const Text('Retry'),
                   ),
@@ -217,36 +167,15 @@ class _MemoriesScreenState extends State<MemoriesScreen> with SingleTickerProvid
           return const Center(child: Text('Unknown state'));
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            _createSlideRoute(
-              BlocProvider.value(
-                value: context.read<MemoryCubit>(),
-                child: AddEditMemoryScreen(childId: widget.childId),
-              ),
-            ),
-          );
-        },
-        child: const Icon(Icons.add),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-      ),
     );
   }
 }
 
-class MemoryCard extends StatelessWidget {
+class FavoriteMemoryCard extends StatelessWidget {
   final Memory memory;
   final VoidCallback onTap;
-  final VoidCallback onToggleFavorite;
 
-  const MemoryCard({
-    Key? key,
-    required this.memory,
-    required this.onTap,
-    required this.onToggleFavorite,
-  }) : super(key: key);
+  const FavoriteMemoryCard({Key? key, required this.memory, required this.onTap}) : super(key: key);
 
   String _truncateDescription(String description) {
     final words = description.split(' ');
@@ -314,13 +243,10 @@ class MemoryCard extends StatelessWidget {
                         ),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10.sp),
                       ),
-                      GestureDetector(
-                        onTap: onToggleFavorite,
-                        child: Icon(
-                          memory.isFavorite ? Icons.favorite : Icons.favorite_border,
-                          color: memory.isFavorite ? Colors.red : Theme.of(context).colorScheme.primary,
-                          size: 16.w,
-                        ),
+                      Icon(
+                        Icons.favorite,
+                        color: Colors.red,
+                        size: 16.w,
                       ),
                     ],
                   ),

@@ -52,7 +52,7 @@ class AppThemes {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.lightButtonPrimary,
-          foregroundColor: AppColors.lightTextPrimary,
+          foregroundColor: Colors.white, // تغيير لون النص/الأيقونات للأبيض عشان يتناسب مع الأزرق
           padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8.r),
@@ -181,7 +181,7 @@ class AppThemes {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.darkButtonPrimary,
-          foregroundColor: AppColors.darkTextPrimary,
+          foregroundColor: Colors.white, // تغيير لون النص/الأيقونات للأبيض عشان يتناسب مع الأزرق الفاتح
           padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8.r),
