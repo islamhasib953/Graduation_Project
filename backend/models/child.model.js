@@ -24,6 +24,7 @@ const ChildSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    deviceId: { type: String, required: false, unique: true }, // حقل جديد لتحديد الساعة
     photo: {
       type: String,
       default: "Uploads/vaccination.jpg",

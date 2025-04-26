@@ -1,0 +1,80 @@
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Real-Time Sensor Data</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f0f0f0;
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    .data-container {
+      border: 1px solid #ccc;
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 5px;
+      background-color: #fff;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .data-item {
+      margin: 5px 0;
+      font-size: 16px;
+    }
+    .data-item strong {
+      color: #007bff;
+    }
+    .error {
+      color: red;
+      text-align: center;
+      font-weight: bold;
+    }
+    #data {
+      min-height: 100px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Real-Time Sensor Data</h1>
+  <div id="data">Waiting for sensor data...</div>
+
+  <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+  <script>
+    const socket = io('http://localhost:8000');
+
+    socket.on('connect', () => {
+      console.log('Connected to WebSocket server');
+      document.getElementById('data').innerHTML = 'Connected! Waiting for sensor data...';
+    });
+
+    socket.on('sensorData', (data) => {
+      console.log('Received sensor data:', data);
+      const dataDiv = document.getElementById('data');
+      const dataContainer = document.createElement('div');
+      dataContainer.className = 'data-container';
+      dataContainer.innerHTML = `
+        <div class="data-item"><strong>Child ID:</strong> ${data.childId}</div>
+        <div class="data-item"><strong>Temperature:</strong> ${data.temperature} °C</div>
+        <div class="data-item"><strong>Heart Rate:</strong> ${data.heartRate} bpm</div>
+        <div class="data-item"><strong>SpO2:</strong> ${data.spo2} %</div>
+        <div class="data-item"><strong>Location:</strong> (${data.latitude}, ${data.longitude})</div>
+        <div class="data-item"><strong>Gyroscope:</strong> (X: ${data.gyroX}, Y: ${data.gyroY}, Z: ${data.gyroZ})</div>
+        <div class="data-item"><strong>Timestamp:</strong> ${new Date(data.timestamp).toLocaleString()}</div>
+      `;
+      dataDiv.prepend(dataContainer); // إضافة البيانات الجديدة في الأعلى
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('WebSocket connection error:', error);
+      document.getElementById('data').innerHTML = `<p class="error">Connection error: ${error.message}</p>`;
+    });
+  </script>
+</body>
+</html>
