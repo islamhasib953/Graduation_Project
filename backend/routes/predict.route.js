@@ -1,8 +1,9 @@
 const express = require("express");
-const { predictAsthma } = require("../controllers/predict.controller");
+const { predictDisease } = require("../controllers/predict.controller");
 
 const router = express.Router();
 
-router.post("/predict/asthma", predictAsthma);
+// Dynamic route for all disease predictions
+router.post("/predict/:disease", predictDisease);
 
 module.exports = router;
