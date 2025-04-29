@@ -23,10 +23,7 @@ const getAllSensorData = asyncWrapper(async (req, res, next) => {
 
   const sensorData = await SensorData.find({ childId })
     .sort({ createdAt: -1 })
-    .limit(50)
-    .select(
-      "childId temperature heartRate spo2 latitude longitude gyroX gyroY gyroZ timestamp createdAt"
-    );
+    .limit(50);
 
   if (!sensorData.length) {
     return next(
@@ -40,20 +37,7 @@ const getAllSensorData = asyncWrapper(async (req, res, next) => {
 
   res.json({
     status: httpStatusText.SUCCESS,
-    data: sensorData.map((data) => ({
-      _id: data._id,
-      childId: data.childId,
-      temperature: data.temperature,
-      heartRate: data.heartRate,
-      spo2: data.spo2,
-      latitude: data.latitude,
-      longitude: data.longitude,
-      gyroX: data.gyroX,
-      gyroY: data.gyroY,
-      gyroZ: data.gyroZ,
-      timestamp: data.timestamp,
-      createdAt: data.createdAt,
-    })),
+    data: sensorData,
   });
 });
 
@@ -77,9 +61,7 @@ const getSingleSensorData = asyncWrapper(async (req, res, next) => {
   const sensorData = await SensorData.findOne({
     _id: sensorDataId,
     childId,
-  }).select(
-    "childId temperature heartRate spo2 latitude longitude gyroX gyroY gyroZ timestamp createdAt"
-  );
+  });
 
   if (!sensorData) {
     return next(
@@ -89,20 +71,7 @@ const getSingleSensorData = asyncWrapper(async (req, res, next) => {
 
   res.json({
     status: httpStatusText.SUCCESS,
-    data: {
-      _id: sensorData._id,
-      childId: sensorData.childId,
-      temperature: sensorData.temperature,
-      heartRate: sensorData.heartRate,
-      spo2: sensorData.spo2,
-      latitude: sensorData.latitude,
-      longitude: sensorData.longitude,
-      gyroX: sensorData.gyroX,
-      gyroY: sensorData.gyroY,
-      gyroZ: sensorData.gyroZ,
-      timestamp: sensorData.timestamp,
-      createdAt: sensorData.createdAt,
-    },
+    data: sensorData,
   });
 });
 
