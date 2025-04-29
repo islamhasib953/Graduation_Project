@@ -4,18 +4,18 @@ const sensorDataSchema = new mongoose.Schema({
   childId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Child",
-    required: true,
+    required: false,
   }, // ربط بالطفل
   deviceId: { type: String, required: false }, // اختياري لتحديد الجهاز
-  temperature: { type: Number, required: true },
-  heartRate: { type: Number, required: true },
-  spo2: { type: Number, required: true },
-  latitude: { type: Number, required: true },
-  longitude: { type: Number, required: true },
-  gyroX: { type: Number, required: true },
-  gyroY: { type: Number, required: true },
-  gyroZ: { type: Number, required: true },
-  timestamp: { type: Number, required: true },
+  temperature: { type: Number, required: false },
+  heartRate: { type: Number, required: false },
+  spo2: { type: Number, required: false },
+  latitude: { type: Number, required: false },
+  longitude: { type: Number, required: false },
+  gyroX: { type: Number, required: false },
+  gyroY: { type: Number, required: false },
+  gyroZ: { type: Number, required: false },
+  timestamp: { type: Number, required: false },
   createdAt: { type: Date, default: Date.now },
 });
 
