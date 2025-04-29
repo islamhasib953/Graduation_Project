@@ -1,5 +1,6 @@
-// 1. الـ Imports
 const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
 const bodyParser = require("body-parser");
 const cookieParser = require("cookie-parser");
 const dotenv = require("dotenv");
@@ -9,13 +10,11 @@ const limitReq = require("express-rate-limit");
 const mongoSanitize = require("express-mongo-sanitize");
 const xssClean = require("xss-clean");
 const hpp = require("hpp");
-const passport = require("passport");
-const session = require("express-session");
-const GoogleStrategy = require("passport-google-oauth20").Strategy;
 
-// استيراد الأدوات المساعدة
 const appError = require("./utils/appError");
 const httpStatusText = require("./utils/httpStatusText");
+const MQTTService = require("./services/mqtt.service");
+const connectDB = require("./config/db.config");
 
 // استيراد الـ Routes
 const medicineRoutes = require("./routes/medicine.route");
@@ -25,19 +24,28 @@ const historyRoutes = require("./routes/history.route");
 const memoryRoutes = require("./routes/memory.route");
 const vaccinationRoutes = require("./routes/vaccination.route");
 const growthRoutes = require("./routes/growth.route");
-const doctorRoutes = require("./routes/doctor.route"); // أضفنا الـ doctorRoutes
-const predictRoutes = require("./routes/predict.route");
-// 2. إعدادات أساسية
+const doctorRoutes = require("./routes/doctor.route");
+const sensorDataRoutes = require("./routes/sensorData.route");
+const predictionRoutes = require("./routes/predict.route");
+
+// إعدادات أساسية
 dotenv.config({ path: "./.env" });
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*", // قم بتحديد نطاق التطبيق في الإنتاج
+    methods: ["GET", "POST"],
+  },
+});
 
-// 3. إعدادات Express
+// إعدادات Express
 app.use("/uploads", express.static("uploads"));
 app.use(express.json());
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-// 4. Middlewares
+// Middlewares
 // أ. أدوات الأمان
 app.use(cors());
 app.use(mongoSanitize());
@@ -55,13 +63,20 @@ app.use(limiter);
 // ج. Morgan لتسجيل الطلبات
 app.use(morgan("combined"));
 
-// د. Middleware للرسائل (Express Messages)
+// د. Express Messages
 app.use(async (req, res, next) => {
   res.locals.messages = require("express-messages")(req, res);
   next();
 });
 
-// 5. الـ Routes
+// إعداد MongoDB
+connectDB();
+
+// إعداد MQTT
+const mqttService = new MQTTService(io);
+mqttService.connect();
+
+// الـ Routes
 app.use("/api/users", usersRoutes);
 app.use("/api/medicines", medicineRoutes);
 app.use("/api/children", childRoutes);
@@ -69,11 +84,11 @@ app.use("/api/history", historyRoutes);
 app.use("/api/memory", memoryRoutes);
 app.use("/api/vaccinations", vaccinationRoutes);
 app.use("/api/growth", growthRoutes);
-app.use("/api/doctors", doctorRoutes); // أضفنا الـ doctorRoutes هنا
+app.use("/api/doctors", doctorRoutes);
+app.use("/api/sensor-data", sensorDataRoutes);
+app.use("/api/predictions", predictionRoutes);
 
-app.use("/api/predict", predictRoutes); // إضافة predict route
-
-// 6. Middleware للـ Routes الغير موجودة (Not Found)
+// Middleware للـ Routes الغير موجودة
 app.all("*", (req, res) => {
   return res.status(404).json({
     status: httpStatusText.ERROR,
@@ -81,7 +96,7 @@ app.all("*", (req, res) => {
   });
 });
 
-// 7. Global Error Handler
+// Global Error Handler
 app.use((error, req, res, next) => {
   res.status(error.statusCode || 500).json({
     status: error.statusText || httpStatusText.ERROR,
@@ -91,13 +106,4 @@ app.use((error, req, res, next) => {
   });
 });
 
-// 8. تصدير الـ App
-module.exports = app;
-
-//ai, community, sensors
-//تعديلات اللى عند عبيد
-// استخدم ال api بتاع logout عند عبيد 
-
-////////////////////
-//اشوف حوار الاشعارات
-//اكمل الاسكرينات فى الدكتور واليوزر
+module.exports = { app, server };
