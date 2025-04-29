@@ -61,6 +61,7 @@ const doctorSchema = new mongoose.Schema({
     default: userRoles.DOCTOR, // التأكد إن الـ default مش معلّق
     required: true, // جعلناه إجباري
   },
+  fcmToken: { type: String, default: null }, // حقل جديد
   avatar: {
     type: String,
     default: "uploads/doctor.jpg",
@@ -100,10 +101,12 @@ const doctorSchema = new mongoose.Schema({
       trim: true,
     },
   ],
-  created_at: {
-    type: Date,
-    default: Date.now,
-  },
-});
+  // created_at: {
+  //   type: Date,
+  //   default: Date.now,
+  // },
+},
+  { timestamps: true }
+);
 
 module.exports = mongoose.model("Doctor", doctorSchema);

@@ -15,6 +15,7 @@ const appError = require("./utils/appError");
 const httpStatusText = require("./utils/httpStatusText");
 const MQTTService = require("./services/mqtt.service");
 const connectDB = require("./config/db.config");
+const scheduleNotifications = require("./utils/scheduleNotifications");
 
 // استيراد الـ Routes
 const medicineRoutes = require("./routes/medicine.route");
@@ -27,6 +28,7 @@ const growthRoutes = require("./routes/growth.route");
 const doctorRoutes = require("./routes/doctor.route");
 const sensorDataRoutes = require("./routes/sensorData.route");
 const predictionRoutes = require("./routes/predict.route");
+const notificationsRoutes = require("./routes/notifications.route");
 
 // إعدادات أساسية
 dotenv.config({ path: "./.env" });
@@ -34,7 +36,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*", // قم بتحديد نطاق التطبيق في الإنتاج
+    origin: "*",
     methods: ["GET", "POST"],
   },
 });
@@ -46,13 +48,11 @@ app.use(bodyParser.json());
 app.use(cookieParser());
 
 // Middlewares
-// أ. أدوات الأمان
 app.use(cors());
 app.use(mongoSanitize());
 app.use(xssClean());
 app.use(hpp());
 
-// ب. Rate Limiting
 const limiter = limitReq({
   max: 200,
   windowMs: 1000 * 60 * 60,
@@ -60,10 +60,8 @@ const limiter = limitReq({
 });
 app.use(limiter);
 
-// ج. Morgan لتسجيل الطلبات
 app.use(morgan("combined"));
 
-// د. Express Messages
 app.use(async (req, res, next) => {
   res.locals.messages = require("express-messages")(req, res);
   next();
@@ -76,6 +74,9 @@ connectDB();
 const mqttService = new MQTTService(io);
 mqttService.connect();
 
+// إعداد الإشعارات المجدولة
+scheduleNotifications();
+
 // الـ Routes
 app.use("/api/users", usersRoutes);
 app.use("/api/medicines", medicineRoutes);
@@ -87,8 +88,8 @@ app.use("/api/growth", growthRoutes);
 app.use("/api/doctors", doctorRoutes);
 app.use("/api/sensor-data", sensorDataRoutes);
 app.use("/api/predictions", predictionRoutes);
+app.use("/api/notifications", notificationsRoutes);
 
-// Middleware للـ Routes الغير موجودة
 app.all("*", (req, res) => {
   return res.status(404).json({
     status: httpStatusText.ERROR,
@@ -96,7 +97,6 @@ app.all("*", (req, res) => {
   });
 });
 
-// Global Error Handler
 app.use((error, req, res, next) => {
   res.status(error.statusCode || 500).json({
     status: error.statusText || httpStatusText.ERROR,
