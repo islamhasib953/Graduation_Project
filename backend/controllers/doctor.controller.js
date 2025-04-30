@@ -1971,9 +1971,9 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     childId,
     doctorId,
     `Appointment Booked for ${child.name}`,
-    `You have booked an appointment with Dr. ${doctor.firstName} ${doctor.lastName} on ${moment(
-      date
-    ).format("YYYY-MM-DD")} at ${time}.`,
+    `You have booked an appointment with Dr. ${doctor.firstName} ${
+      doctor.lastName
+    } on ${moment(date).format("YYYY-MM-DD")} at ${time}.`,
     "appointment"
   );
 
@@ -2136,9 +2136,11 @@ const updateAppointmentStatus = asyncWrapper(async (req, res, next) => {
     childId,
     doctorId,
     `Appointment ${status} for ${childName}`,
-    `Your appointment with Dr. ${doctor.firstName} ${doctor.lastName} on ${moment(
-      appointment.date
-    ).format("YYYY-MM-DD")} at ${appointment.time} has been ${status.toLowerCase()}.`,
+    `Your appointment with Dr. ${doctor.firstName} ${
+      doctor.lastName
+    } on ${moment(appointment.date).format("YYYY-MM-DD")} at ${
+      appointment.time
+    } has been ${status.toLowerCase()}.`,
     "appointment"
   );
 
@@ -2668,11 +2670,10 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
     phone,
     address,
     gender,
+    avatar,
     specialise,
     about,
     rate,
-    availableDays,
-    availableTimes,
   } = req.body;
 
   const doctor = await Doctor.findById(doctorId);
@@ -2680,42 +2681,76 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
   }
 
-  const updatedFields = {
-    firstName: firstName || doctor.firstName,
-    lastName: lastName || doctor.lastName,
-    email: email || doctor.email,
-    phone: phone || doctor.phone,
-    address: address || doctor.address,
-    gender: gender || doctor.gender,
-    specialise: specialise || doctor.specialise,
-    about: about || doctor.about,
-    rate: rate || doctor.rate,
-    availableDays: availableDays || doctor.availableDays,
-    availableTimes: availableTimes || doctor.availableTimes,
-  };
+  const changes = [];
+  if (firstName && firstName !== doctor.firstName) {
+    changes.push(`First Name changed to ${firstName}`);
+    doctor.firstName = firstName;
+  }
+  if (lastName && lastName !== doctor.lastName) {
+    changes.push(`Last Name changed to ${lastName}`);
+    doctor.lastName = lastName;
+  }
+  if (email && email !== doctor.email) {
+    changes.push(`Email changed to ${email}`);
+    doctor.email = email;
+  }
+  if (phone && phone !== doctor.phone) {
+    changes.push(`Phone changed to ${phone}`);
+    doctor.phone = phone;
+  }
+  if (address && address !== doctor.address) {
+    changes.push(`Address changed to ${address}`);
+    doctor.address = address;
+  }
+  if (gender && gender !== doctor.gender) {
+    changes.push(`Gender changed to ${gender}`);
+    doctor.gender = gender;
+  }
+  if (avatar && avatar !== doctor.avatar) {
+    changes.push(`Avatar updated`);
+    doctor.avatar = avatar;
+  }
+  if (specialise && specialise !== doctor.specialise) {
+    changes.push(`Specialization changed to ${specialise}`);
+    doctor.specialise = specialise;
+  }
+  if (about && about !== doctor.about) {
+    changes.push(`About updated`);
+    doctor.about = about;
+  }
+  if (rate && rate !== doctor.rate) {
+    changes.push(`Rate changed to ${rate}`);
+    doctor.rate = rate;
+  }
 
-  const updatedDoctor = await Doctor.findByIdAndUpdate(
-    doctorId,
-    updatedFields,
-    { new: true }
-  );
+  await doctor.save();
+
+  // إرسال إشعار لو فيه تغييرات
+  if (changes.length > 0) {
+    await sendNotification(
+      null,
+      null,
+      doctorId,
+      `Doctor Profile Updated`,
+      `Your profile has been updated: ${changes.join(", ")}.`,
+      "doctor"
+    );
+  }
 
   res.json({
     status: httpStatusText.SUCCESS,
     message: "Doctor profile updated successfully",
     data: {
-      firstName: updatedDoctor.firstName,
-      lastName: updatedDoctor.lastName,
-      email: updatedDoctor.email,
-      phone: updatedDoctor.phone,
-      address: updatedDoctor.address,
-      gender: updatedDoctor.gender,
-      avatar: updatedDoctor.avatar,
-      specialise: updatedDoctor.specialise,
-      about: updatedDoctor.about,
-      rate: updatedDoctor.rate,
-      availableDays: updatedDoctor.availableDays,
-      availableTimes: updatedDoctor.availableTimes,
+      firstName: doctor.firstName,
+      lastName: doctor.lastName,
+      email: doctor.email,
+      phone: doctor.phone,
+      address: doctor.address,
+      gender: doctor.gender,
+      avatar: doctor.avatar,
+      specialise: doctor.specialise,
+      about: doctor.about,
+      rate: doctor.rate,
     },
   });
 });
@@ -2723,12 +2758,22 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
 const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
 
-  const doctor = await Doctor.findByIdAndDelete(doctorId);
+  const doctor = await Doctor.findById(doctorId);
   if (!doctor) {
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
   }
 
-  await Appointment.deleteMany({ doctorId });
+  // إرسال إشعار قبل الحذف
+  await sendNotification(
+    null,
+    null,
+    doctorId,
+    "Doctor Profile Deleted",
+    "Your doctor profile has been deleted.",
+    "doctor"
+  );
+
+  await Doctor.findByIdAndDelete(doctorId);
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -2736,11 +2781,8 @@ const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
   });
 });
 
-const logoutDoctor = asyncWrapper(async (req, res) => {
-  const doctorId = req.user.id;
-
-  await Doctor.findByIdAndUpdate(doctorId, { token: null });
-
+const logoutDoctor = asyncWrapper(async (req, res, next) => {
+  res.clearCookie("token");
   res.json({
     status: httpStatusText.SUCCESS,
     message: "Doctor logged out successfully",
@@ -2748,9 +2790,8 @@ const logoutDoctor = asyncWrapper(async (req, res) => {
 });
 
 const updateAvailability = asyncWrapper(async (req, res, next) => {
-  const { availableDays, availableTimes } = req.body;
-  prayToTop(availableDays, availableTimes);
   const doctorId = req.user.id;
+  const { availableDays, availableTimes } = req.body;
 
   if (!availableDays || !availableTimes) {
     return next(
@@ -2762,15 +2803,64 @@ const updateAvailability = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  const doctor = await Doctor.findByIdAndUpdate(
-    doctorId,
-    { availableDays, availableTimes },
-    { new: true }
-  );
-
+  const doctor = await Doctor.findById(doctorId);
   if (!doctor) {
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
   }
+
+  const validDays = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+  ];
+  const invalidDays = availableDays.filter((day) => !validDays.includes(day));
+  if (invalidDays.length > 0) {
+    return next(
+      appError.create(
+        `Invalid days: ${invalidDays.join(", ")}`,
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const timeRegex = /^(1[0-2]|0?[1-9]):([0-5][0-9]) (AM|PM)$/i;
+  const invalidTimes = availableTimes.filter((time) => !timeRegex.test(time));
+  if (invalidTimes.length > 0) {
+    return next(
+      appError.create(
+        `Invalid times: ${invalidTimes.join(
+          ", "
+        )}. Time must be in the format HH:MM AM/PM (e.g., 9:00 AM)`,
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const normalizedTimes = availableTimes.map((time) =>
+    time.trim().toUpperCase()
+  );
+
+  doctor.availableDays = availableDays;
+  doctor.availableTimes = normalizedTimes;
+  await doctor.save();
+
+  // إرسال إشعار للدكتور
+  await sendNotification(
+    null,
+    null,
+    doctorId,
+    "Availability Updated",
+    `Your availability has been updated. Days: ${availableDays.join(
+      ", "
+    )}, Times: ${normalizedTimes.join(", ")}.`,
+    "doctor"
+  );
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -2788,7 +2878,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
   if (req.user.role !== userRoles.DOCTOR) {
     return next(
       appError.create(
-        "Unauthorized: Only doctors can view their appointments",
+        "Unauthorized: Only doctors can view their upcoming appointments",
         403,
         httpStatusText.FAIL
       )
@@ -2799,10 +2889,11 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
   const appointments = await Appointment.find({
     doctorId,
     date: { $gte: today },
+    status: { $in: ["Pending", "Accepted"] },
   })
-    .populate("userId", "firstName lastName phone")
     .populate("childId", "name")
-    .select("userId childId date time visitType status");
+    .populate("userId", "firstName lastName phone")
+    .select("childId userId date time visitType status");
 
   if (!appointments.length) {
     return next(
@@ -2830,10 +2921,10 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
 
     acc[monthYear].push({
       appointmentId: appointment._id,
-      userName: `${appointment.userId.firstName} ${appointment.userId.lastName}`,
-      userPhone: appointment.userId.phone,
       childId: appointment.childId._id,
       childName: appointment.childId.name,
+      parentName: `${appointment.userId.firstName} ${appointment.userId.lastName}`,
+      parentPhone: appointment.userId.phone,
       date: appointment.date,
       time: appointment.time,
       visitType: appointment.visitType,
@@ -2872,26 +2963,28 @@ const getChildRecords = asyncWrapper(async (req, res, next) => {
   if (!appointment) {
     return next(
       appError.create(
-        "No accepted appointment found for this child",
+        "No accepted appointment found for this child with this doctor",
         403,
         httpStatusText.FAIL
       )
     );
   }
 
-  const child = await Child.findById(childId).select(
-    "name gender birthDate heightAtBirth weightAtBirth headCircumferenceAtBirth bloodType photo"
-  );
+  const child = await Child.findById(childId)
+    .populate("parentId", "firstName lastName phone")
+    .select(
+      "name gender birthDate bloodType heightAtBirth weightAtBirth headCircumferenceAtBirth"
+    );
 
   if (!child) {
     return next(appError.create("Child not found", 404, httpStatusText.FAIL));
   }
 
-  const history = await History.find({ childId }).select(
-    "disease startDate endDate description"
+  const medicalHistory = await History.find({ childId }).select(
+    "disease description date"
   );
 
-  const growth = await Growth.find({ childId }).select(
+  const growthRecords = await Growth.find({ childId }).select(
     "height weight headCircumference date"
   );
 
@@ -2902,14 +2995,17 @@ const getChildRecords = asyncWrapper(async (req, res, next) => {
         name: child.name,
         gender: child.gender,
         birthDate: child.birthDate,
+        bloodType: child.bloodType,
         heightAtBirth: child.heightAtBirth,
         weightAtBirth: child.weightAtBirth,
         headCircumferenceAtBirth: child.headCircumferenceAtBirth,
-        bloodType: child.bloodType,
-        photo: child.photo,
+        parent: {
+          name: `${child.parentId.firstName} ${child.parentId.lastName}`,
+          phone: child.parentId.phone,
+        },
       },
-      medicalHistory: history,
-      growthRecords: growth,
+      medicalHistory,
+      growthRecords,
     },
   });
 });
