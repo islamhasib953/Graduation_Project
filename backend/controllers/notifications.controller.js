@@ -13,21 +13,22 @@ const sendNotification = async (
   doctorId,
   title,
   body,
-  type
+  type,
+  target
 ) => {
   try {
     let fcmToken = null;
     let recipientId = null;
     let role = null;
 
-    if (userId) {
+    if (userId && target === "user") {
       const user = await User.findById(userId);
       if (user) {
         fcmToken = user.fcmToken;
         recipientId = userId;
         role = userRoles.PATIENT;
       }
-    } else if (doctorId) {
+    } else if (doctorId && target === "doctor") {
       const doctor = await Doctor.findById(doctorId);
       if (doctor) {
         fcmToken = doctor.fcmToken;
@@ -41,6 +42,23 @@ const sendNotification = async (
       return;
     }
 
+    // فحص إذا كان الإشعار موجود بالفعل
+    const existingNotification = await Notification.findOne({
+      userId: role === userRoles.PATIENT ? recipientId : null,
+      doctorId: role === userRoles.DOCTOR ? recipientId : doctorId || null,
+      childId: childId || null,
+      title,
+      body,
+      type,
+      target,
+      createdAt: { $gte: new Date(Date.now() - 60 * 1000) }, // في آخر دقيقة
+    });
+
+    if (existingNotification) {
+      console.log("Notification already exists, skipping...");
+      return;
+    }
+
     const notification = new Notification({
       userId: role === userRoles.PATIENT ? recipientId : null,
       childId: childId || null,
@@ -48,6 +66,7 @@ const sendNotification = async (
       title,
       body,
       type,
+      target,
       isRead: false,
     });
 
@@ -58,6 +77,7 @@ const sendNotification = async (
         type,
         childId: childId ? childId.toString() : null,
         doctorId: doctorId ? doctorId.toString() : null,
+        target,
       });
     }
   } catch (error) {
@@ -82,9 +102,10 @@ const getUserNotifications = asyncWrapper(async (req, res, next) => {
   const notifications = await Notification.find({
     userId,
     childId,
+    target: "user",
   })
     .sort({ createdAt: -1 })
-    .select("title body type isRead createdAt");
+    .select("title body type target isRead createdAt");
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -107,9 +128,10 @@ const getDoctorNotifications = asyncWrapper(async (req, res, next) => {
 
   const notifications = await Notification.find({
     doctorId,
+    target: "doctor",
   })
     .sort({ createdAt: -1 })
-    .select("title body type isRead createdAt childId");
+    .select("title body type target isRead createdAt childId");
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -131,9 +153,9 @@ const markAsRead = asyncWrapper(async (req, res, next) => {
 
   if (
     (role === userRoles.PATIENT &&
-      notification.userId.toString() !== userId.toString()) ||
+      notification.userId?.toString() !== userId.toString()) ||
     (role === userRoles.DOCTOR &&
-      notification.doctorId.toString() !== userId.toString())
+      notification.doctorId?.toString() !== userId.toString())
   ) {
     return next(
       appError.create(

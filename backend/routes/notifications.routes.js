@@ -29,13 +29,54 @@ router.patch(
   notificationsController.markAsRead
 );
 
+// نقطة نهاية لإرسال إشعارات الـ Bracelet
+router.post(
+  "/bracelet",
+  verifyToken,
+  allowedTo(userRoles.PATIENT),
+  async (req, res, next) => {
+    const { childId, title, body } = req.body;
+    const userId = req.user.id;
+
+    if (!childId || !title || !body) {
+      return res.status(400).json({
+        status: "fail",
+        message: "childId, title, and body are required",
+      });
+    }
+
+    try {
+      await notificationsController.sendNotification(
+        userId,
+        childId,
+        null,
+        title,
+        body,
+        "bracelet",
+        "user"
+      );
+
+      res.status(201).json({
+        status: "success",
+        message: "Bracelet notification sent successfully",
+      });
+    } catch (error) {
+      console.error("Error sending bracelet notification:", error);
+      res.status(500).json({
+        status: "error",
+        message: "Failed to send bracelet notification",
+      });
+    }
+  }
+);
+
 // نقطة نهاية لإرسال إشعارات عامة (للأدمن فقط)
 router.post(
   "/send-general",
   verifyToken,
   allowedTo(userRoles.ADMIN),
   async (req, res, next) => {
-    const { title, body, target } = req.body; // target: "users", "doctors", or "all"
+    const { title, body, target } = req.body;
 
     if (!title || !body || !target) {
       return res.status(400).json({
@@ -46,18 +87,39 @@ router.post(
 
     try {
       let fcmTokens = [];
+      let notifications = [];
 
-      if (target === "users" || target === "all") {
-        const users = await User.find().select("fcmToken");
+      if (target === "user" || target === "all") {
+        const users = await User.find().select("fcmToken _id");
         fcmTokens.push(
           ...users.map((user) => user.fcmToken).filter((token) => token)
         );
+        notifications.push(
+          ...users.map((user) => ({
+            userId: user._id,
+            title,
+            body,
+            type: "general",
+            target: "user",
+            isRead: false,
+          }))
+        );
       }
 
-      if (target === "doctors" || target === "all") {
-        const doctors = await Doctor.find().select("fcmToken");
+      if (target === "doctor" || target === "all") {
+        const doctors = await Doctor.find().select("fcmToken _id");
         fcmTokens.push(
           ...doctors.map((doctor) => doctor.fcmToken).filter((token) => token)
+        );
+        notifications.push(
+          ...doctors.map((doctor) => ({
+            doctorId: doctor._id,
+            title,
+            body,
+            type: "general",
+            target: "doctor",
+            isRead: false,
+          }))
         );
       }
 
@@ -68,9 +130,16 @@ router.post(
         });
       }
 
-      // إرسال الإشعار لكل المستلمين
-      for (const token of fcmTokens) {
-        await sendPushNotification(token, title, body, { type: "general" });
+      for (const notification of notifications) {
+        await notificationsController.sendNotification(
+          notification.userId || null,
+          null,
+          notification.doctorId || null,
+          notification.title,
+          notification.body,
+          notification.type,
+          notification.target
+        );
       }
 
       res.status(200).json({

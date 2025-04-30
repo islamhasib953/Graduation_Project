@@ -466,7 +466,6 @@
 // };
 
 
-
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const User = require("../models/user.model");
 const Doctor = require("../models/doctor.model");
@@ -548,7 +547,6 @@ const updateUserProfile = asyncWrapper(async (req, res, next) => {
     return next(appError.create("User not found", 404, httpStatusText.FAIL));
   }
 
-  // التحقق من التغييرات
   const changes = [];
   if (firstName && firstName !== user.firstName) {
     changes.push(`First Name changed to ${firstName}`);
@@ -573,15 +571,15 @@ const updateUserProfile = asyncWrapper(async (req, res, next) => {
 
   await user.save();
 
-  // إرسال إشعار لو فيه تغييرات
   if (changes.length > 0) {
     await sendNotification(
       userId,
-      null, // childId مش موجود لأن دي عملية مش مرتبطة بطفل معين
-      null, // doctorId مش موجود
+      null,
+      null,
       "Profile Updated",
       `You have updated your profile: ${changes.join(", ")}.`,
-      "profile"
+      "profile",
+      "user"
     );
   }
 
@@ -641,13 +639,23 @@ const deleteUserProfile = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // استخدام Transaction للتأكد من إن كل العمليات بتتم مع بعض
+  // إرسال إشعار قبل الحذف
+  await sendNotification(
+    userId,
+    null,
+    null,
+    "Account Deleted",
+    `Your account (${user.firstName} ${user.lastName}) has been deleted successfully.`,
+    "profile",
+    "user"
+  );
+
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     user.token = null;
-    user.fcmToken = null; // مسح الـ FCM Token
+    user.fcmToken = null;
     await user.save({ session });
 
     const deleteResult = await User.deleteOne({ _id: userId }, { session });
@@ -655,7 +663,6 @@ const deleteUserProfile = asyncWrapper(async (req, res, next) => {
       throw new Error("Failed to delete user account");
     }
 
-    // Commit الـ Transaction
     await session.commitTransaction();
 
     res.json({
@@ -663,7 +670,6 @@ const deleteUserProfile = asyncWrapper(async (req, res, next) => {
       message: "User account deleted successfully",
     });
   } catch (error) {
-    // Rollback الـ Transaction لو حصل أي خطأ
     await session.abortTransaction();
     return next(
       appError.create(
@@ -697,7 +703,7 @@ const logoutUser = asyncWrapper(async (req, res, next) => {
   }
 
   user.token = null;
-  user.fcmToken = null; // مسح الـ FCM Token عند تسجيل الخروج
+  user.fcmToken = null;
   await user.save();
 
   res.json({
@@ -722,7 +728,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
     rate,
     availableDays,
     availableTimes,
-    fcmToken, // إضافة الـ FCM Token
+    fcmToken,
   } = req.body;
 
   const oldUser = await User.findOne({ email });
@@ -754,7 +760,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       availableDays,
       availableTimes,
       avatar: req.file ? req.file.filename : "uploads/doctor.jpg",
-      fcmToken: fcmToken || null, // حفظ الـ FCM Token
+      fcmToken: fcmToken || null,
     });
 
     const token = await genrateJWT(
@@ -804,7 +810,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       password: hashedPassword,
       role: userRoles.PATIENT,
       avatar: req.file ? req.file.filename : "uploads/profile.jpg",
-      fcmToken: fcmToken || null, // حفظ الـ FCM Token
+      fcmToken: fcmToken || null,
     });
 
     const token = await genrateJWT(
@@ -819,14 +825,14 @@ const registerUser = asyncWrapper(async (req, res, next) => {
 
     await newUser.save();
 
-    // إرسال إشعار ترحيبي لليوزر
     await sendNotification(
       newUser._id,
-      null, // childId مش موجود
-      null, // doctorId مش موجود
+      null,
+      null,
       "Welcome to ChildCare System!",
       `Hi ${newUser.firstName}, welcome to ChildCare System! We're here to help you manage your child's healthcare.`,
-      "welcome"
+      "welcome",
+      "user"
     );
 
     const userData = {
@@ -892,21 +898,20 @@ const loginUser = asyncWrapper(async (req, res, next) => {
       "7d"
     );
 
-    // تحديث الـ FCM Token لو موجود
     user.token = token;
     if (fcmToken) {
       user.fcmToken = fcmToken;
     }
     await user.save();
 
-    // إرسال إشعار ترحيبي عند تسجيل الدخول
     await sendNotification(
       user._id,
-      null, // childId مش موجود
-      null, // doctorId مش موجود
+      null,
+      null,
       "Login Successful",
       `Hi ${user.firstName}, you have successfully logged in to ChildCare System!`,
-      "login"
+      "login",
+      "user"
     );
 
     res.status(200).json({

@@ -135,16 +135,17 @@
 
 // module.exports = router;
 
-
 const express = require("express");
 const router = express.Router();
-
 const verifyToken = require("../middlewares/virifyToken");
 const allowedTo = require("../middlewares/allowedTo");
 const userRoles = require("../utils/userRoles");
 const doctorController = require("../controllers/doctor.controller");
+const Notification = require("../models/notification.model");
+const appError = require("../utils/appError");
+const { sendNotification } = require("../controllers/notifications.controller");
 
-// Routes للدكتور نفسه (Profile, Logout) - مش محتاج childId
+// Routes للدكتور نفسه (Profile, Logout)
 router
   .route("/profile")
   .get(
@@ -170,7 +171,7 @@ router.post(
   doctorController.logoutDoctor
 );
 
-// Route لتعديل الأيام والأوقات المتاحة (جديد)
+// Route لتعديل الأيام والأوقات المتاحة
 router.patch(
   "/availability",
   verifyToken,
@@ -178,7 +179,7 @@ router.patch(
   doctorController.updateAvailability
 );
 
-// Route لجلب الحجوزات القادمة (ثابت)
+// Route لجلب الحجوزات القادمة
 router.get(
   "/appointments/upcoming",
   verifyToken,
@@ -186,7 +187,7 @@ router.get(
   doctorController.getUpcomingAppointments
 );
 
-// Route لجلب السجل الطبي وبيانات النمو بتاعة الطفل (ثابت، لازم يكون قبل الـ Routes الديناميكية)
+// Route لجلب السجل الطبي وبيانات النمو بتاعة الطفل
 router.post(
   "/child/records",
   verifyToken,
@@ -194,7 +195,7 @@ router.post(
   doctorController.getChildRecords
 );
 
-// Route لتحديث حالة الحجز (يحتوي على appointmentId)
+// Route لتحديث حالة الحجز
 router.patch(
   "/appointments/:appointmentId/status",
   verifyToken,
@@ -202,7 +203,7 @@ router.patch(
   doctorController.updateAppointmentStatus
 );
 
-// Route لجلب كل الحجوزات بتاعة اليوزر مع childId في الـ Path
+// Route لجلب كل الحجوزات بتاعة اليوزر مع childId
 router.get(
   "/appointments/user/:childId",
   verifyToken,
@@ -210,7 +211,7 @@ router.get(
   doctorController.getUserAppointments
 );
 
-// Route لجلب الدكاترة المفضلين مع childId في الـ Path (ثابت، لازم يكون قبل /:childId)
+// Route لجلب الدكاترة المفضلين مع childId
 router.get(
   "/favorites/:childId",
   verifyToken,
@@ -218,7 +219,7 @@ router.get(
   doctorController.getFavoriteDoctors
 );
 
-// Route لعرض كل الدكاترة مع childId في الـ Path (ديناميكي)
+// Route لعرض كل الدكاترة مع childId
 router.get(
   "/:childId",
   verifyToken,
@@ -226,7 +227,7 @@ router.get(
   doctorController.getAllDoctors
 );
 
-// Routes لتفاصيل دكتور معين مع childId في الـ Path (ديناميكي)
+// Routes لتفاصيل دكتور معين مع childId
 router
   .route("/:childId/:doctorId")
   .get(
@@ -235,15 +236,65 @@ router
     doctorController.getSingleDoctor
   );
 
-// Route لحجز موعد مع childId في الـ Path
+// Route لحجز موعد مع childId
 router.post(
   "/:childId/:doctorId/book",
   verifyToken,
   allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-  doctorController.bookAppointment
+  async (req, res, next) => {
+    try {
+      const { childId, doctorId } = req.params;
+      const { date, time } = req.body;
+      const userId = req.user.id;
+
+      const appointment = await require("../models/appointment.model").create({
+        userId,
+        childId,
+        doctorId,
+        date: new Date(date),
+        time,
+        status: "Pending",
+      });
+
+      // إشعار لليوزر
+      await sendNotification(
+        userId,
+        childId,
+        doctorId,
+        "New Appointment Scheduled",
+        `You have scheduled an appointment with Dr. on ${new Date(
+          date
+        ).toLocaleDateString()} at ${time}.`,
+        "appointment",
+        "user"
+      );
+
+      // إشعار للدكتور
+      await sendNotification(
+        null,
+        childId,
+        doctorId,
+        "New Appointment Scheduled",
+        `A new appointment has been scheduled with a patient on ${new Date(
+          date
+        ).toLocaleDateString()} at ${time}.`,
+        "appointment",
+        "doctor"
+      );
+
+      res.status(201).json({
+        status: "success",
+        message: "Appointment booked successfully",
+        data: appointment,
+      });
+    } catch (error) {
+      console.error("Error booking appointment:", error);
+      return next(appError.create("Failed to book appointment", 500, "error"));
+    }
+  }
 );
 
-// Routes لإضافة وإزالة دكتور من المفضلة مع childId في الـ Path
+// Routes لإضافة وإزالة دكتور من المفضلة
 router
   .route("/:childId/:doctorId/favorite")
   .post(
@@ -257,18 +308,120 @@ router
     doctorController.removeFromFavorite
   );
 
-// Routes لتعديل وإلغاء الحجز مع childId في الـ Path
+// Routes لتعديل وإلغاء الحجز
 router
   .route("/appointments/:childId/:appointmentId")
   .patch(
     verifyToken,
     allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-    doctorController.rescheduleAppointment
+    async (req, res, next) => {
+      try {
+        const { childId, appointmentId } = req.params;
+        const { date, time } = req.body;
+        const userId = req.user.id;
+
+        const appointment =
+          await require("../models/appointment.model").findOneAndUpdate(
+            { _id: appointmentId, childId, userId },
+            { date: new Date(date), time, status: "Pending" },
+            { new: true }
+          );
+
+        if (!appointment) {
+          return next(appError.create("Appointment not found", 404, "fail"));
+        }
+
+        // إشعار لليوزر
+        await sendNotification(
+          userId,
+          childId,
+          appointment.doctorId,
+          "Appointment Rescheduled",
+          `Your appointment for your child has been rescheduled to ${new Date(
+            date
+          ).toLocaleDateString()} at ${time}.`,
+          "appointment",
+          "user"
+        );
+
+        // إشعار للدكتور
+        await sendNotification(
+          null,
+          childId,
+          appointment.doctorId,
+          "Appointment Rescheduled",
+          `An appointment with a patient has been rescheduled to ${new Date(
+            date
+          ).toLocaleDateString()} at ${time}.`,
+          "appointment",
+          "doctor"
+        );
+
+        res.status(200).json({
+          status: "success",
+          message: "Appointment rescheduled successfully",
+          data: appointment,
+        });
+      } catch (error) {
+        console.error("Error rescheduling appointment:", error);
+        return next(
+          appError.create("Failed to reschedule appointment", 500, "error")
+        );
+      }
+    }
   )
   .delete(
     verifyToken,
     allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-    doctorController.deleteAppointment
+    async (req, res, next) => {
+      try {
+        const { childId, appointmentId } = req.params;
+        const userId = req.user.id;
+
+        const appointment =
+          await require("../models/appointment.model").findOneAndDelete({
+            _id: appointmentId,
+            childId,
+            userId,
+          });
+
+        if (!appointment) {
+          return next(appError.create("Appointment not found", 404, "fail"));
+        }
+
+        // إشعار لليوزر
+        await sendNotification(
+          userId,
+          childId,
+          appointment.doctorId,
+          "Appointment Cancelled",
+          `Your appointment for your child has been cancelled.`,
+          "appointment",
+          "user"
+        );
+
+        // إشعار للدكتور
+        await sendNotification(
+          null,
+          childId,
+          appointment.doctorId,
+          "Appointment Cancelled",
+          `An appointment with a patient has been cancelled.`,
+          "appointment",
+          "doctor"
+        );
+
+        res.status(200).json({
+          status: "success",
+          message: "Appointment cancelled successfully",
+        });
+      } catch (error) {
+        console.error("Error cancelling appointment:", error);
+        return next(
+          appError.create("Failed to cancel appointment", 500, "error")
+        );
+      }
+    }
   );
 
 // نقطة نهاية لحفظ FCM Token

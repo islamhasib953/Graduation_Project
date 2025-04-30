@@ -232,6 +232,7 @@
 //   deleteChild,
 // };
 
+
 const Child = require("../models/child.model");
 const User = require("../models/user.model");
 const asyncWrapper = require("../middlewares/asyncWrapper");
@@ -309,14 +310,19 @@ const createChild = asyncWrapper(async (req, res, next) => {
     await UserVaccination.insertMany(vaccinationsToCreate);
   }
 
-  // إرسال إشعار لليوزر بإضافة الطفل
+  // إرسال إشعار لليوزر
   await sendNotification(
     parentId,
     newChild._id,
     null,
-    "Child Added",
-    `You have successfully added ${newChild.name} to your children list.`,
-    "child"
+    `New Child Added`,
+    `You have successfully added ${
+      newChild.name
+    } to your children list. Birth Date: ${
+      newChild.birthDate.toISOString().split("T")[0]
+    }.`,
+    "child",
+    "user"
   );
 
   res.status(201).json({
@@ -426,7 +432,6 @@ const updateChild = asyncWrapper(async (req, res, next) => {
     return next(appError.create("Child not found", 404, httpStatusText.FAIL));
   }
 
-  // التحقق من التغييرات
   const changes = [];
   if (name && name !== child.name) {
     changes.push(`Name changed to ${name}`);
@@ -476,7 +481,8 @@ const updateChild = asyncWrapper(async (req, res, next) => {
       null,
       `Child Profile Updated`,
       `${child.name}'s profile has been updated: ${changes.join(", ")}.`,
-      "child"
+      "child",
+      "user"
     );
   }
 
@@ -510,9 +516,10 @@ const deleteChild = asyncWrapper(async (req, res, next) => {
     userId,
     childId,
     null,
-    "Child Removed",
+    `Child Removed`,
     `You have removed ${child.name} from your children list.`,
-    "child"
+    "child",
+    "user"
   );
 
   await Child.findByIdAndDelete(childId);

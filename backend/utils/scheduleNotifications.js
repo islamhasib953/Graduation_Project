@@ -15,12 +15,11 @@ const scheduleNotifications = () => {
   cron.schedule("* * * * *", async () => {
     try {
       const now = moment();
-      const currentDay = now.format("dddd"); // اليوم الحالي (مثل "Monday")
-      const currentTime = now.format("h:mm A"); // الوقت الحالي (مثل "2:30 PM")
+      const currentDay = now.format("dddd");
+      const currentTime = now.format("h:mm A");
       const currentDate = now.startOf("day").toDate();
-      const notificationKey = `${currentDate.toISOString()}-${currentDay}-${currentTime}-medicine`; // مفتاح فريد لليوم والوقت للأدوية
+      const notificationKey = `${currentDate.toISOString()}-${currentDay}-${currentTime}-medicine`;
 
-      // التحقق إذا تم إرسال إشعار لهذا اليوم والوقت بالفعل
       if (sentNotifications.has(notificationKey)) {
         return;
       }
@@ -41,16 +40,15 @@ const scheduleNotifications = () => {
           null,
           `Medicine Reminder for ${childName}`,
           `It's time to give ${childName} the medicine: ${medicine.name}.`,
-          "medicine"
+          "medicine",
+          "user"
         );
       }
 
-      // إضافة المفتاح إلى المخزن المؤقت لتجنب التكرار
       if (medicines.length > 0) {
         sentNotifications.add(notificationKey);
       }
 
-      // تنظيف المخزن المؤقت لليوم السابق
       const yesterday = moment().subtract(1, "day").startOf("day").toDate();
       for (const key of sentNotifications) {
         const keyDate = new Date(key.split("-")[0]);
@@ -91,7 +89,8 @@ const scheduleNotifications = () => {
           null,
           `Vaccination Reminder for ${childName}`,
           `Today is the due date for ${childName}'s ${vaccineDisease} vaccination.`,
-          "vaccination"
+          "vaccination",
+          "user"
         );
       }
 
@@ -133,7 +132,8 @@ const scheduleNotifications = () => {
           null,
           `Vaccination Reminder for ${childName}`,
           `Reminder: ${childName}'s ${vaccineDisease} vaccination is due tomorrow.`,
-          "vaccination"
+          "vaccination",
+          "user"
         );
       }
 
@@ -157,7 +157,7 @@ const scheduleNotifications = () => {
 
       const vaccinations = await UserVaccination.find({
         dueDate: { $lt: today },
-        status: "Pending",
+        status: "Pending",  
       }).populate("childId vaccineInfoId");
 
       for (const vaccination of vaccinations) {
@@ -172,7 +172,8 @@ const scheduleNotifications = () => {
           null,
           `Delayed Vaccination for ${childName}`,
           `${childName}'s ${vaccineDisease} vaccination is overdue. Please schedule it soon.`,
-          "vaccination"
+          "vaccination",
+          "user"
         );
       }
 
@@ -210,11 +211,11 @@ const scheduleNotifications = () => {
           null,
           `Growth Update for ${childName}`,
           `A new growth record for ${childName} has been added: Height: ${record.height}, Weight: ${record.weight}.`,
-          "growth"
+          "growth",
+          "user"
         );
 
-        // التحقق من الانحرافات في الطول
-        const standardHeight = record.ageInMonths * 2 + 50; // معادلة افتراضية
+        const standardHeight = record.ageInMonths * 2 + 50;
         const heightDeviation = Math.abs(record.height - standardHeight);
 
         if (heightDeviation > 10) {
@@ -224,7 +225,8 @@ const scheduleNotifications = () => {
             null,
             `Growth Alert for ${childName}`,
             `The height of ${childName} (${record.height} cm) deviates significantly from the expected value (${standardHeight} cm) for their age.`,
-            "growth_alert"
+            "growth_alert",
+            "user"
           );
         }
       }
@@ -253,20 +255,42 @@ const scheduleNotifications = () => {
       const appointments = await Appointment.find({
         date: tomorrow,
         status: { $in: ["Pending", "Accepted"] },
-      }).populate("childId");
+      }).populate("childId doctorId");
 
       for (const appointment of appointments) {
         const userId = appointment.userId;
         const childId = appointment.childId._id;
         const childName = appointment.childId.name;
+        const doctorId = appointment.doctorId._id;
+        const doctorName = appointment.doctorId.name;
 
+        // التحقق إن الموعد لسه موجود وصالح
+        const isValidAppointment =
+          appointment.status === "Pending" || appointment.status === "Accepted";
+        if (!isValidAppointment) {
+          continue;
+        }
+
+        // إشعار لليوزر
         await sendNotification(
           userId,
           childId,
-          appointment.doctorId,
+          doctorId,
           `Appointment Reminder for ${childName}`,
-          `Reminder: You have an appointment for ${childName} tomorrow at ${appointment.time}.`,
-          "appointment_reminder"
+          `Reminder: You have an appointment for ${childName} with Dr. ${doctorName} tomorrow at ${appointment.time}.`,
+          "appointment",
+          "user"
+        );
+
+        // إشعار للدكتور
+        await sendNotification(
+          null,
+          childId,
+          doctorId,
+          `Appointment Reminder for ${childName}`,
+          `Reminder: You have an appointment with ${childName} tomorrow at ${appointment.time}.`,
+          "appointment",
+          "doctor"
         );
       }
 
@@ -280,3 +304,4 @@ const scheduleNotifications = () => {
 };
 
 module.exports = scheduleNotifications;
+  
