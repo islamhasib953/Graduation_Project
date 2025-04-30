@@ -1,284 +1,280 @@
 const cron = require("node-cron");
+const moment = require("moment");
 const Medicine = require("../models/medicine.model");
-const UserVaccination = require("../models/UserVaccination.model");
-const Child = require("../models/child.model");
+const UserVaccination = require("../models/userVaccination.model");
 const Growth = require("../models/growth.model");
 const Appointment = require("../models/appointment.model");
-const Doctor = require("../models/doctor.model");
+const Child = require("../models/child.model");
 const { sendNotification } = require("../controllers/notifications.controller");
-const moment = require("moment");
+
+// تخزين مؤقت للأيام والأوقات التي تم إرسال الإشعارات لها
+const sentNotifications = new Set();
 
 const scheduleNotifications = () => {
-  // Schedule medicine notifications (every minute)
+  // إشعارات الأدوية: التحقق كل دقيقة
   cron.schedule("* * * * *", async () => {
     try {
       const now = moment();
-      const currentTime = now.format("h:mm A");
+      const currentDay = now.format("dddd"); // اليوم الحالي (مثل "Monday")
+      const currentTime = now.format("h:mm A"); // الوقت الحالي (مثل "2:30 PM")
       const currentDate = now.startOf("day").toDate();
+      const notificationKey = `${currentDate.toISOString()}-${currentDay}-${currentTime}-medicine`; // مفتاح فريد لليوم والوقت للأدوية
+
+      // التحقق إذا تم إرسال إشعار لهذا اليوم والوقت بالفعل
+      if (sentNotifications.has(notificationKey)) {
+        return;
+      }
 
       const medicines = await Medicine.find({
-        schedule: currentTime,
-        startDate: { $lte: currentDate },
-        endDate: { $gte: currentDate },
+        days: currentDay,
+        times: currentTime,
       }).populate("childId");
 
       for (const medicine of medicines) {
-        const child = medicine.childId;
+        const userId = medicine.userId;
+        const childId = medicine.childId._id;
+        const childName = medicine.childId.name;
+
         await sendNotification(
-          child.parentId,
-          medicine.childId,
+          userId,
+          childId,
           null,
-          `Medicine Reminder for ${child.name}`,
-          `It's time for ${child.name} to take ${medicine.name} (${medicine.dosage}).`,
+          `Medicine Reminder for ${childName}`,
+          `It's time to give ${childName} the medicine: ${medicine.name}.`,
           "medicine"
         );
       }
+
+      // إضافة المفتاح إلى المخزن المؤقت لتجنب التكرار
+      if (medicines.length > 0) {
+        sentNotifications.add(notificationKey);
+      }
+
+      // تنظيف المخزن المؤقت لليوم السابق
+      const yesterday = moment().subtract(1, "day").startOf("day").toDate();
+      for (const key of sentNotifications) {
+        const keyDate = new Date(key.split("-")[0]);
+        if (keyDate < yesterday) {
+          sentNotifications.delete(key);
+        }
+      }
     } catch (error) {
-      console.error("Error scheduling medicine notifications:", error);
+      console.error("Error in medicine notification cron job:", error);
     }
   });
 
-  // Schedule vaccination notifications (every minute for exact due date)
-  cron.schedule("* * * * *", async () => {
+  // إشعارات التطعيمات: تذكير يومي في الوقت المحدد
+  cron.schedule("0 8 * * *", async () => {
     try {
       const now = moment();
-      const currentDateTime = now.toDate();
-      const startOfMinute = moment(now).startOf("minute").toDate();
-      const endOfMinute = moment(now).endOf("minute").toDate();
+      const currentDate = now.startOf("day").toDate();
+      const notificationKey = `${currentDate.toISOString()}-vaccination-due`;
+
+      if (sentNotifications.has(notificationKey)) {
+        return;
+      }
 
       const vaccinations = await UserVaccination.find({
-        dueDate: {
-          $gte: startOfMinute,
-          $lte: endOfMinute,
-        },
+        dueDate: currentDate,
         status: "Pending",
-      })
-        .populate("childId")
-        .populate("vaccineInfoId");
+      }).populate("childId vaccineInfoId");
 
       for (const vaccination of vaccinations) {
-        const child = vaccination.childId;
-        const vaccineInfo = vaccination.vaccineInfoId;
-
-        if (!child || !vaccineInfo) {
-          console.warn(
-            `Missing child or vaccine info for vaccination ID: ${vaccination._id}`
-          );
-          continue;
-        }
+        const userId = vaccination.childId.parentId;
+        const childId = vaccination.childId._id;
+        const childName = vaccination.childId.name;
+        const vaccineDisease = vaccination.vaccineInfoId.disease;
 
         await sendNotification(
-          child.parentId,
-          vaccination.childId,
+          userId,
+          childId,
           null,
-          `Vaccination Reminder for ${child.name}`,
-          `It's time for ${child.name}'s ${
-            vaccineInfo.disease
-          } vaccination (Dose: ${vaccineInfo.doseName}). Dosage: ${
-            vaccineInfo.dosageAmount
-          }, Method: ${vaccineInfo.administrationMethod}.${
-            vaccineInfo.description ? ` Note: ${vaccineInfo.description}` : ""
-          }`,
+          `Vaccination Reminder for ${childName}`,
+          `Today is the due date for ${childName}'s ${vaccineDisease} vaccination.`,
           "vaccination"
         );
       }
+
+      if (vaccinations.length > 0) {
+        sentNotifications.add(notificationKey);
+      }
     } catch (error) {
-      console.error("Error scheduling vaccination notifications:", error);
+      console.error("Error in vaccination notification cron job:", error);
     }
   });
 
-  // Schedule vaccination reminders (1 day before, runs daily at 8 AM)
+  // تذكير قبل يوم من التطعيم
   cron.schedule("0 8 * * *", async () => {
     try {
       const tomorrow = moment().add(1, "day").startOf("day").toDate();
-      const endOfTomorrow = moment(tomorrow).endOf("day").toDate();
+      const notificationKey = `${moment()
+        .startOf("day")
+        .toDate()
+        .toISOString()}-vaccination-reminder`;
+
+      if (sentNotifications.has(notificationKey)) {
+        return;
+      }
 
       const vaccinations = await UserVaccination.find({
-        dueDate: {
-          $gte: tomorrow,
-          $lte: endOfTomorrow,
-        },
+        dueDate: tomorrow,
         status: "Pending",
-      })
-        .populate("childId")
-        .populate("vaccineInfoId");
+      }).populate("childId vaccineInfoId");
 
       for (const vaccination of vaccinations) {
-        const child = vaccination.childId;
-        const vaccineInfo = vaccination.vaccineInfoId;
-
-        if (!child || !vaccineInfo) {
-          console.warn(
-            `Missing child or vaccine info for vaccination ID: ${vaccination._id}`
-          );
-          continue;
-        }
+        const userId = vaccination.childId.parentId;
+        const childId = vaccination.childId._id;
+        const childName = vaccination.childId.name;
+        const vaccineDisease = vaccination.vaccineInfoId.disease;
 
         await sendNotification(
-          child.parentId,
-          vaccination.childId,
+          userId,
+          childId,
           null,
-          `Upcoming Vaccination for ${child.name}`,
-          `Reminder: ${child.name}'s ${
-            vaccineInfo.disease
-          } vaccination (Dose: ${
-            vaccineInfo.doseName
-          }) is scheduled for tomorrow at ${moment(vaccination.dueDate).format(
-            "h:mm A"
-          )}. Dosage: ${vaccineInfo.dosageAmount}, Method: ${
-            vaccineInfo.administrationMethod
-          }.${
-            vaccineInfo.description ? ` Note: ${vaccineInfo.description}` : ""
-          }`,
+          `Vaccination Reminder for ${childName}`,
+          `Reminder: ${childName}'s ${vaccineDisease} vaccination is due tomorrow.`,
           "vaccination"
         );
       }
+
+      if (vaccinations.length > 0) {
+        sentNotifications.add(notificationKey);
+      }
     } catch (error) {
-      console.error("Error scheduling vaccination reminders:", error);
+      console.error("Error in vaccination reminder cron job:", error);
     }
   });
 
-  // Schedule delayed vaccination notifications (runs daily at 9 AM)
+  // تنبيه التأخير في التطعيمات
   cron.schedule("0 9 * * *", async () => {
     try {
-      const now = moment().startOf("day").toDate();
+      const today = moment().startOf("day").toDate();
+      const notificationKey = `${today.toISOString()}-vaccination-delayed`;
+
+      if (sentNotifications.has(notificationKey)) {
+        return;
+      }
 
       const vaccinations = await UserVaccination.find({
-        dueDate: { $lt: now },
+        dueDate: { $lt: today },
         status: "Pending",
-      })
-        .populate("childId")
-        .populate("vaccineInfoId");
+      }).populate("childId vaccineInfoId");
 
       for (const vaccination of vaccinations) {
-        const child = vaccination.childId;
-        const vaccineInfo = vaccination.vaccineInfoId;
-
-        if (!child || !vaccineInfo) {
-          console.warn(
-            `Missing child or vaccine info for vaccination ID: ${vaccination._id}`
-          );
-          continue;
-        }
-
-        const daysDelayed = moment(now).diff(
-          moment(vaccination.dueDate),
-          "days"
-        );
+        const userId = vaccination.childId.parentId;
+        const childId = vaccination.childId._id;
+        const childName = vaccination.childId.name;
+        const vaccineDisease = vaccination.vaccineInfoId.disease;
 
         await sendNotification(
-          child.parentId,
-          vaccination.childId,
+          userId,
+          childId,
           null,
-          `Delayed Vaccination for ${child.name}`,
-          `${child.name}'s ${vaccineInfo.disease} vaccination (Dose: ${
-            vaccineInfo.doseName
-          }) is delayed by ${daysDelayed} day(s). Please schedule it as soon as possible. Dosage: ${
-            vaccineInfo.dosageAmount
-          }, Method: ${vaccineInfo.administrationMethod}.${
-            vaccineInfo.description ? ` Note: ${vaccineInfo.description}` : ""
-          }`,
+          `Delayed Vaccination for ${childName}`,
+          `${childName}'s ${vaccineDisease} vaccination is overdue. Please schedule it soon.`,
           "vaccination"
         );
+      }
 
-        if (daysDelayed > 7) {
-          vaccination.status = "Missed";
-          await vaccination.save();
-        }
+      if (vaccinations.length > 0) {
+        sentNotifications.add(notificationKey);
       }
     } catch (error) {
-      console.error(
-        "Error scheduling delayed vaccination notifications:",
-        error
-      );
+      console.error("Error in delayed vaccination cron job:", error);
     }
   });
 
-  // Schedule growth notifications (runs daily at 10 AM to check for updates)
+  // إشعارات النمو
   cron.schedule("0 10 * * *", async () => {
     try {
       const today = moment().startOf("day").toDate();
       const yesterday = moment().subtract(1, "day").startOf("day").toDate();
+      const notificationKey = `${today.toISOString()}-growth`;
+
+      if (sentNotifications.has(notificationKey)) {
+        return;
+      }
 
       const growthRecords = await Growth.find({
         date: { $gte: yesterday, $lte: today },
       }).populate("childId");
 
       for (const record of growthRecords) {
-        const child = record.childId;
-        if (!child) {
-          console.warn(`Missing child for growth record ID: ${record._id}`);
-          continue;
-        }
+        const userId = record.parentId;
+        const childId = record.childId._id;
+        const childName = record.childId.name;
 
-        // إرسال إشعار تحديث النمو
         await sendNotification(
-          child.parentId,
-          child._id,
+          userId,
+          childId,
           null,
-          `Growth Update for ${child.name}`,
-          `${child.name}'s growth updated: Height: ${record.height} cm, Weight: ${record.weight} kg, Head Circumference: ${record.headCircumference} cm.`,
+          `Growth Update for ${childName}`,
+          `A new growth record for ${childName} has been added: Height: ${record.height}, Weight: ${record.weight}.`,
           "growth"
         );
 
-        // التحقق من الانحرافات (مثال: افتراض معايير مبسطة للطول بناءً على العمر)
-        const ageInMonths = moment().diff(moment(child.birthDate), "months");
-        const expectedHeight = ageInMonths * 0.5 + 50; // معادلة مبسطة: 50 سم عند الولادة + 0.5 سم لكل شهر
-        const heightDeviation = Math.abs(record.height - expectedHeight);
+        // التحقق من الانحرافات في الطول
+        const standardHeight = record.ageInMonths * 2 + 50; // معادلة افتراضية
+        const heightDeviation = Math.abs(record.height - standardHeight);
 
         if (heightDeviation > 10) {
-          // الانحراف أكثر من 10 سم
           await sendNotification(
-            child.parentId,
-            child._id,
+            userId,
+            childId,
             null,
-            `Growth Alert for ${child.name}`,
-            `${child.name}'s height (${record.height} cm) deviates significantly from the expected average (${expectedHeight} cm). Please consult a doctor.`,
+            `Growth Alert for ${childName}`,
+            `The height of ${childName} (${record.height} cm) deviates significantly from the expected value (${standardHeight} cm) for their age.`,
             "growth_alert"
           );
         }
       }
+
+      if (growthRecords.length > 0) {
+        sentNotifications.add(notificationKey);
+      }
     } catch (error) {
-      console.error("Error scheduling growth notifications:", error);
+      console.error("Error in growth notification cron job:", error);
     }
   });
 
-  // Schedule appointment reminders (1 day before, runs daily at 8 AM)
+  // تذكير المواعيد قبل يوم
   cron.schedule("0 8 * * *", async () => {
     try {
       const tomorrow = moment().add(1, "day").startOf("day").toDate();
-      const endOfTomorrow = moment(tomorrow).endOf("day").toDate();
+      const notificationKey = `${moment()
+        .startOf("day")
+        .toDate()
+        .toISOString()}-appointment-reminder`;
+
+      if (sentNotifications.has(notificationKey)) {
+        return;
+      }
 
       const appointments = await Appointment.find({
-        date: { $gte: tomorrow, $lte: endOfTomorrow },
+        date: tomorrow,
         status: { $in: ["Pending", "Accepted"] },
-      })
-        .populate("childId")
-        .populate("doctorId");
+      }).populate("childId");
 
       for (const appointment of appointments) {
-        const child = appointment.childId;
-        const doctor = appointment.doctorId;
+        const userId = appointment.userId;
+        const childId = appointment.childId._id;
+        const childName = appointment.childId.name;
 
-        if (!child || !doctor) {
-          console.warn(
-            `Missing child or doctor for appointment ID: ${appointment._id}`
-          );
-          continue;
-        }
-
-        // إشعار للمستخدم
         await sendNotification(
-          appointment.userId,
-          child._id,
-          doctor._id,
-          `Appointment Reminder for ${child.name}`,
-          `You have an appointment with Dr. ${doctor.firstName} ${doctor.lastName} tomorrow at ${appointment.time}.`,
+          userId,
+          childId,
+          appointment.doctorId,
+          `Appointment Reminder for ${childName}`,
+          `Reminder: You have an appointment for ${childName} tomorrow at ${appointment.time}.`,
           "appointment_reminder"
         );
       }
+
+      if (appointments.length > 0) {
+        sentNotifications.add(notificationKey);
+      }
     } catch (error) {
-      console.error("Error scheduling appointment reminders:", error);
+      console.error("Error in appointment reminder cron job:", error);
     }
   });
 };
