@@ -40,19 +40,7 @@ class MQTTService {
         }
 
         // إنشاء سجل SensorData
-        const sensorData = new SensorData({
-          childId: data.childId,
-          deviceId: data.deviceId || null, // اختياري
-          temperature: data.temperature,
-          heartRate: data.heartRate,
-          spo2: data.spo2,
-          latitude: data.latitude,
-          longitude: data.longitude,
-          gyroX: data.gyroX,
-          gyroY: data.gyroY,
-          gyroZ: data.gyroZ,
-          timestamp: data.timestamp,
-        });
+        const sensorData = new SensorData({ ...data });
 
         await sensorData.save();
         console.log("Sensor data saved:", sensorData);
