@@ -28,7 +28,7 @@ const growthRoutes = require("./routes/growth.route");
 const doctorRoutes = require("./routes/doctor.route");
 const sensorDataRoutes = require("./routes/sensorData.route");
 const predictionRoutes = require("./routes/predict.route");
-const notificationsRoutes = require("./routes/notifications.route");
+const notificationsRoutes = require("./routes/notifications.routes");
 
 // إعدادات أساسية
 dotenv.config({ path: "./.env" });
