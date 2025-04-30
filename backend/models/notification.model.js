@@ -5,12 +5,12 @@ const notificationSchema = new mongoose.Schema(
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: false,
     },
     childId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Child",
-      required: true,
+      required: false,
     },
     doctorId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -27,7 +27,18 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["appointment", "medicine", "vaccination", "favorite"],
+      enum: [
+        "medicine",
+        "vaccination",
+        "growth",
+        "growth_alert",
+        "appointment",
+        "appointment_reminder",
+        "child",
+        "doctor",
+        "favorite",
+        "general",
+      ],
       required: true,
     },
     isRead: {

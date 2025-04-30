@@ -1,7 +1,6 @@
 const Notification = require("../models/notification.model");
 const User = require("../models/user.model");
 const Doctor = require("../models/doctor.model");
-const Child = require("../models/child.model");
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
@@ -17,36 +16,48 @@ const sendNotification = async (
   type
 ) => {
   try {
-    const user = await User.findById(userId);
-    const child = await Child.findById(childId);
-    const doctor = doctorId ? await Doctor.findById(doctorId) : null;
+    let fcmToken = null;
+    let recipientId = null;
+    let role = null;
 
-    if (!user || !child) {
-      console.error("User or Child not found for notification");
+    if (userId) {
+      const user = await User.findById(userId);
+      if (user) {
+        fcmToken = user.fcmToken;
+        recipientId = userId;
+        role = userRoles.PATIENT;
+      }
+    } else if (doctorId) {
+      const doctor = await Doctor.findById(doctorId);
+      if (doctor) {
+        fcmToken = doctor.fcmToken;
+        recipientId = doctorId;
+        role = userRoles.DOCTOR;
+      }
+    }
+
+    if (!recipientId) {
+      console.warn("No recipient found for notification");
       return;
     }
 
     const notification = new Notification({
-      userId,
-      childId,
-      doctorId,
+      userId: role === userRoles.PATIENT ? recipientId : null,
+      childId: childId || null,
+      doctorId: role === userRoles.DOCTOR ? recipientId : doctorId || null,
       title,
       body,
       type,
+      isRead: false,
     });
 
     await notification.save();
 
-    if (user.fcmToken) {
-      await sendPushNotification(user.fcmToken, title, body, {
-        childId: childId.toString(),
+    if (fcmToken) {
+      await sendPushNotification(fcmToken, title, body, {
         type,
-      });
-    }
-
-    if (doctor && doctor.fcmToken) {
-      await sendPushNotification(doctor.fcmToken, title, body, {
-        type: "doctor",
+        childId: childId ? childId.toString() : null,
+        doctorId: doctorId ? doctorId.toString() : null,
       });
     }
   } catch (error) {
@@ -55,23 +66,25 @@ const sendNotification = async (
 };
 
 const getUserNotifications = asyncWrapper(async (req, res, next) => {
-  const { childId } = req.params;
   const userId = req.user.id;
+  const { childId } = req.params;
 
-  const child = await Child.findOne({ _id: childId, parentId: userId });
-  if (!child) {
+  if (req.user.role !== userRoles.PATIENT) {
     return next(
       appError.create(
-        "Child not found or not associated with this user",
-        404,
+        "Unauthorized: Only patients can view their notifications",
+        403,
         httpStatusText.FAIL
       )
     );
   }
 
-  const notifications = await Notification.find({ userId, childId })
+  const notifications = await Notification.find({
+    userId,
+    childId,
+  })
     .sort({ createdAt: -1 })
-    .limit(50);
+    .select("title body type isRead createdAt");
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -92,9 +105,11 @@ const getDoctorNotifications = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  const notifications = await Notification.find({ doctorId })
+  const notifications = await Notification.find({
+    doctorId,
+  })
     .sort({ createdAt: -1 })
-    .limit(50);
+    .select("title body type isRead createdAt childId");
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -105,6 +120,7 @@ const getDoctorNotifications = asyncWrapper(async (req, res, next) => {
 const markAsRead = asyncWrapper(async (req, res, next) => {
   const { notificationId } = req.params;
   const userId = req.user.id;
+  const role = req.user.role;
 
   const notification = await Notification.findById(notificationId);
   if (!notification) {
@@ -114,8 +130,10 @@ const markAsRead = asyncWrapper(async (req, res, next) => {
   }
 
   if (
-    notification.userId.toString() !== userId.toString() &&
-    notification.doctorId?.toString() !== userId.toString()
+    (role === userRoles.PATIENT &&
+      notification.userId.toString() !== userId.toString()) ||
+    (role === userRoles.DOCTOR &&
+      notification.doctorId.toString() !== userId.toString())
   ) {
     return next(
       appError.create(
@@ -132,6 +150,10 @@ const markAsRead = asyncWrapper(async (req, res, next) => {
   res.json({
     status: httpStatusText.SUCCESS,
     message: "Notification marked as read",
+    data: {
+      notificationId: notification._id,
+      isRead: notification.isRead,
+    },
   });
 });
 

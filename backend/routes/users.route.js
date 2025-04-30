@@ -174,4 +174,37 @@ router.post(
   usersController.logoutUser
 );
 
+// نقطة نهاية لحفظ FCM Token
+router.post(
+  "/save-fcm-token",
+  verifyToken,
+  allowedTo(userRoles.PATIENT),
+  async (req, res, next) => {
+    const { fcmToken } = req.body;
+    const userId = req.user.id;
+
+    if (!fcmToken) {
+      return next(appError.create("FCM Token is required", 400, "fail"));
+    }
+
+    try {
+      const user = await require("../models/user.model").findByIdAndUpdate(
+        userId,
+        { fcmToken },
+        { new: true }
+      );
+      if (!user) {
+        return next(appError.create("User not found", 404, "fail"));
+      }
+      res.status(200).json({
+        status: "success",
+        message: "FCM Token saved successfully",
+      });
+    } catch (error) {
+      console.error("Error saving FCM Token:", error);
+      return next(appError.create("Server error", 500, "error"));
+    }
+  }
+);
+
 module.exports = router;

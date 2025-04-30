@@ -232,7 +232,6 @@
 //   deleteChild,
 // };
 
-
 const Child = require("../models/child.model");
 const User = require("../models/user.model");
 const asyncWrapper = require("../middlewares/asyncWrapper");
@@ -314,7 +313,7 @@ const createChild = asyncWrapper(async (req, res, next) => {
   await sendNotification(
     parentId,
     newChild._id,
-    null, // doctorId مش موجود
+    null,
     "Child Added",
     `You have successfully added ${newChild.name} to your children list.`,
     "child"
@@ -474,7 +473,7 @@ const updateChild = asyncWrapper(async (req, res, next) => {
     await sendNotification(
       child.parentId,
       childId,
-      null, // doctorId مش موجود
+      null,
       `Child Profile Updated`,
       `${child.name}'s profile has been updated: ${changes.join(", ")}.`,
       "child"
@@ -510,7 +509,7 @@ const deleteChild = asyncWrapper(async (req, res, next) => {
   await sendNotification(
     userId,
     childId,
-    null, // doctorId مش موجود
+    null,
     "Child Removed",
     `You have removed ${child.name} from your children list.`,
     "child"
