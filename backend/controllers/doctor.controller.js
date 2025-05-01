@@ -1629,7 +1629,6 @@
 // };
 
 
-
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const Doctor = require("../models/doctor.model");
 const User = require("../models/user.model");
@@ -1638,6 +1637,7 @@ const Appointment = require("../models/appointment.model");
 const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
 const { sendNotification } = require("./notifications.controller");
+const moment = require("moment"); // استيراد moment لحل المشكلة
 
 // ✅ Get all doctors
 const getAllDoctors = asyncWrapper(async (req, res) => {
@@ -1739,7 +1739,7 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     "Appointment Booked",
     `With Dr. ${doctor.firstName} on ${date} at ${time}.`,
     "appointment",
-    "patient" // تغيير من "user" إلى "patient"
+    "patient"
   );
 
   await sendNotification(
@@ -1824,7 +1824,7 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
     "Appointment Rescheduled",
     `With Dr. ${appointment.doctorId.firstName} to ${date} at ${time}.`,
     "appointment",
-    "patient" // تغيير من "user" إلى "patient"
+    "patient"
   );
 
   await sendNotification(
@@ -1877,7 +1877,7 @@ const cancelAppointment = asyncWrapper(async (req, res, next) => {
     "Appointment Cancelled",
     `With Dr. ${appointment.doctorId.firstName} on ${appointment.date}.`,
     "appointment",
-    "patient" // تغيير من "user" إلى "patient"
+    "patient"
   );
 
   await sendNotification(
@@ -2186,7 +2186,7 @@ const getDoctorProfile = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  if (req.user.role !== userRoles.DOCTOR) {
+  if (req.user.role !== "doctor") {
     return next(
       appError.create(
         "Unauthorized: Only doctors can view their profile",
@@ -2239,7 +2239,7 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
     availableTimes,
   } = req.body;
 
-  if (req.user.role !== userRoles.DOCTOR) {
+  if (req.user.role !== "doctor") {
     return next(
       appError.create(
         "Unauthorized: Only doctors can update their profile",
@@ -2343,7 +2343,7 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
 const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
 
-  if (req.user.role !== userRoles.DOCTOR) {
+  if (req.user.role !== "doctor") {
     return next(
       appError.create(
         "Unauthorized: Only doctors can delete their profile",
@@ -2409,12 +2409,11 @@ const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
   }
 });
 
-
 // ✅ Logout doctor
 const logoutDoctor = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
 
-  if (req.user.role !== userRoles.DOCTOR) {
+  if (req.user.role !== "doctor") {
     return next(
       appError.create(
         "Unauthorized: Only doctors can logout",
@@ -2495,7 +2494,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
   const now = new Date();
 
-  if (req.user.role !== userRoles.DOCTOR) {
+  if (req.user.role !== "doctor") {
     return next(
       appError.create(
         "Unauthorized: Only doctors can view their appointments",
@@ -2545,7 +2544,7 @@ const getChildRecords = asyncWrapper(async (req, res, next) => {
   const { childId } = req.body;
   const doctorId = req.user.id;
 
-  if (req.user.role !== userRoles.DOCTOR) {
+  if (req.user.role !== "doctor") {
     return next(
       appError.create(
         "Unauthorized: Only doctors can view child records",
@@ -2588,7 +2587,7 @@ const updateAppointmentStatus = asyncWrapper(async (req, res, next) => {
     return next(appError.create("Invalid status", 400, httpStatusText.FAIL));
   }
 
-  if (req.user.role !== userRoles.DOCTOR) {
+  if (req.user.role !== "doctor") {
     return next(
       appError.create(
         "Unauthorized: Only doctors can update appointment status",
@@ -2618,7 +2617,7 @@ const updateAppointmentStatus = asyncWrapper(async (req, res, next) => {
     "Appointment Status Updated",
     `Your appointment on ${appointment.date} is now ${status}.`,
     "appointment",
-    "patient" // تغيير من "user" إلى "patient"
+    "patient"
   );
 
   res.json({
@@ -2672,7 +2671,7 @@ const saveFcmToken = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  if (req.user.role !== userRoles.DOCTOR) {
+  if (req.user.role !== "doctor") {
     return next(
       appError.create(
         "Unauthorized: Only doctors can save FCM Token",
@@ -2719,24 +2718,22 @@ const saveFcmToken = asyncWrapper(async (req, res, next) => {
 });
 
 module.exports = {
-  getAllDoctors,//
-  getSingleDoctor,//
-  bookAppointment,//
-  rescheduleAppointment,//
-  cancelAppointment,//
-  addFavoriteDoctor,//
-  removeFavoriteDoctor,//
-  getFavoriteDoctors,//
-  getDoctorProfile,//
-  updateDoctorProfile,//
-  deleteDoctorProfile,//
-  logoutDoctor,//
+  getAllDoctors,
+  getSingleDoctor,
+  bookAppointment,
+  rescheduleAppointment,
+  cancelAppointment,
+  addFavoriteDoctor,
+  removeFavoriteDoctor,
+  getFavoriteDoctors,
+  getDoctorProfile,
+  updateDoctorProfile,
+  deleteDoctorProfile,
+  logoutDoctor,
   updateAvailability,
-  getUpcomingAppointments,///////
-  getChildRecords,//
-  updateAppointmentStatus,//
-  getUserAppointments,//
+  getUpcomingAppointments,
+  getChildRecords,
+  updateAppointmentStatus,
+  getUserAppointments,
   saveFcmToken,
 };
-
-
