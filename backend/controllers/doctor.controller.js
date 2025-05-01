@@ -1628,16 +1628,17 @@
 //   updateAvailability,
 // };
 
-
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const Doctor = require("../models/doctor.model");
 const User = require("../models/user.model");
 const Child = require("../models/child.model");
 const Appointment = require("../models/appointment.model");
+const Growth = require("../models/growth.model"); // استيراد نموذج Growth
+const History = require("../models/history.model"); // استيراد نموذج History
 const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
 const { sendNotification } = require("./notifications.controller");
-const moment = require("moment"); // استيراد moment لحل المشكلة
+const moment = require("moment");
 
 // ✅ Get all doctors
 const getAllDoctors = asyncWrapper(async (req, res) => {
@@ -1665,12 +1666,17 @@ const getSingleDoctor = asyncWrapper(async (req, res, next) => {
 // ✅ Book an appointment
 const bookAppointment = asyncWrapper(async (req, res, next) => {
   const { doctorId, childId } = req.params;
-  const { date, time } = req.body;
+  const { date, time, visitType } = req.body; // إضافة visitType
   const userId = req.user.id;
 
-  if (!date || !time) {
+  // التحقق من وجود جميع الحقول المطلوبة
+  if (!date || !time || !visitType) {
     return next(
-      appError.create("Date and time are required", 400, httpStatusText.FAIL)
+      appError.create(
+        "Date, time, and visitType are required",
+        400,
+        httpStatusText.FAIL
+      )
     );
   }
 
@@ -1728,6 +1734,7 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     doctorId,
     date,
     time,
+    visitType, // إضافة visitType إلى الموعد الجديد
   });
 
   await newAppointment.save();
@@ -1811,6 +1818,12 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
         httpStatusText.FAIL
       )
     );
+  }
+
+  // جلب بيانات الطفل لاستخدامها في الإشعار
+  const child = await Child.findById(childId);
+  if (!child) {
+    return next(appError.create("Child not found", 404, httpStatusText.FAIL));
   }
 
   appointment.date = date;
@@ -1901,7 +1914,6 @@ const addFavoriteDoctor = asyncWrapper(async (req, res, next) => {
   const { childId, doctorId } = req.params;
   const userId = req.user.id;
 
-  // التحقق من صلاحيات المستخدم
   if (req.user.role !== "patient") {
     return next(
       appError.create(
@@ -1912,7 +1924,6 @@ const addFavoriteDoctor = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // التحقق من وجود الطفل وارتباطه بالمستخدم
   const child = await Child.findOne({ _id: childId, parentId: userId });
   if (!child) {
     return next(
@@ -1924,18 +1935,15 @@ const addFavoriteDoctor = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // التحقق من وجود الطبيب
   const doctor = await Doctor.findById(doctorId);
   if (!doctor) {
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
   }
 
-  // استخدام منطق الـ toggle
   const isDoctorInFavorites = child.favorite.includes(doctorId);
   let message, notificationTitle, notificationMessage;
 
   if (isDoctorInFavorites) {
-    // إذا كان الطبيب موجودًا بالفعل في المفضلة، قم بإزالته
     child.favorite = child.favorite.filter(
       (id) => id.toString() !== doctorId.toString()
     );
@@ -1943,7 +1951,6 @@ const addFavoriteDoctor = asyncWrapper(async (req, res, next) => {
     notificationTitle = "Doctor Unfavorited";
     notificationMessage = `Dr. ${doctor.firstName} removed from favorites.`;
   } else {
-    // إذا لم يكن الطبيب موجودًا، قم بإضافته
     child.favorite.push(doctorId);
     message = "Doctor added to favorites successfully";
     notificationTitle = "Doctor Favorited";
@@ -1952,7 +1959,6 @@ const addFavoriteDoctor = asyncWrapper(async (req, res, next) => {
 
   await child.save();
 
-  // إرسال إشعار بناءً على الإجراء
   await sendNotification(
     userId,
     childId,
@@ -1974,7 +1980,6 @@ const removeFavoriteDoctor = asyncWrapper(async (req, res, next) => {
   const { childId, doctorId } = req.params;
   const userId = req.user.id;
 
-  // التحقق من صلاحيات المستخدم
   if (req.user.role !== "patient") {
     return next(
       appError.create(
@@ -1985,7 +1990,6 @@ const removeFavoriteDoctor = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // التحقق من وجود الطفل وارتباطه بالمستخدم
   const child = await Child.findOne({ _id: childId, parentId: userId });
   if (!child) {
     return next(
@@ -1997,18 +2001,15 @@ const removeFavoriteDoctor = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // التحقق من وجود الطبيب
   const doctor = await Doctor.findById(doctorId);
   if (!doctor) {
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
   }
 
-  // استخدام منطق الـ toggle
   const isDoctorInFavorites = child.favorite.includes(doctorId);
   let message, notificationTitle, notificationMessage;
 
   if (isDoctorInFavorites) {
-    // إذا كان الطبيب موجودًا في المفضلة، قم بإزالته
     child.favorite = child.favorite.filter(
       (id) => id.toString() !== doctorId.toString()
     );
@@ -2016,7 +2017,6 @@ const removeFavoriteDoctor = asyncWrapper(async (req, res, next) => {
     notificationTitle = "Doctor Unfavorited";
     notificationMessage = `Dr. ${doctor.firstName} removed from favorites.`;
   } else {
-    // إذا لم يكن الطبيب موجودًا، قم بإضافته
     child.favorite.push(doctorId);
     message = "Doctor added to favorites successfully";
     notificationTitle = "Doctor Favorited";
@@ -2025,7 +2025,6 @@ const removeFavoriteDoctor = asyncWrapper(async (req, res, next) => {
 
   await child.save();
 
-  // إرسال إشعار بناءً على الإجراء
   await sendNotification(
     userId,
     childId,
@@ -2506,7 +2505,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
 
   const appointments = await Appointment.find({
     doctorId,
-    date: { $gte: now },
+    date: { $gte: now }, // التأكد من أن التاريخ في المستقبل
   })
     .populate("userId", "firstName lastName")
     .populate("childId", "name");
@@ -2539,7 +2538,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Get child records
+// ✅ Get child records (فقط النمو والتاريخ الطبي)
 const getChildRecords = asyncWrapper(async (req, res, next) => {
   const { childId } = req.body;
   const doctorId = req.user.id;
@@ -2559,20 +2558,21 @@ const getChildRecords = asyncWrapper(async (req, res, next) => {
     return next(appError.create("Child not found", 404, httpStatusText.FAIL));
   }
 
-  const appointments = await Appointment.find({ childId, doctorId }).populate(
-    "userId",
-    "firstName lastName"
+  // جلب بيانات النمو (Growth)
+  const growthRecords = await Growth.find({ childId }).select(
+    "weight height headCircumference date time notes notesImage ageInMonths createdAt updatedAt"
+  );
+
+  // جلب بيانات التاريخ الطبي (History)
+  const historyRecords = await History.find({ childId }).select(
+    "diagnosis disease treatment notes date time doctorName notesImage createdAt updatedAt"
   );
 
   res.json({
     status: httpStatusText.SUCCESS,
     data: {
-      child: {
-        name: child.name,
-        birthDate: child.birthDate,
-        gender: child.gender,
-      },
-      appointments,
+      growth: growthRecords,
+      history: historyRecords,
     },
   });
 });
