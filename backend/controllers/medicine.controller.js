@@ -506,13 +506,13 @@ const createMedicine = asyncWrapper(async (req, res, next) => {
 
   await newMedicine.save();
 
-  // إرسال إشعار لليوزر
+  // إرسال إشعار مختصر
   await sendNotification(
     userId,
     childId,
     null,
-    `New Medicine Added for ${child.name}`,
-    `A new medicine (${name}) has been added for ${child.name}.`,
+    "Medicine Added",
+    `${child.name}: ${name} added.`,
     "medicine",
     "user"
   );
@@ -647,13 +647,13 @@ const updateMedicine = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // إرسال إشعار لليوزر
+  // إرسال إشعار مختصر
   await sendNotification(
     userId,
     childId,
     null,
-    `Medicine Updated for ${child.name}`,
-    `The medicine (${updatedMedicine.name}) for ${child.name} has been updated.`,
+    "Medicine Updated",
+    `${child.name}: ${updatedMedicine.name} updated.`,
     "medicine",
     "user"
   );
@@ -699,13 +699,13 @@ const deleteMedicine = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // إرسال إشعار لليوزر
+  // إرسال إشعار مختصر
   await sendNotification(
     userId,
     childId,
     null,
-    `Medicine Removed for ${child.name}`,
-    `The medicine (${deletedMedicine.name}) for ${child.name} has been removed.`,
+    "Medicine Removed",
+    `${child.name}: ${deletedMedicine.name} removed.`,
     "medicine",
     "user"
   );

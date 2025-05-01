@@ -526,13 +526,13 @@ const createGrowth = asyncWrapper(async (req, res, next) => {
 
   await newGrowth.save();
 
-  // إرسال إشعار لليوزر
+  // إرسال إشعار مختصر
   await sendNotification(
     child.parentId,
     childId,
     null,
-    `New Growth Record for ${child.name}`,
-    `A new growth record has been added for ${child.name}: Height: ${height} cm, Weight: ${weight} kg.`,
+    "Growth Added",
+    `${child.name}: Growth record added.`,
     "growth",
     "user"
   );
@@ -638,9 +638,7 @@ const getSingleGrowth = asyncWrapper(async (req, res, next) => {
   );
 
   if (!growthRecord) {
-    return next(
-      appError.create("Growth record not found", 404, httpStatusText.FAIL)
-    );
+    return next(appError.create("Growth record not found", 404, httpStatusText.FAIL));
   }
 
   res.json({
@@ -697,13 +695,13 @@ const updateGrowth = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // إرسال إشعار لليوزر
+  // إرسال إشعار مختصر
   await sendNotification(
     child.parentId,
     childId,
     null,
-    `Growth Record Updated for ${child.name}`,
-    `The growth record for ${child.name} has been updated: Height: ${updatedGrowth.height} cm, Weight: ${updatedGrowth.weight} kg.`,
+    "Growth Updated",
+    `${child.name}: Growth record updated.`,
     "growth",
     "user"
   );
@@ -757,13 +755,13 @@ const deleteGrowth = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // إرسال إشعار لليوزر
+  // إرسال إشعار مختصر
   await sendNotification(
     child.parentId,
     childId,
     null,
-    `Growth Record Deleted for ${child.name}`,
-    `A growth record for ${child.name} has been deleted.`,
+    "Growth Removed",
+    `${child.name}: Growth record removed.`,
     "growth",
     "user"
   );

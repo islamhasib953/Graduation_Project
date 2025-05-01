@@ -310,17 +310,13 @@ const createChild = asyncWrapper(async (req, res, next) => {
     await UserVaccination.insertMany(vaccinationsToCreate);
   }
 
-  // إرسال إشعار لليوزر
+  // إرسال إشعار مختصر
   await sendNotification(
     parentId,
     newChild._id,
     null,
-    `New Child Added`,
-    `You have successfully added ${
-      newChild.name
-    } to your children list. Birth Date: ${
-      newChild.birthDate.toISOString().split("T")[0]
-    }.`,
+    "Child Added",
+    `${newChild.name} added.`,
     "child",
     "user"
   );
@@ -434,53 +430,51 @@ const updateChild = asyncWrapper(async (req, res, next) => {
 
   const changes = [];
   if (name && name !== child.name) {
-    changes.push(`Name changed to ${name}`);
+    changes.push(`name to ${name}`);
     child.name = name;
   }
   if (gender && gender !== child.gender) {
-    changes.push(`Gender changed to ${gender}`);
+    changes.push(`gender to ${gender}`);
     child.gender = gender;
   }
   if (birthDate && birthDate !== child.birthDate.toISOString()) {
-    changes.push(`Birth Date changed to ${birthDate}`);
+    changes.push(`birth date to ${birthDate}`);
     child.birthDate = birthDate;
   }
   if (bloodType && bloodType !== child.bloodType) {
-    changes.push(`Blood Type changed to ${bloodType}`);
+    changes.push(`blood type to ${bloodType}`);
     child.bloodType = bloodType;
   }
   if (heightAtBirth && heightAtBirth !== child.heightAtBirth) {
-    changes.push(`Height at Birth changed to ${heightAtBirth}`);
+    changes.push(`birth height to ${heightAtBirth}`);
     child.heightAtBirth = heightAtBirth;
   }
   if (weightAtBirth && weightAtBirth !== child.weightAtBirth) {
-    changes.push(`Weight at Birth changed to ${weightAtBirth}`);
+    changes.push(`birth weight to ${weightAtBirth}`);
     child.weightAtBirth = weightAtBirth;
   }
   if (
     headCircumferenceAtBirth &&
     headCircumferenceAtBirth !== child.headCircumferenceAtBirth
   ) {
-    changes.push(
-      `Head Circumference at Birth changed to ${headCircumferenceAtBirth}`
-    );
+    changes.push(`birth head circumference to ${headCircumferenceAtBirth}`);
     child.headCircumferenceAtBirth = headCircumferenceAtBirth;
   }
   if (photo && photo !== child.photo) {
-    changes.push(`Photo updated`);
+    changes.push(`photo updated`);
     child.photo = photo;
   }
 
   await child.save();
 
-  // إرسال إشعار لو فيه تغييرات
+  // إرسال إشعار مختصر مع التغييرات فقط
   if (changes.length > 0) {
     await sendNotification(
       child.parentId,
       childId,
       null,
-      `Child Profile Updated`,
-      `${child.name}'s profile has been updated: ${changes.join(", ")}.`,
+      "Child Updated",
+      `${child.name} updated: ${changes.join(", ")}`,
       "child",
       "user"
     );
@@ -511,13 +505,13 @@ const deleteChild = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // إرسال إشعار قبل الحذف
+  // إرسال إشعار مختصر
   await sendNotification(
     userId,
     childId,
     null,
-    `Child Removed`,
-    `You have removed ${child.name} from your children list.`,
+    "Child Removed",
+    `${child.name} removed.`,
     "child",
     "user"
   );

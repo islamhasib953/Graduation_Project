@@ -466,6 +466,7 @@
 // };
 
 
+
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const User = require("../models/user.model");
 const Doctor = require("../models/doctor.model");
@@ -549,23 +550,23 @@ const updateUserProfile = asyncWrapper(async (req, res, next) => {
 
   const changes = [];
   if (firstName && firstName !== user.firstName) {
-    changes.push(`First Name changed to ${firstName}`);
+    changes.push(`name to ${firstName}`);
     user.firstName = firstName;
   }
   if (lastName && lastName !== user.lastName) {
-    changes.push(`Last Name changed to ${lastName}`);
+    changes.push(`last name to ${lastName}`);
     user.lastName = lastName;
   }
   if (email && email !== user.email) {
-    changes.push(`Email changed to ${email}`);
+    changes.push(`email to ${email}`);
     user.email = email;
   }
   if (phone && phone !== user.phone) {
-    changes.push(`Phone changed to ${phone}`);
+    changes.push(`phone to ${phone}`);
     user.phone = phone;
   }
   if (address && address !== user.address) {
-    changes.push(`Address changed to ${address}`);
+    changes.push(`address to ${address}`);
     user.address = address;
   }
 
@@ -577,7 +578,7 @@ const updateUserProfile = asyncWrapper(async (req, res, next) => {
       null,
       null,
       "Profile Updated",
-      `You have updated your profile: ${changes.join(", ")}.`,
+      `Updated: ${changes.join(", ")}`,
       "profile",
       "user"
     );
@@ -639,13 +640,13 @@ const deleteUserProfile = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // إرسال إشعار قبل الحذف
+  // إرسال إشعار مختصر
   await sendNotification(
     userId,
     null,
     null,
     "Account Deleted",
-    `Your account (${user.firstName} ${user.lastName}) has been deleted successfully.`,
+    "Your account has been deleted.",
     "profile",
     "user"
   );
@@ -706,6 +707,17 @@ const logoutUser = asyncWrapper(async (req, res, next) => {
   user.fcmToken = null;
   await user.save();
 
+  // إرسال إشعار مختصر
+  await sendNotification(
+    userId,
+    null,
+    null,
+    "Logged Out",
+    "You have logged out.",
+    "logout",
+    "user"
+  );
+
   res.json({
     status: httpStatusText.SUCCESS,
     message: "Logged out successfully",
@@ -759,7 +771,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       rate,
       availableDays,
       availableTimes,
-      avatar: req.file ? req.file.filename : "uploads/doctor.jpg",
+      avatar: req.file ? req.file.filename : "Uploads/doctor.jpg",
       fcmToken: fcmToken || null,
     });
 
@@ -809,7 +821,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       email,
       password: hashedPassword,
       role: userRoles.PATIENT,
-      avatar: req.file ? req.file.filename : "uploads/profile.jpg",
+      avatar: req.file ? req.file.filename : "Uploads/profile.jpg",
       fcmToken: fcmToken || null,
     });
 
@@ -829,8 +841,8 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       newUser._id,
       null,
       null,
-      "Welcome to ChildCare System!",
-      `Hi ${newUser.firstName}, welcome to ChildCare System! We're here to help you manage your child's healthcare.`,
+      "Welcome!",
+      `Hi ${newUser.firstName}, welcome aboard!`,
       "welcome",
       "user"
     );
@@ -908,8 +920,8 @@ const loginUser = asyncWrapper(async (req, res, next) => {
       user._id,
       null,
       null,
-      "Login Successful",
-      `Hi ${user.firstName}, you have successfully logged in to ChildCare System!`,
+      "Logged In",
+      `Welcome back, ${user.firstName}!`,
       "login",
       "user"
     );

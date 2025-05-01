@@ -323,13 +323,13 @@ const createHistory = asyncWrapper(async (req, res, next) => {
 
   await newHistory.save();
 
-  // إرسال إشعار لليوزر
+  // إرسال إشعار مختصر
   await sendNotification(
     userId,
     childId,
     null,
-    `New Medical History for ${child.name}`,
-    `A new medical history record has been added for ${child.name}: ${disease}.`,
+    "History Added",
+    `${child.name}: ${disease} added.`,
     "history",
     "user"
   );
@@ -485,13 +485,13 @@ const updateHistory = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // إرسال إشعار لليوزر
+  // إرسال إشعار مختصر
   await sendNotification(
     userId,
     childId,
     null,
-    `Medical History Updated for ${child.name}`,
-    `The medical history record for ${child.name} has been updated: ${updatedHistory.disease}.`,
+    "History Updated",
+    `${child.name}: ${updatedHistory.disease} updated.`,
     "history",
     "user"
   );
@@ -541,13 +541,13 @@ const deleteHistory = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // إرسال إشعار لليوزر
+  // إرسال إشعار مختصر
   await sendNotification(
     userId,
     childId,
     null,
-    `Medical History Deleted for ${child.name}`,
-    `A medical history record for ${child.name} has been deleted.`,
+    "History Removed",
+    `${child.name}: Record removed.`,
     "history",
     "user"
   );
