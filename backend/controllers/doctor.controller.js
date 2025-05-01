@@ -1627,6 +1627,9 @@
 //   getChildRecords,
 //   updateAvailability,
 // };
+
+
+
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const Doctor = require("../models/doctor.model");
 const User = require("../models/user.model");
@@ -1893,22 +1896,42 @@ const cancelAppointment = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Add a doctor to favorites
+// ✅ Add a doctor to favorites with childId in the path
 const addFavoriteDoctor = asyncWrapper(async (req, res, next) => {
-  const { doctorId } = req.params;
+  const { childId, doctorId } = req.params;
   const userId = req.user.id;
 
+  // التحقق من صلاحيات المستخدم
+  if (req.user.role !== userRoles.PATIENT) {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can add favorite doctors",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  // التحقق من وجود الطفل وارتباطه بالمستخدم
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or not associated with this user",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  // التحقق من وجود الطبيب
   const doctor = await Doctor.findById(doctorId);
   if (!doctor) {
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
   }
 
-  const user = await User.findById(userId);
-  if (!user) {
-    return next(appError.create("User not found", 404, httpStatusText.FAIL));
-  }
-
-  if (user.favorite.includes(doctorId)) {
+  // التحقق مما إذا كان الطبيب موجودًا بالفعل في المفضلة
+  if (child.favorite.includes(doctorId)) {
     return next(
       appError.create(
         "Doctor is already in favorites",
@@ -1918,17 +1941,19 @@ const addFavoriteDoctor = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  user.favorite.push(doctorId);
-  await user.save();
+  // إضافة الطبيب إلى قائمة المفضلة في Child
+  child.favorite.push(doctorId);
+  await child.save();
 
+  // إرسال إشعار
   await sendNotification(
     userId,
-    null,
+    childId,
     doctorId,
     "Doctor Favorited",
     `Dr. ${doctor.firstName} added to favorites.`,
     "favorite",
-    "patient" // تغيير من "user" إلى "patient"
+    "patient"
   );
 
   res.json({
@@ -1937,40 +1962,62 @@ const addFavoriteDoctor = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Remove a doctor from favorites
+// ✅ Remove a doctor from favorites with childId in the path
 const removeFavoriteDoctor = asyncWrapper(async (req, res, next) => {
-  const { doctorId } = req.params;
+  const { childId, doctorId } = req.params;
   const userId = req.user.id;
 
+  // التحقق من صلاحيات المستخدم
+  if (req.user.role !== userRoles.PATIENT) {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can remove favorite doctors",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  // التحقق من وجود الطفل وارتباطه بالمستخدم
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or not associated with this user",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  // التحقق من وجود الطبيب
   const doctor = await Doctor.findById(doctorId);
   if (!doctor) {
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
   }
 
-  const user = await User.findById(userId);
-  if (!user) {
-    return next(appError.create("User not found", 404, httpStatusText.FAIL));
-  }
-
-  if (!user.favorite.includes(doctorId)) {
+  // التحقق مما إذا كان الطبيب غير موجود في المفضلة
+  if (!child.favorite.includes(doctorId)) {
     return next(
       appError.create("Doctor is not in favorites", 400, httpStatusText.FAIL)
     );
   }
 
-  user.favorite = user.favorite.filter(
+  // إزالة الطبيب من قائمة المفضلة في Child
+  child.favorite = child.favorite.filter(
     (id) => id.toString() !== doctorId.toString()
   );
-  await user.save();
+  await child.save();
 
+  // إرسال إشعار
   await sendNotification(
     userId,
-    null,
+    childId,
     doctorId,
     "Doctor Unfavorited",
     `Dr. ${doctor.firstName} removed from favorites.`,
     "favorite",
-    "patient" // تغيير من "user" إلى "patient"
+    "patient"
   );
 
   res.json({
@@ -1979,27 +2026,149 @@ const removeFavoriteDoctor = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Get favorite doctors for a user
+// ✅ جلب الدكاترة المفضلين مع childId في الـ Path
 const getFavoriteDoctors = asyncWrapper(async (req, res, next) => {
+  const { childId } = req.params;
   const userId = req.user.id;
 
-  const user = await User.findById(userId).populate(
-    "favorite",
-    "-password -__v -token"
-  );
-  if (!user) {
-    return next(appError.create("User not found", 404, httpStatusText.FAIL));
+  if (req.user.role !== userRoles.PATIENT) {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can view favorite doctors",
+        403,
+        httpStatusText.FAIL
+      )
+    );
   }
+
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or not associated with this user",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const favoriteDoctorIds = child.favorite;
+  if (!favoriteDoctorIds || favoriteDoctorIds.length === 0) {
+    return next(
+      appError.create("No favorite doctors found", 404, httpStatusText.FAIL)
+    );
+  }
+
+  const doctors = await Doctor.find({
+    _id: { $in: favoriteDoctorIds },
+  }).select(
+    "firstName lastName phone availableTimes availableDays created_at address avatar specialise about rate"
+  );
+
+  if (!doctors.length) {
+    return next(
+      appError.create("No favorite doctors found", 404, httpStatusText.FAIL)
+    );
+  }
+
+  const currentDay = moment().format("dddd");
+  const today = moment().startOf("day").toDate();
+
+  const doctorsWithStatus = await Promise.all(
+    doctors.map(async (doctor) => {
+      const hasAvailableDays =
+        doctor.availableDays && doctor.availableDays.length > 0;
+      const hasAvailableTimes =
+        doctor.availableTimes && doctor.availableTimes.length > 0;
+
+      if (!hasAvailableDays || !hasAvailableTimes) {
+        return {
+          _id: doctor._id,
+          firstName: doctor.firstName,
+          lastName: doctor.lastName,
+          phone: doctor.phone,
+          availableTimes: doctor.availableTimes,
+          availableDays: doctor.availableDays,
+          created_at: doctor.created_at,
+          address: doctor.address,
+          avatar: doctor.avatar,
+          specialise: doctor.specialise,
+          about: doctor.about,
+          rate: doctor.rate,
+          status: "Closed",
+          isFavorite: true,
+        };
+      }
+
+      const isDayAvailable = doctor.availableDays.includes(currentDay);
+      if (!isDayAvailable) {
+        return {
+          _id: doctor._id,
+          firstName: doctor.firstName,
+          lastName: doctor.lastName,
+          phone: doctor.phone,
+          availableTimes: doctor.availableTimes,
+          availableDays: doctor.availableDays,
+          created_at: doctor.created_at,
+          address: doctor.address,
+          avatar: doctor.avatar,
+          specialise: doctor.specialise,
+          about: doctor.about,
+          rate: doctor.rate,
+          status: "Closed",
+          isFavorite: true,
+        };
+      }
+
+      const bookedAppointments = await Appointment.find({
+        doctorId: doctor._id,
+        date: today,
+      }).select("time");
+
+      const bookedTimes = bookedAppointments.map(
+        (appointment) => appointment.time
+      );
+
+      const hasAvailableTimeToday = doctor.availableTimes.some(
+        (time) => !bookedTimes.includes(time)
+      );
+
+      const status = hasAvailableTimeToday ? "Open" : "Closed";
+
+      return {
+        _id: doctor._id,
+        firstName: doctor.firstName,
+        lastName: doctor.lastName,
+        phone: doctor.phone,
+        availableTimes: doctor.availableTimes,
+        availableDays: doctor.availableDays,
+        created_at: doctor.created_at,
+        address: doctor.address,
+        avatar: doctor.avatar,
+        specialise: doctor.specialise,
+        about: doctor.about,
+        rate: doctor.rate,
+        status,
+        isFavorite: true,
+      };
+    })
+  );
 
   res.json({
     status: httpStatusText.SUCCESS,
-    data: { favoriteDoctors: user.favorite },
+    data: doctorsWithStatus,
   });
 });
 
-// ✅ Get doctor profile
+// ✅ جلب بيانات الدكتور (Profile)
 const getDoctorProfile = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
+
+  if (!doctorId) {
+    return next(
+      appError.create("User ID not found in token", 401, httpStatusText.FAIL)
+    );
+  }
 
   if (req.user.role !== userRoles.DOCTOR) {
     return next(
@@ -2027,12 +2196,12 @@ const getDoctorProfile = asyncWrapper(async (req, res, next) => {
       address: doctor.address,
       email: doctor.email,
       role: doctor.role,
+      avatar: doctor.avatar,
       specialise: doctor.specialise,
       about: doctor.about,
       rate: doctor.rate,
       availableDays: doctor.availableDays,
       availableTimes: doctor.availableTimes,
-      avatar: doctor.avatar,
       created_at: doctor.created_at,
     },
   });
@@ -2224,46 +2393,6 @@ const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
   }
 });
 
-// ✅ Get all appointments for a doctor
-const getDoctorAppointments = asyncWrapper(async (req, res, next) => {
-  const doctorId = req.user.id;
-
-  if (req.user.role !== userRoles.DOCTOR) {
-    return next(
-      appError.create(
-        "Unauthorized: Only doctors can view their appointments",
-        403,
-        httpStatusText.FAIL
-      )
-    );
-  }
-
-  const appointments = await Appointment.find({ doctorId })
-    .populate("userId", "firstName lastName")
-    .populate("childId", "name");
-
-  if (!appointments.length) {
-    return next(
-      appError.create("No appointments found", 404, httpStatusText.FAIL)
-    );
-  }
-
-  res.json({
-    status: httpStatusText.SUCCESS,
-    data: appointments.map((appointment) => ({
-      _id: appointment._id,
-      user: {
-        firstName: appointment.userId?.firstName,
-        lastName: appointment.userId?.lastName,
-      },
-      child: {
-        name: appointment.childId?.name,
-      },
-      date: appointment.date,
-      time: appointment.time,
-    })),
-  });
-});
 
 // ✅ Logout doctor
 const logoutDoctor = asyncWrapper(async (req, res, next) => {
@@ -2574,23 +2703,24 @@ const saveFcmToken = asyncWrapper(async (req, res, next) => {
 });
 
 module.exports = {
-  getAllDoctors,
-  getSingleDoctor,
-  bookAppointment,
-  rescheduleAppointment,
-  cancelAppointment,
-  addFavoriteDoctor,
-  removeFavoriteDoctor,
-  getFavoriteDoctors,
-  getDoctorProfile,
-  updateDoctorProfile,
-  deleteDoctorProfile,
-  getDoctorAppointments,
-  logoutDoctor,
+  getAllDoctors,//
+  getSingleDoctor,//
+  bookAppointment,//
+  rescheduleAppointment,//
+  cancelAppointment,//
+  addFavoriteDoctor,//
+  removeFavoriteDoctor,//
+  getFavoriteDoctors,//
+  getDoctorProfile,//
+  updateDoctorProfile,//
+  deleteDoctorProfile,//
+  logoutDoctor,//
   updateAvailability,
-  getUpcomingAppointments,
-  getChildRecords,
-  updateAppointmentStatus,
-  getUserAppointments,
+  getUpcomingAppointments,///////
+  getChildRecords,//
+  updateAppointmentStatus,//
+  getUserAppointments,//
   saveFcmToken,
 };
+
+
