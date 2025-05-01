@@ -265,7 +265,6 @@
 // };
 
 
-
 const History = require("../models/history.model");
 const Child = require("../models/child.model");
 const asyncWrapper = require("../middlewares/asyncWrapper");
@@ -331,7 +330,7 @@ const createHistory = asyncWrapper(async (req, res, next) => {
     "History Added",
     `${child.name}: ${disease} added.`,
     "history",
-    "user"
+    "patient" // تغيير من "user" إلى "patient"
   );
 
   res.json({
@@ -493,7 +492,7 @@ const updateHistory = asyncWrapper(async (req, res, next) => {
     "History Updated",
     `${child.name}: ${updatedHistory.disease} updated.`,
     "history",
-    "user"
+    "patient" // تغيير من "user" إلى "patient"
   );
 
   res.json({
@@ -549,7 +548,7 @@ const deleteHistory = asyncWrapper(async (req, res, next) => {
     "History Removed",
     `${child.name}: Record removed.`,
     "history",
-    "user"
+    "patient" // تغيير من "user" إلى "patient"
   );
 
   res.json({

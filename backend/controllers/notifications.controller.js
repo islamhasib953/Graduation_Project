@@ -21,7 +21,8 @@ const sendNotification = async (
     let recipientId = null;
     let role = null;
 
-    if (userId && target === "user") {
+    if (userId && target === "patient") {
+      // تغيير من "user" إلى "patient"
       const user = await User.findById(userId);
       if (user) {
         fcmToken = user.fcmToken;
@@ -51,7 +52,7 @@ const sendNotification = async (
       body,
       type,
       target,
-      createdAt: { $gte: new Date(Date.now() - 60 * 1000) }, // في آخر دقيقة
+      createdAt: { $gte: new Date(Date.now() - 60 * 1000) },
     });
 
     if (existingNotification) {
@@ -102,7 +103,7 @@ const getUserNotifications = asyncWrapper(async (req, res, next) => {
   const notifications = await Notification.find({
     userId,
     childId,
-    target: "user",
+    target: "patient", // تغيير من "user" إلى "patient"
   })
     .sort({ createdAt: -1 })
     .select("title body type target isRead createdAt");

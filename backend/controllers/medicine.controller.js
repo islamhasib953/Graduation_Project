@@ -460,7 +460,6 @@
 //   deleteMedicine,
 // };
 
-
 const Medicine = require("../models/medicine.model");
 const Child = require("../models/child.model");
 const asyncWrapper = require("../middlewares/asyncWrapper");
@@ -514,7 +513,7 @@ const createMedicine = asyncWrapper(async (req, res, next) => {
     "Medicine Added",
     `${child.name}: ${name} added.`,
     "medicine",
-    "user"
+    "patient" // تغيير من "user" إلى "patient"
   );
 
   res.status(201).json({
@@ -655,7 +654,7 @@ const updateMedicine = asyncWrapper(async (req, res, next) => {
     "Medicine Updated",
     `${child.name}: ${updatedMedicine.name} updated.`,
     "medicine",
-    "user"
+    "patient" // تغيير من "user" إلى "patient"
   );
 
   res.json({
@@ -707,7 +706,7 @@ const deleteMedicine = asyncWrapper(async (req, res, next) => {
     "Medicine Removed",
     `${child.name}: ${deletedMedicine.name} removed.`,
     "medicine",
-    "user"
+    "patient" // تغيير من "user" إلى "patient"
   );
 
   res.json({

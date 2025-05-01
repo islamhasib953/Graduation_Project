@@ -53,7 +53,7 @@ router.post(
         title,
         body,
         "bracelet",
-        "user"
+        "patient"
       );
 
       res.status(201).json({
@@ -89,7 +89,7 @@ router.post(
       let fcmTokens = [];
       let notifications = [];
 
-      if (target === "user" || target === "all") {
+      if (target === "patient" || target === "all") {
         const users = await User.find().select("fcmToken _id");
         fcmTokens.push(
           ...users.map((user) => user.fcmToken).filter((token) => token)
@@ -100,7 +100,7 @@ router.post(
             title,
             body,
             type: "general",
-            target: "user",
+            target: "patient",
             isRead: false,
           }))
         );

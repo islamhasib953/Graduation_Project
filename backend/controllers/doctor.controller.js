@@ -1627,7 +1627,6 @@
 //   getChildRecords,
 //   updateAvailability,
 // };
-
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const Doctor = require("../models/doctor.model");
 const User = require("../models/user.model");
@@ -1737,7 +1736,7 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     "Appointment Booked",
     `With Dr. ${doctor.firstName} on ${date} at ${time}.`,
     "appointment",
-    "user"
+    "patient" // تغيير من "user" إلى "patient"
   );
 
   await sendNotification(
@@ -1822,7 +1821,7 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
     "Appointment Rescheduled",
     `With Dr. ${appointment.doctorId.firstName} to ${date} at ${time}.`,
     "appointment",
-    "user"
+    "patient" // تغيير من "user" إلى "patient"
   );
 
   await sendNotification(
@@ -1875,7 +1874,7 @@ const cancelAppointment = asyncWrapper(async (req, res, next) => {
     "Appointment Cancelled",
     `With Dr. ${appointment.doctorId.firstName} on ${appointment.date}.`,
     "appointment",
-    "user"
+    "patient" // تغيير من "user" إلى "patient"
   );
 
   await sendNotification(
@@ -1929,7 +1928,7 @@ const addFavoriteDoctor = asyncWrapper(async (req, res, next) => {
     "Doctor Favorited",
     `Dr. ${doctor.firstName} added to favorites.`,
     "favorite",
-    "user"
+    "patient" // تغيير من "user" إلى "patient"
   );
 
   res.json({
@@ -1971,7 +1970,7 @@ const removeFavoriteDoctor = asyncWrapper(async (req, res, next) => {
     "Doctor Unfavorited",
     `Dr. ${doctor.firstName} removed from favorites.`,
     "favorite",
-    "user"
+    "patient" // تغيير من "user" إلى "patient"
   );
 
   res.json({
@@ -2474,7 +2473,7 @@ const updateAppointmentStatus = asyncWrapper(async (req, res, next) => {
     "Appointment Status Updated",
     `Your appointment on ${appointment.date} is now ${status}.`,
     "appointment",
-    "user"
+    "patient" // تغيير من "user" إلى "patient"
   );
 
   res.json({

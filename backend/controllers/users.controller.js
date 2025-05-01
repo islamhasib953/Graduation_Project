@@ -466,7 +466,6 @@
 // };
 
 
-
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const User = require("../models/user.model");
 const Doctor = require("../models/doctor.model");
@@ -527,10 +526,129 @@ const getUserProfile = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ تعديل بيانات اليوزر (Profile)
+// ✅ Register a new user
+const registerUser = asyncWrapper(async (req, res, next) => {
+  const { firstName, lastName, email, password, phone, address, gender } = req.body;
+
+  if (!firstName || !lastName || !email || !password || !phone || !address || !gender) {
+    return next(
+      appError.create("All fields are required", 400, httpStatusText.FAIL)
+    );
+  }
+
+  const user = await User.findOne({ email });
+  if (user) {
+    return next(
+      appError.create("Email already exists", 400, httpStatusText.FAIL)
+    );
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  const newUser = new User({
+    firstName,
+    lastName,
+    email,
+    password: hashedPassword,
+    phone,
+    address,
+    gender,
+    role: userRoles.PATIENT,
+  });
+
+  const token = await genrateJWT({ email: newUser.email, id: newUser._id, role: newUser.role });
+  newUser.token = token;
+
+  await newUser.save();
+
+  // إرسال إشعار مختصر
+  await sendNotification(
+    newUser._id,
+    null,
+    null,
+    "Account Created",
+    "Welcome! Your account has been created.",
+    "user",
+    "patient" // تغيير من "user" إلى "patient"
+  );
+
+  res.status(201).json({
+    status: httpStatusText.SUCCESS,
+    data: {
+      user: {
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        email: newUser.email,
+        phone: newUser.phone,
+        address: newUser.address,
+        gender: newUser.gender,
+        role: newUser.role,
+        token: newUser.token,
+      },
+    },
+  });
+});
+
+// ✅ Login user
+const loginUser = asyncWrapper(async (req, res, next) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return next(
+      appError.create("Email and password are required", 400, httpStatusText.FAIL)
+    );
+  }
+
+  const user = await User.findOne({ email });
+  if (!user) {
+    return next(
+      appError.create("User not found", 404, httpStatusText.FAIL)
+    );
+  }
+
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) {
+    return next(
+      appError.create("Invalid credentials", 401, httpStatusText.FAIL)
+    );
+  }
+
+  const token = await genrateJWT({ email: user.email, id: user._id, role: user.role });
+  user.token = token;
+  await user.save();
+
+  // إرسال إشعار مختصر
+  await sendNotification(
+    user._id,
+    null,
+    null,
+    "Logged In",
+    "You have logged in successfully.",
+    "login",
+    "patient" // تغيير من "user" إلى "patient"
+  );
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: {
+      user: {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone,
+        address: user.address,
+        gender: user.gender,
+        role: user.role,
+        token: user.token,
+      },
+    },
+  });
+});
+
+// ✅ Update user profile
 const updateUserProfile = asyncWrapper(async (req, res, next) => {
   const userId = req.user.id;
-  const { firstName, lastName, email, phone, address } = req.body;
+  const { firstName, lastName, email, phone, address, gender } = req.body;
 
   if (req.user.role !== userRoles.PATIENT) {
     return next(
@@ -543,7 +661,6 @@ const updateUserProfile = asyncWrapper(async (req, res, next) => {
   }
 
   const user = await User.findById(userId);
-
   if (!user) {
     return next(appError.create("User not found", 404, httpStatusText.FAIL));
   }
@@ -558,6 +675,12 @@ const updateUserProfile = asyncWrapper(async (req, res, next) => {
     user.lastName = lastName;
   }
   if (email && email !== user.email) {
+    const existingUser = await User.findOne({ email });
+    if (existingUser && existingUser._id.toString() !== userId.toString()) {
+      return next(
+        appError.create("Email already exists", 400, httpStatusText.FAIL)
+      );
+    }
     changes.push(`email to ${email}`);
     user.email = email;
   }
@@ -569,9 +692,14 @@ const updateUserProfile = asyncWrapper(async (req, res, next) => {
     changes.push(`address to ${address}`);
     user.address = address;
   }
+  if (gender && gender !== user.gender) {
+    changes.push(`gender to ${gender}`);
+    user.gender = gender;
+  }
 
   await user.save();
 
+  // إرسال إشعار مختصر مع التغييرات فقط
   if (changes.length > 0) {
     await sendNotification(
       userId,
@@ -579,45 +707,30 @@ const updateUserProfile = asyncWrapper(async (req, res, next) => {
       null,
       "Profile Updated",
       `Updated: ${changes.join(", ")}`,
-      "profile",
-      "user"
+      "user",
+      "patient" // تغيير من "user" إلى "patient"
     );
   }
 
   res.json({
     status: httpStatusText.SUCCESS,
-    message: "Profile updated successfully",
+    message: "User profile updated successfully",
     data: {
       firstName: user.firstName,
       lastName: user.lastName,
-      gender: user.gender,
+      email: user.email,
       phone: user.phone,
       address: user.address,
-      email: user.email,
+      gender: user.gender,
       role: user.role,
       avatar: user.avatar,
-      favorite: user.favorite,
-      created_at: user.created_at,
     },
   });
 });
 
-// ✅ حذف الأكونت بتاع اليوزر (مع مسح الـ Token)
+// ✅ Delete user profile
 const deleteUserProfile = asyncWrapper(async (req, res, next) => {
   const userId = req.user.id;
-  const userEmail = req.user.email;
-
-  if (!userId) {
-    return next(
-      appError.create("User ID not found in token", 401, httpStatusText.FAIL)
-    );
-  }
-
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    return next(
-      appError.create("Invalid User ID in token", 400, httpStatusText.FAIL)
-    );
-  }
 
   if (req.user.role !== userRoles.PATIENT) {
     return next(
@@ -634,27 +747,13 @@ const deleteUserProfile = asyncWrapper(async (req, res, next) => {
     return next(appError.create("User not found", 404, httpStatusText.FAIL));
   }
 
-  if (user.email !== userEmail) {
-    return next(
-      appError.create("Unauthorized: Email mismatch", 403, httpStatusText.FAIL)
-    );
-  }
-
-  // إرسال إشعار مختصر
-  await sendNotification(
-    userId,
-    null,
-    null,
-    "Account Deleted",
-    "Your account has been deleted.",
-    "profile",
-    "user"
-  );
-
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
+    await Child.deleteMany({ parentId: userId }, { session });
+    await Appointment.deleteMany({ userId }, { session });
+
     user.token = null;
     user.fcmToken = null;
     await user.save({ session });
@@ -665,6 +764,17 @@ const deleteUserProfile = asyncWrapper(async (req, res, next) => {
     }
 
     await session.commitTransaction();
+
+    // إرسال إشعار مختصر
+    await sendNotification(
+      userId,
+      null,
+      null,
+      "Account Deleted",
+      "Your account has been deleted.",
+      "user",
+      "patient" // تغيير من "user" إلى "patient"
+    );
 
     res.json({
       status: httpStatusText.SUCCESS,
@@ -684,7 +794,7 @@ const deleteUserProfile = asyncWrapper(async (req, res, next) => {
   }
 });
 
-// ✅ تسجيل الخروج لليوزر
+// ✅ Logout user
 const logoutUser = asyncWrapper(async (req, res, next) => {
   const userId = req.user.id;
 
@@ -715,240 +825,79 @@ const logoutUser = asyncWrapper(async (req, res, next) => {
     "Logged Out",
     "You have logged out.",
     "logout",
-    "user"
+    "patient" // تغيير من "user" إلى "patient"
   );
 
   res.json({
     status: httpStatusText.SUCCESS,
-    message: "Logged out successfully",
+    message: "User logged out successfully",
   });
 });
 
-// Register New User or Doctor
-const registerUser = asyncWrapper(async (req, res, next) => {
-  const {
-    firstName,
-    lastName,
-    gender,
-    phone,
-    address,
-    email,
-    password,
-    role,
-    specialise,
-    about,
-    rate,
-    availableDays,
-    availableTimes,
-    fcmToken,
-  } = req.body;
+// ✅ Save FCM Token for user
+const saveFcmToken = asyncWrapper(async (req, res, next) => {
+  const { fcmToken } = req.body;
+  const userId = req.user.id;
 
-  const oldUser = await User.findOne({ email });
-  const oldDoctor = await Doctor.findOne({ email });
-  if (oldUser || oldDoctor) {
-    const error = appError.create(
-      "Email already exists",
-      400,
-      httpStatusText.FAIL
+  if (!fcmToken) {
+    return next(
+      appError.create("FCM Token is required", 400, httpStatusText.FAIL)
     );
-    return next(error);
   }
 
-  const hashedPassword = await bcrypt.hash(password, 12);
-
-  if (role === userRoles.DOCTOR) {
-    const newDoctor = new Doctor({
-      firstName,
-      lastName,
-      gender,
-      phone,
-      address,
-      email,
-      password: hashedPassword,
-      role: userRoles.DOCTOR,
-      specialise,
-      about,
-      rate,
-      availableDays,
-      availableTimes,
-      avatar: req.file ? req.file.filename : "Uploads/doctor.jpg",
-      fcmToken: fcmToken || null,
-    });
-
-    const token = await genrateJWT(
-      {
-        email: newDoctor.email,
-        id: newDoctor._id,
-        role: newDoctor.role,
-      },
-      "7d"
+  if (req.user.role !== userRoles.PATIENT) {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can save FCM Token",
+        403,
+        httpStatusText.FAIL
+      )
     );
-    newDoctor.token = token;
-
-    await newDoctor.save();
-
-    const doctorData = {
-      _id: newDoctor._id,
-      firstName: newDoctor.firstName,
-      lastName: newDoctor.lastName,
-      gender: newDoctor.gender,
-      phone: newDoctor.phone,
-      address: newDoctor.address,
-      email: newDoctor.email,
-      role: newDoctor.role,
-      specialise: newDoctor.specialise,
-      about: newDoctor.about,
-      rate: newDoctor.rate,
-      availableDays: newDoctor.availableDays,
-      availableTimes: newDoctor.availableTimes,
-      avatar: newDoctor.avatar,
-      created_at: newDoctor.created_at,
-      token: newDoctor.token,
-    };
-
-    res.status(201).json({
-      status: httpStatusText.SUCCESS,
-      message: "Doctor registered successfully",
-      data: { user: doctorData },
-    });
-  } else {
-    const newUser = new User({
-      firstName,
-      lastName,
-      gender,
-      phone,
-      address,
-      email,
-      password: hashedPassword,
-      role: userRoles.PATIENT,
-      avatar: req.file ? req.file.filename : "Uploads/profile.jpg",
-      fcmToken: fcmToken || null,
-    });
-
-    const token = await genrateJWT(
-      {
-        email: newUser.email,
-        id: newUser._id,
-        role: newUser.role,
-      },
-      "7d"
-    );
-    newUser.token = token;
-
-    await newUser.save();
-
-    await sendNotification(
-      newUser._id,
-      null,
-      null,
-      "Welcome!",
-      `Hi ${newUser.firstName}, welcome aboard!`,
-      "welcome",
-      "user"
-    );
-
-    const userData = {
-      _id: newUser._id,
-      firstName: newUser.firstName,
-      lastName: newUser.lastName,
-      gender: newUser.gender,
-      phone: newUser.phone,
-      address: newUser.address,
-      email: newUser.email,
-      role: newUser.role,
-      avatar: newUser.avatar,
-      favorite: newUser.favorite,
-      created_at: newUser.created_at,
-      token: newUser.token,
-    };
-
-    res.status(201).json({
-      status: httpStatusText.SUCCESS,
-      message: "User registered successfully",
-      data: { user: userData },
-    });
-  }
-});
-
-// Login User or Doctor
-const loginUser = asyncWrapper(async (req, res, next) => {
-  const { email, password, fcmToken } = req.body;
-  if (!email || !password) {
-    const error = appError.create(
-      "Email and Password are required",
-      400,
-      httpStatusText.FAIL
-    );
-    return next(error);
   }
 
-  let user = await User.findOne({ email });
-  let role;
-
-  if (user) {
-    role = user.role;
-  } else {
-    user = await Doctor.findOne({ email });
-    if (user) {
-      role = user.role;
-    }
-  }
-
+  const user = await User.findById(userId);
   if (!user) {
-    const error = appError.create("User not found", 400, httpStatusText.FAIL);
-    return next(error);
+    return next(appError.create("User not found", 404, httpStatusText.FAIL));
   }
 
-  const isPasswordCorrect = await bcrypt.compare(password, user.password);
-  if (isPasswordCorrect && user) {
-    const token = await genrateJWT(
-      {
-        email: user.email,
-        id: user._id,
-        role: role,
-      },
-      "7d"
-    );
-
-    user.token = token;
-    if (fcmToken) {
-      user.fcmToken = fcmToken;
-    }
-    await user.save();
-
-    await sendNotification(
-      user._id,
-      null,
-      null,
-      "Logged In",
-      `Welcome back, ${user.firstName}!`,
-      "login",
-      "user"
-    );
-
-    res.status(200).json({
+  if (user.fcmToken === fcmToken) {
+    return res.status(200).json({
       status: httpStatusText.SUCCESS,
-      data: {
-        token: token,
-        role: role,
-      },
+      message: "FCM Token is already up to date",
     });
-  } else {
-    const error = appError.create(
-      "Email or Password are incorrect",
-      500,
-      httpStatusText.ERROR
-    );
-    return next(error);
   }
+
+  await User.updateMany(
+    { fcmToken, _id: { $ne: userId } },
+    { fcmToken: null }
+  );
+
+  user.fcmToken = fcmToken;
+  await user.save();
+
+  await sendNotification(
+    userId,
+    null,
+    null,
+    "FCM Token Updated",
+    "Notification settings updated.",
+    "user",
+    "patient" // تغيير من "user" إلى "patient"
+  );
+
+  res.status(200).json({
+    status: httpStatusText.SUCCESS,
+    message: "FCM Token saved successfully",
+  });
 });
 
 module.exports = {
   getAllUsers,
+  getUserProfile,
   registerUser,
   loginUser,
-  getUserProfile,
   updateUserProfile,
   deleteUserProfile,
   logoutUser,
+  saveFcmToken,
 };

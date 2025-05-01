@@ -209,7 +209,6 @@
 
 // module.exports = router;
 
-
 const express = require("express");
 const usersController = require("../controllers/users.controller");
 const verifyToken = require("../middlewares/virifyToken");
@@ -341,7 +340,7 @@ router.post(
         "FCM Token Updated",
         "Your notification settings have been updated successfully.",
         "profile",
-        "user"
+        "patient"
       );
 
       res.status(200).json({

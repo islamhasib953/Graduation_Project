@@ -77,7 +77,7 @@ router
               "New Medicine Added",
               `A new medicine "${medicine.name}" has been added for your child.`,
               "medicine",
-              "user"
+              "patient"
             );
           }
         }
@@ -121,7 +121,7 @@ router
               "Medicine Updated",
               `The medicine "${medicine.name}" has been updated for your child.`,
               "medicine",
-              "user"
+              "patient"
             );
           }
         }
@@ -157,7 +157,7 @@ router
             "Medicine Deleted",
             `The medicine has been deleted for your child.`,
             "medicine",
-            "user"
+            "patient"
           );
         }
       } catch (error) {
