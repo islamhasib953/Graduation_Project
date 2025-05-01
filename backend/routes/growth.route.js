@@ -61,7 +61,6 @@
 // module.exports = router;
 
 
-
 const express = require("express");
 const router = express.Router();
 const verifyToken = require("../middlewares/virifyToken");
@@ -100,7 +99,7 @@ router
               "New Growth Record Added",
               `A new growth record (Height: ${growth.height}, Weight: ${growth.weight}) has been added for your child.`,
               "growth",
-              "user"
+              "patient"
             );
 
             // التحقق من انحراف الطول
@@ -117,7 +116,7 @@ router
                 "Growth Alert",
                 `The height of your child (${growth.height} cm) deviates significantly from the expected value (${standardHeight} cm).`,
                 "growth_alert",
-                "user"
+                "patient"
               );
 
               // إشعار للدكتور (مش مفعل افتراضيًا)
@@ -206,7 +205,7 @@ router
               "Growth Record Updated",
               `The growth record (Height: ${growth.height}, Weight: ${growth.weight}) has been updated for your child.`,
               "growth",
-              "user"
+              "patient"
             );
 
             // التحقق من انحراف الطول
@@ -223,7 +222,7 @@ router
                 "Growth Alert",
                 `The height of your child (${growth.height} cm) deviates significantly from the expected value (${standardHeight} cm).`,
                 "growth_alert",
-                "user"
+                "patient"
               );
 
               // إشعار للدكتور (مش مفعل افتراضيًا)
@@ -280,7 +279,7 @@ router
             "Growth Record Deleted",
             `A growth record has been deleted for your child.`,
             "growth",
-            "user"
+            "patient"
           );
         }
       } catch (error) {

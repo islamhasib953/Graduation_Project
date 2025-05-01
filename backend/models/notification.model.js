@@ -32,13 +32,17 @@ const notificationSchema = new mongoose.Schema(
         "vaccination",
         "growth",
         "growth_alert",
-        "appointment",
         "appointment_reminder",
         "child",
         "doctor",
         "favorite",
         "general",
       ],
+      required: true,
+    },
+    target: {
+      type: String,
+      enum: ["patient", "doctor"], // تغيير من "user" إلى "patient"
       required: true,
     },
     isRead: {

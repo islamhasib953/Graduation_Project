@@ -318,7 +318,7 @@ const createChild = asyncWrapper(async (req, res, next) => {
     "Child Added",
     `${newChild.name} added.`,
     "child",
-    "user"
+    "patient" // تغيير من "user" إلى "patient"
   );
 
   res.status(201).json({
@@ -476,7 +476,7 @@ const updateChild = asyncWrapper(async (req, res, next) => {
       "Child Updated",
       `${child.name} updated: ${changes.join(", ")}`,
       "child",
-      "user"
+      "patient" // تغيير من "user" إلى "patient"
     );
   }
 
@@ -513,7 +513,7 @@ const deleteChild = asyncWrapper(async (req, res, next) => {
     "Child Removed",
     `${child.name} removed.`,
     "child",
-    "user"
+    "patient" // تغيير من "user" إلى "patient"
   );
 
   await Child.findByIdAndDelete(childId);

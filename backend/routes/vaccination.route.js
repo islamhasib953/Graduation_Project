@@ -101,7 +101,7 @@ router
             "New Vaccination Added",
             `A new vaccination "${req.body.disease}" has been added for all children.`,
             "vaccination",
-            "user"
+            "patient"
           );
 
           // إشعار لكل اليوزرز اللي عندهم أطفال
@@ -120,7 +120,7 @@ router
               "New Vaccination Available",
               `A new vaccination "${req.body.disease}" is now required for your child.`,
               "vaccination",
-              "user"
+              "patient"
             );
           }
         }
@@ -159,7 +159,7 @@ router
           "Vaccination Deleted",
           `The vaccination has been deleted for all children.`,
           "vaccination",
-          "user"
+          "patient"
         );
       }
     } catch (error) {
@@ -217,7 +217,7 @@ router
               "Vaccination Updated",
               `The vaccination "${vaccination.vaccineInfoId.disease}" has been updated for your child.`,
               "vaccination",
-              "user"
+              "patient"
             );
           }
         }
@@ -259,7 +259,7 @@ router
             "Vaccination Deleted",
             `The vaccination has been deleted for your child.`,
             "vaccination",
-            "user"
+            "patient"
           );
         }
       } catch (error) {

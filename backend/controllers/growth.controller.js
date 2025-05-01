@@ -534,7 +534,7 @@ const createGrowth = asyncWrapper(async (req, res, next) => {
     "Growth Added",
     `${child.name}: Growth record added.`,
     "growth",
-    "user"
+    "patient" // تغيير من "user" إلى "patient"
   );
 
   res.status(201).json({
@@ -638,7 +638,9 @@ const getSingleGrowth = asyncWrapper(async (req, res, next) => {
   );
 
   if (!growthRecord) {
-    return next(appError.create("Growth record not found", 404, httpStatusText.FAIL));
+    return next(
+      appError.create("Growth record not found", 404, httpStatusText.FAIL)
+    );
   }
 
   res.json({
@@ -703,7 +705,7 @@ const updateGrowth = asyncWrapper(async (req, res, next) => {
     "Growth Updated",
     `${child.name}: Growth record updated.`,
     "growth",
-    "user"
+    "patient" // تغيير من "user" إلى "patient"
   );
 
   res.json({
@@ -763,7 +765,7 @@ const deleteGrowth = asyncWrapper(async (req, res, next) => {
     "Growth Removed",
     `${child.name}: Growth record removed.`,
     "growth",
-    "user"
+    "patient" // تغيير من "user" إلى "patient"
   );
 
   res.json({
