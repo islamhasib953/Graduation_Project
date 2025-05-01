@@ -2583,7 +2583,7 @@ const updateAppointmentStatus = asyncWrapper(async (req, res, next) => {
   const { status } = req.body;
   const doctorId = req.user.id;
 
-  if (!["Pending", "Confirmed", "Cancelled"].includes(status)) {
+  if (!["Pending", "Accepted", "Closed"].includes(status)) {
     return next(appError.create("Invalid status", 400, httpStatusText.FAIL));
   }
 
