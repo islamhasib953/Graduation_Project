@@ -1896,13 +1896,13 @@ const cancelAppointment = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Add a doctor to favorites with childId in the path
+// ✅ Add a doctor to favorites with childId in the path (using toggle logic)
 const addFavoriteDoctor = asyncWrapper(async (req, res, next) => {
   const { childId, doctorId } = req.params;
   const userId = req.user.id;
 
   // التحقق من صلاحيات المستخدم
-  if (req.user.role !== userRoles.PATIENT) {
+  if (req.user.role !== "patient") {
     return next(
       appError.create(
         "Unauthorized: Only patients can add favorite doctors",
@@ -1930,45 +1930,52 @@ const addFavoriteDoctor = asyncWrapper(async (req, res, next) => {
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
   }
 
-  // التحقق مما إذا كان الطبيب موجودًا بالفعل في المفضلة
-  if (child.favorite.includes(doctorId)) {
-    return next(
-      appError.create(
-        "Doctor is already in favorites",
-        400,
-        httpStatusText.FAIL
-      )
+  // استخدام منطق الـ toggle
+  const isDoctorInFavorites = child.favorite.includes(doctorId);
+  let message, notificationTitle, notificationMessage;
+
+  if (isDoctorInFavorites) {
+    // إذا كان الطبيب موجودًا بالفعل في المفضلة، قم بإزالته
+    child.favorite = child.favorite.filter(
+      (id) => id.toString() !== doctorId.toString()
     );
+    message = "Doctor removed from favorites successfully";
+    notificationTitle = "Doctor Unfavorited";
+    notificationMessage = `Dr. ${doctor.firstName} removed from favorites.`;
+  } else {
+    // إذا لم يكن الطبيب موجودًا، قم بإضافته
+    child.favorite.push(doctorId);
+    message = "Doctor added to favorites successfully";
+    notificationTitle = "Doctor Favorited";
+    notificationMessage = `Dr. ${doctor.firstName} added to favorites.`;
   }
 
-  // إضافة الطبيب إلى قائمة المفضلة في Child
-  child.favorite.push(doctorId);
   await child.save();
 
-  // إرسال إشعار
+  // إرسال إشعار بناءً على الإجراء
   await sendNotification(
     userId,
     childId,
     doctorId,
-    "Doctor Favorited",
-    `Dr. ${doctor.firstName} added to favorites.`,
+    notificationTitle,
+    notificationMessage,
     "favorite",
     "patient"
   );
 
   res.json({
     status: httpStatusText.SUCCESS,
-    message: "Doctor added to favorites successfully",
+    message: message,
   });
 });
 
-// ✅ Remove a doctor from favorites with childId in the path
+// ✅ Remove a doctor from favorites with childId in the path (using toggle logic)
 const removeFavoriteDoctor = asyncWrapper(async (req, res, next) => {
   const { childId, doctorId } = req.params;
   const userId = req.user.id;
 
   // التحقق من صلاحيات المستخدم
-  if (req.user.role !== userRoles.PATIENT) {
+  if (req.user.role !== "patient") {
     return next(
       appError.create(
         "Unauthorized: Only patients can remove favorite doctors",
@@ -1996,33 +2003,42 @@ const removeFavoriteDoctor = asyncWrapper(async (req, res, next) => {
     return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
   }
 
-  // التحقق مما إذا كان الطبيب غير موجود في المفضلة
-  if (!child.favorite.includes(doctorId)) {
-    return next(
-      appError.create("Doctor is not in favorites", 400, httpStatusText.FAIL)
+  // استخدام منطق الـ toggle
+  const isDoctorInFavorites = child.favorite.includes(doctorId);
+  let message, notificationTitle, notificationMessage;
+
+  if (isDoctorInFavorites) {
+    // إذا كان الطبيب موجودًا في المفضلة، قم بإزالته
+    child.favorite = child.favorite.filter(
+      (id) => id.toString() !== doctorId.toString()
     );
+    message = "Doctor removed from favorites successfully";
+    notificationTitle = "Doctor Unfavorited";
+    notificationMessage = `Dr. ${doctor.firstName} removed from favorites.`;
+  } else {
+    // إذا لم يكن الطبيب موجودًا، قم بإضافته
+    child.favorite.push(doctorId);
+    message = "Doctor added to favorites successfully";
+    notificationTitle = "Doctor Favorited";
+    notificationMessage = `Dr. ${doctor.firstName} added to favorites.`;
   }
 
-  // إزالة الطبيب من قائمة المفضلة في Child
-  child.favorite = child.favorite.filter(
-    (id) => id.toString() !== doctorId.toString()
-  );
   await child.save();
 
-  // إرسال إشعار
+  // إرسال إشعار بناءً على الإجراء
   await sendNotification(
     userId,
     childId,
     doctorId,
-    "Doctor Unfavorited",
-    `Dr. ${doctor.firstName} removed from favorites.`,
+    notificationTitle,
+    notificationMessage,
     "favorite",
     "patient"
   );
 
   res.json({
     status: httpStatusText.SUCCESS,
-    message: "Doctor removed from favorites successfully",
+    message: message,
   });
 });
 
@@ -2031,7 +2047,7 @@ const getFavoriteDoctors = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
   const userId = req.user.id;
 
-  if (req.user.role !== userRoles.PATIENT) {
+  if (req.user.role !== "patient") {
     return next(
       appError.create(
         "Unauthorized: Only patients can view favorite doctors",
