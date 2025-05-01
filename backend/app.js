@@ -186,7 +186,7 @@ const mqttService = new MQTTService(io);
 mqttService.connect();
 
 // إعداد الإشعارات المجدولة
-scheduleNotifications();
+scheduleNotifications.scheduleNotifications();
 
 // الـ Routes
 app.use("/api/users", usersRoutes);

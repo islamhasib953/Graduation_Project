@@ -1,150 +1,14 @@
-// const express = require("express");
-// const router = express.Router();
-
-// const verifyToken = require("../middlewares/virifyToken");
-// const allowedTo = require("../middlewares/allowedTo");
-// const userRoles = require("../utils/userRoles");
-// const doctorController = require("../controllers/doctor.controller");
-
-// // Routes للدكتور نفسه (Profile, Logout) - مش محتاج childId
-// router
-//   .route("/profile")
-//   .get(
-//     verifyToken,
-//     allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
-//     doctorController.getDoctorProfile
-//   )
-//   .patch(
-//     verifyToken,
-//     allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
-//     doctorController.updateDoctorProfile
-//   )
-//   .delete(
-//     verifyToken,
-//     allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
-//     doctorController.deleteDoctorProfile
-//   );
-
-// router.post(
-//   "/logout",
-//   verifyToken,
-//   allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
-//   doctorController.logoutDoctor
-// );
-
-// // Route لتعديل الأيام والأوقات المتاحة (جديد)
-// router.patch(
-//   "/availability",
-//   verifyToken,
-//   allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
-//   doctorController.updateAvailability
-// );
-
-// // Route لجلب الحجوزات القادمة (ثابت)
-// router.get(
-//   "/appointments/upcoming",
-//   verifyToken,
-//   allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
-//   doctorController.getUpcomingAppointments
-// );
-
-// // Route لجلب السجل الطبي وبيانات النمو بتاعة الطفل (ثابت، لازم يكون قبل الـ Routes الديناميكية)
-// router.post(
-//   "/child/records",
-//   verifyToken,
-//   allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
-//   doctorController.getChildRecords
-// );
-
-// // Route لتحديث حالة الحجز (يحتوي على appointmentId)
-// router.patch(
-//   "/appointments/:appointmentId/status",
-//   verifyToken,
-//   allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
-//   doctorController.updateAppointmentStatus
-// );
-
-// // Route لجلب كل الحجوزات بتاعة اليوزر مع childId في الـ Path
-// router.get(
-//   "/appointments/user/:childId",
-//   verifyToken,
-//   allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-//   doctorController.getUserAppointments
-// );
-
-// // Route لجلب الدكاترة المفضلين مع childId في الـ Path (ثابت، لازم يكون قبل /:childId)
-// router.get(
-//   "/favorites/:childId",
-//   verifyToken,
-//   allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-//   doctorController.getFavoriteDoctors
-// );
-
-// // Route لعرض كل الدكاترة مع childId في الـ Path (ديناميكي)
-// router.get(
-//   "/:childId",
-//   verifyToken,
-//   allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-//   doctorController.getAllDoctors
-// );
-
-// // Routes لتفاصيل دكتور معين مع childId في الـ Path (ديناميكي)
-// router
-//   .route("/:childId/:doctorId")
-//   .get(
-//     verifyToken,
-//     allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-//     doctorController.getSingleDoctor
-//   );
-
-// // Route لحجز موعد مع childId في الـ Path
-// router.post(
-//   "/:childId/:doctorId/book",
-//   verifyToken,
-//   allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-//   doctorController.bookAppointment
-// );
-
-// // Routes لإضافة وإزالة دكتور من المفضلة مع childId في الـ Path
-// router
-//   .route("/:childId/:doctorId/favorite")
-//   .post(
-//     verifyToken,
-//     allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-//     doctorController.addToFavorite
-//   )
-//   .delete(
-//     verifyToken,
-//     allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-//     doctorController.removeFromFavorite
-//   );
-
-// // Routes لتعديل وإلغاء الحجز مع childId في الـ Path
-// router
-//   .route("/appointments/:childId/:appointmentId")
-//   .patch(
-//     verifyToken,
-//     allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-//     doctorController.rescheduleAppointment
-//   )
-//   .delete(
-//     verifyToken,
-//     allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-//     doctorController.deleteAppointment
-//   );
-
-// module.exports = router;
-
-
 const express = require("express");
 const router = express.Router();
-
 const verifyToken = require("../middlewares/virifyToken");
 const allowedTo = require("../middlewares/allowedTo");
 const userRoles = require("../utils/userRoles");
 const doctorController = require("../controllers/doctor.controller");
+const Notification = require("../models/notification.model");
+const appError = require("../utils/appError");
+const { sendNotification } = require("../controllers/notifications.controller");
 
-// Routes للدكتور نفسه (Profile, Logout) - مش محتاج childId
+// Routes للدكتور نفسه (Profile, Logout)
 router
   .route("/profile")
   .get(
@@ -170,7 +34,7 @@ router.post(
   doctorController.logoutDoctor
 );
 
-// Route لتعديل الأيام والأوقات المتاحة (جديد)
+// Route لتعديل الأيام والأوقات المتاحة
 router.patch(
   "/availability",
   verifyToken,
@@ -178,7 +42,7 @@ router.patch(
   doctorController.updateAvailability
 );
 
-// Route لجلب الحجوزات القادمة (ثابت)
+// Route لجلب الحجوزات القادمة
 router.get(
   "/appointments/upcoming",
   verifyToken,
@@ -186,7 +50,7 @@ router.get(
   doctorController.getUpcomingAppointments
 );
 
-// Route لجلب السجل الطبي وبيانات النمو بتاعة الطفل (ثابت، لازم يكون قبل الـ Routes الديناميكية)
+// Route لجلب السجل الطبي وبيانات النمو بتاعة الطفل
 router.post(
   "/child/records",
   verifyToken,
@@ -194,7 +58,7 @@ router.post(
   doctorController.getChildRecords
 );
 
-// Route لتحديث حالة الحجز (يحتوي على appointmentId)
+// Route لتحديث حالة الحجز
 router.patch(
   "/appointments/:appointmentId/status",
   verifyToken,
@@ -202,7 +66,7 @@ router.patch(
   doctorController.updateAppointmentStatus
 );
 
-// Route لجلب كل الحجوزات بتاعة اليوزر مع childId في الـ Path
+// Route لجلب كل الحجوزات بتاعة اليوزر مع childId
 router.get(
   "/appointments/user/:childId",
   verifyToken,
@@ -210,7 +74,7 @@ router.get(
   doctorController.getUserAppointments
 );
 
-// Route لجلب الدكاترة المفضلين مع childId في الـ Path (ثابت، لازم يكون قبل /:childId)
+// Route لجلب الدكاترة المفضلين مع childId
 router.get(
   "/favorites/:childId",
   verifyToken,
@@ -218,7 +82,7 @@ router.get(
   doctorController.getFavoriteDoctors
 );
 
-// Route لعرض كل الدكاترة مع childId في الـ Path (ديناميكي)
+// Route لعرض كل الدكاترة مع childId
 router.get(
   "/:childId",
   verifyToken,
@@ -226,7 +90,7 @@ router.get(
   doctorController.getAllDoctors
 );
 
-// Routes لتفاصيل دكتور معين مع childId في الـ Path (ديناميكي)
+// Routes لتفاصيل دكتور معين مع childId
 router
   .route("/:childId/:doctorId")
   .get(
@@ -235,7 +99,7 @@ router
     doctorController.getSingleDoctor
   );
 
-// Route لحجز موعد مع childId في الـ Path
+// Route لحجز موعد مع childId
 router.post(
   "/:childId/:doctorId/book",
   verifyToken,
@@ -243,21 +107,21 @@ router.post(
   doctorController.bookAppointment
 );
 
-// Routes لإضافة وإزالة دكتور من المفضلة مع childId في الـ Path
+// Routes لإضافة وإزالة دكتور من المفضلة
 router
   .route("/:childId/:doctorId/favorite")
   .post(
     verifyToken,
     allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-    doctorController.addToFavorite
+    doctorController.addFavoriteDoctor
   )
   .delete(
     verifyToken,
     allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-    doctorController.removeFromFavorite
+    doctorController.removeFavoriteDoctor
   );
 
-// Routes لتعديل وإلغاء الحجز مع childId في الـ Path
+// Routes لتعديل وإلغاء الحجز
 router
   .route("/appointments/:childId/:appointmentId")
   .patch(
@@ -268,7 +132,7 @@ router
   .delete(
     verifyToken,
     allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-    doctorController.deleteAppointment
+    doctorController.cancelAppointment
   );
 
 // نقطة نهاية لحفظ FCM Token
@@ -276,32 +140,7 @@ router.post(
   "/save-fcm-token",
   verifyToken,
   allowedTo(userRoles.DOCTOR),
-  async (req, res, next) => {
-    const { fcmToken } = req.body;
-    const doctorId = req.user.id;
-
-    if (!fcmToken) {
-      return next(appError.create("FCM Token is required", 400, "fail"));
-    }
-
-    try {
-      const doctor = await require("../models/doctor.model").findByIdAndUpdate(
-        doctorId,
-        { fcmToken },
-        { new: true }
-      );
-      if (!doctor) {
-        return next(appError.create("Doctor not found", 404, "fail"));
-      }
-      res.status(200).json({
-        status: "success",
-        message: "FCM Token saved successfully",
-      });
-    } catch (error) {
-      console.error("Error saving FCM Token:", error);
-      return next(appError.create("Server error", 500, "error"));
-    }
-  }
+  doctorController.saveFcmToken
 );
 
 module.exports = router;

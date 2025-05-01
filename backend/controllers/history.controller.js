@@ -1,11 +1,282 @@
+// const History = require("../models/history.model");
+// const asyncWrapper = require("../middlewares/asyncWrapper");
+// const httpStatusText = require("../utils/httpStatusText");
+// const appError = require("../utils/appError");
+
+// // ✅ Create a new history record
+// const createHistory = asyncWrapper(async (req, res, next) => {
+//   const { childId } = req.params; // Extract childId from URL params
+//   const {
+//     diagnosis,
+//     disease,
+//     treatment,
+//     notes,
+//     date,
+//     time,
+//     notesImage,
+//     doctorName,
+//   } = req.body; // أضفنا doctorName هنا
+
+//   if (!diagnosis || !disease || !treatment || !date || !time) {
+//     return next(
+//       appError.create(
+//         "All required fields must be provided",
+//         400,
+//         httpStatusText.FAIL
+//       )
+//     );
+//   }
+
+//   const newHistory = new History({
+//     childId,
+//     diagnosis,
+//     disease,
+//     treatment,
+//     notes,
+//     date,
+//     time,
+//     doctorName: doctorName || undefined, // لو ما بعتيش doctorName، هياخد القيمة الافتراضية من الـ Schema
+//     notesImage: notesImage || null,
+//   });
+
+//   await newHistory.save();
+
+//   // مكان التعديل: أضفنا doctorName في الـ Response
+//   res.json({
+//     status: httpStatusText.SUCCESS,
+//     data: {
+//       _id: newHistory._id,
+//       diagnosis: newHistory.diagnosis,
+//       disease: newHistory.disease,
+//       treatment: newHistory.treatment,
+//       notes: newHistory.notes,
+//       notesImage: newHistory.notesImage,
+//       date: newHistory.date,
+//       time: newHistory.time,
+//       doctorName: newHistory.doctorName, // أضفنا doctorName هنا
+//     },
+//   });
+// });
+
+// // ✅ Get all history records for a specific child
+// const getAllHistory = asyncWrapper(async (req, res, next) => {
+//   const { childId } = req.params;
+
+//   // مكان التعديل: أضفنا doctorName في الـ select
+//   const history = await History.find({ childId }).select(
+//     "diagnosis disease treatment date childId notes notesImage time doctorName" // أضفنا doctorName هنا
+//   );
+
+//   if (!history.length) {
+//     return next(
+//       appError.create(
+//         "No history records found for this child",
+//         404,
+//         httpStatusText.FAIL
+//       )
+//     );
+//   }
+
+//   // مكان التعديل: أضفنا doctorName في الـ Response
+//   res.json({
+//     status: httpStatusText.SUCCESS,
+//     data: history.map((record) => ({
+//       _id: record._id,
+//       diagnosis: record.diagnosis,
+//       disease: record.disease,
+//       treatment: record.treatment,
+//       notes: record.notes,
+//       date: record.date,
+//       time: record.time,
+//       notesImage: record.notesImage, // عدلنا notesImage بدل notes
+//       doctorName: record.doctorName, // أضفنا doctorName هنا
+//     })),
+//   });
+// });
+
+// // ✅ Get a single history record for a specific child
+// const getSingleHistory = asyncWrapper(async (req, res, next) => {
+//   const { childId, historyId } = req.params;
+
+//   // مكان التعديل: أضفنا doctorName في الـ select
+//   const history = await History.findOne({ _id: historyId, childId }).select(
+//     "_id diagnosis disease treatment notes notesImage date time doctorName" // أضفنا doctorName هنا
+//   );
+
+//   if (!history) {
+//     return next(
+//       appError.create("History record not found", 404, httpStatusText.FAIL)
+//     );
+//   }
+
+//   // مكان التعديل: أضفنا doctorName في الـ Response
+//   res.json({
+//     status: httpStatusText.SUCCESS,
+//     data: {
+//       _id: history._id,
+//       diagnosis: history.diagnosis,
+//       disease: history.disease,
+//       treatment: history.treatment,
+//       notes: history.notes,
+//       notesImage: history.notesImage,
+//       date: history.date,
+//       time: history.time,
+//       doctorName: history.doctorName, // أضفنا doctorName هنا
+//     },
+//   });
+// });
+
+// // ✅ Update a history record
+// const updateHistory = asyncWrapper(async (req, res, next) => {
+//   const { childId, historyId } = req.params;
+//   const {
+//     diagnosis,
+//     disease,
+//     treatment,
+//     notes,
+//     date,
+//     time,
+//     notesImage,
+//     doctorName,
+//   } = req.body; // أضفنا doctorName هنا
+
+//   // مكان التعديل: أضفنا doctorName في الـ Update
+//   const updatedHistory = await History.findOneAndUpdate(
+//     { _id: historyId, childId },
+//     {
+//       diagnosis,
+//       disease,
+//       treatment,
+//       notes,
+//       date,
+//       time,
+//       notesImage,
+//       doctorName,
+//     }, // أضفنا doctorName هنا
+//     { new: true, runValidators: true }
+//   );
+
+//   if (!updatedHistory) {
+//     return next(
+//       appError.create("History record not found", 404, httpStatusText.FAIL)
+//     );
+//   }
+
+//   // مكان التعديل: أضفنا doctorName في الـ Response
+//   res.json({
+//     status: httpStatusText.SUCCESS,
+//     data: {
+//       history: {
+//         _id: updatedHistory._id,
+//         diagnosis: updatedHistory.diagnosis,
+//         disease: updatedHistory.disease,
+//         treatment: updatedHistory.treatment,
+//         notes: updatedHistory.notes,
+//         notesImage: updatedHistory.notesImage,
+//         date: updatedHistory.date,
+//         time: updatedHistory.time,
+//         doctorName: updatedHistory.doctorName, // أضفنا doctorName هنا
+//       },
+//     },
+//   });
+// });
+
+// // ✅ Delete a history record
+// const deleteHistory = asyncWrapper(async (req, res, next) => {
+//   const { childId, historyId } = req.params;
+
+//   const deletedHistory = await History.findOneAndDelete({
+//     _id: historyId,
+//     childId,
+//   });
+
+//   if (!deletedHistory) {
+//     return next(
+//       appError.create("History record not found", 404, httpStatusText.FAIL)
+//     );
+//   }
+
+//   res.json({
+//     status: httpStatusText.SUCCESS,
+//     message: "History record deleted successfully",
+//   });
+// });
+
+// // ✅ Filter history records using query parameters
+// const filterHistory = asyncWrapper(async (req, res, next) => {
+//   const { childId } = req.params;
+//   const { diagnosis, disease, treatment, fromDate, toDate, sortBy } = req.query;
+
+//   let query = { childId };
+
+//   if (diagnosis) {
+//     query.diagnosis = { $regex: diagnosis, $options: "i" };
+//   }
+
+//   if (disease) {
+//     query.disease = { $regex: disease, $options: "i" };
+//   }
+
+//   if (treatment) {
+//     query.treatment = { $regex: treatment, $options: "i" };
+//   }
+
+//   if (fromDate && toDate) {
+//     query.date = { $gte: new Date(fromDate), $lte: new Date(toDate) };
+//   }
+
+//   let sortOption = { date: -1 };
+//   if (sortBy === "oldest") {
+//     sortOption = { date: 1 };
+//   }
+
+//   // مكان التعديل: أضفنا doctorName في الـ select
+//   const history = await History.find(query)
+//     .sort(sortOption)
+//     .select("_id diagnosis disease treatment date doctorName"); // أضفنا doctorName هنا
+
+//   if (!history.length) {
+//     return next(
+//       appError.create("No history records found", 404, httpStatusText.FAIL)
+//     );
+//   }
+
+//   // مكان التعديل: أضفنا doctorName في الـ Response
+//   res.json({
+//     status: httpStatusText.SUCCESS,
+//     data: history.map((record) => ({
+//       _id: record._id,
+//       diagnosis: record.diagnosis,
+//       disease: record.disease,
+//       treatment: record.treatment,
+//       date: record.date,
+//       doctorName: record.doctorName, // أضفنا doctorName هنا
+//     })),
+//   });
+// });
+
+// module.exports = {
+//   createHistory,
+//   getAllHistory,
+//   getSingleHistory,
+//   updateHistory,
+//   deleteHistory,
+//   filterHistory,
+// };
+
+
+
 const History = require("../models/history.model");
+const Child = require("../models/child.model");
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
+const { sendNotification } = require("../controllers/notifications.controller");
 
 // ✅ Create a new history record
 const createHistory = asyncWrapper(async (req, res, next) => {
-  const { childId } = req.params; // Extract childId from URL params
+  const { childId } = req.params;
+  const userId = req.user.id;
   const {
     diagnosis,
     disease,
@@ -15,13 +286,24 @@ const createHistory = asyncWrapper(async (req, res, next) => {
     time,
     notesImage,
     doctorName,
-  } = req.body; // أضفنا doctorName هنا
+  } = req.body;
 
   if (!diagnosis || !disease || !treatment || !date || !time) {
     return next(
       appError.create(
         "All required fields must be provided",
         400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or you are not authorized",
+        404,
         httpStatusText.FAIL
       )
     );
@@ -35,13 +317,23 @@ const createHistory = asyncWrapper(async (req, res, next) => {
     notes,
     date,
     time,
-    doctorName: doctorName || undefined, // لو ما بعتيش doctorName، هياخد القيمة الافتراضية من الـ Schema
+    doctorName: doctorName || undefined,
     notesImage: notesImage || null,
   });
 
   await newHistory.save();
 
-  // مكان التعديل: أضفنا doctorName في الـ Response
+  // إرسال إشعار مختصر
+  await sendNotification(
+    userId,
+    childId,
+    null,
+    "History Added",
+    `${child.name}: ${disease} added.`,
+    "history",
+    "user"
+  );
+
   res.json({
     status: httpStatusText.SUCCESS,
     data: {
@@ -53,7 +345,7 @@ const createHistory = asyncWrapper(async (req, res, next) => {
       notesImage: newHistory.notesImage,
       date: newHistory.date,
       time: newHistory.time,
-      doctorName: newHistory.doctorName, // أضفنا doctorName هنا
+      doctorName: newHistory.doctorName,
     },
   });
 });
@@ -61,10 +353,21 @@ const createHistory = asyncWrapper(async (req, res, next) => {
 // ✅ Get all history records for a specific child
 const getAllHistory = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
+  const userId = req.user.id;
 
-  // مكان التعديل: أضفنا doctorName في الـ select
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or you are not authorized",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
   const history = await History.find({ childId }).select(
-    "diagnosis disease treatment date childId notes notesImage time doctorName" // أضفنا doctorName هنا
+    "diagnosis disease treatment date childId notes notesImage time doctorName"
   );
 
   if (!history.length) {
@@ -77,7 +380,6 @@ const getAllHistory = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // مكان التعديل: أضفنا doctorName في الـ Response
   res.json({
     status: httpStatusText.SUCCESS,
     data: history.map((record) => ({
@@ -88,8 +390,8 @@ const getAllHistory = asyncWrapper(async (req, res, next) => {
       notes: record.notes,
       date: record.date,
       time: record.time,
-      notesImage: record.notesImage, // عدلنا notesImage بدل notes
-      doctorName: record.doctorName, // أضفنا doctorName هنا
+      notesImage: record.notesImage,
+      doctorName: record.doctorName,
     })),
   });
 });
@@ -97,10 +399,21 @@ const getAllHistory = asyncWrapper(async (req, res, next) => {
 // ✅ Get a single history record for a specific child
 const getSingleHistory = asyncWrapper(async (req, res, next) => {
   const { childId, historyId } = req.params;
+  const userId = req.user.id;
 
-  // مكان التعديل: أضفنا doctorName في الـ select
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or you are not authorized",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
   const history = await History.findOne({ _id: historyId, childId }).select(
-    "_id diagnosis disease treatment notes notesImage date time doctorName" // أضفنا doctorName هنا
+    "_id diagnosis disease treatment notes notesImage date time doctorName"
   );
 
   if (!history) {
@@ -109,7 +422,6 @@ const getSingleHistory = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // مكان التعديل: أضفنا doctorName في الـ Response
   res.json({
     status: httpStatusText.SUCCESS,
     data: {
@@ -121,7 +433,7 @@ const getSingleHistory = asyncWrapper(async (req, res, next) => {
       notesImage: history.notesImage,
       date: history.date,
       time: history.time,
-      doctorName: history.doctorName, // أضفنا doctorName هنا
+      doctorName: history.doctorName,
     },
   });
 });
@@ -129,6 +441,7 @@ const getSingleHistory = asyncWrapper(async (req, res, next) => {
 // ✅ Update a history record
 const updateHistory = asyncWrapper(async (req, res, next) => {
   const { childId, historyId } = req.params;
+  const userId = req.user.id;
   const {
     diagnosis,
     disease,
@@ -138,9 +451,19 @@ const updateHistory = asyncWrapper(async (req, res, next) => {
     time,
     notesImage,
     doctorName,
-  } = req.body; // أضفنا doctorName هنا
+  } = req.body;
 
-  // مكان التعديل: أضفنا doctorName في الـ Update
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or you are not authorized",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
   const updatedHistory = await History.findOneAndUpdate(
     { _id: historyId, childId },
     {
@@ -152,7 +475,7 @@ const updateHistory = asyncWrapper(async (req, res, next) => {
       time,
       notesImage,
       doctorName,
-    }, // أضفنا doctorName هنا
+    },
     { new: true, runValidators: true }
   );
 
@@ -162,7 +485,17 @@ const updateHistory = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // مكان التعديل: أضفنا doctorName في الـ Response
+  // إرسال إشعار مختصر
+  await sendNotification(
+    userId,
+    childId,
+    null,
+    "History Updated",
+    `${child.name}: ${updatedHistory.disease} updated.`,
+    "history",
+    "user"
+  );
+
   res.json({
     status: httpStatusText.SUCCESS,
     data: {
@@ -175,7 +508,7 @@ const updateHistory = asyncWrapper(async (req, res, next) => {
         notesImage: updatedHistory.notesImage,
         date: updatedHistory.date,
         time: updatedHistory.time,
-        doctorName: updatedHistory.doctorName, // أضفنا doctorName هنا
+        doctorName: updatedHistory.doctorName,
       },
     },
   });
@@ -184,6 +517,18 @@ const updateHistory = asyncWrapper(async (req, res, next) => {
 // ✅ Delete a history record
 const deleteHistory = asyncWrapper(async (req, res, next) => {
   const { childId, historyId } = req.params;
+  const userId = req.user.id;
+
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or you are not authorized",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
 
   const deletedHistory = await History.findOneAndDelete({
     _id: historyId,
@@ -196,6 +541,17 @@ const deleteHistory = asyncWrapper(async (req, res, next) => {
     );
   }
 
+  // إرسال إشعار مختصر
+  await sendNotification(
+    userId,
+    childId,
+    null,
+    "History Removed",
+    `${child.name}: Record removed.`,
+    "history",
+    "user"
+  );
+
   res.json({
     status: httpStatusText.SUCCESS,
     message: "History record deleted successfully",
@@ -205,7 +561,19 @@ const deleteHistory = asyncWrapper(async (req, res, next) => {
 // ✅ Filter history records using query parameters
 const filterHistory = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
+  const userId = req.user.id;
   const { diagnosis, disease, treatment, fromDate, toDate, sortBy } = req.query;
+
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or you are not authorized",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
 
   let query = { childId };
 
@@ -230,10 +598,9 @@ const filterHistory = asyncWrapper(async (req, res, next) => {
     sortOption = { date: 1 };
   }
 
-  // مكان التعديل: أضفنا doctorName في الـ select
   const history = await History.find(query)
     .sort(sortOption)
-    .select("_id diagnosis disease treatment date doctorName"); // أضفنا doctorName هنا
+    .select("_id diagnosis disease treatment date doctorName");
 
   if (!history.length) {
     return next(
@@ -241,7 +608,6 @@ const filterHistory = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // مكان التعديل: أضفنا doctorName في الـ Response
   res.json({
     status: httpStatusText.SUCCESS,
     data: history.map((record) => ({
@@ -250,7 +616,7 @@ const filterHistory = asyncWrapper(async (req, res, next) => {
       disease: record.disease,
       treatment: record.treatment,
       date: record.date,
-      doctorName: record.doctorName, // أضفنا doctorName هنا
+      doctorName: record.doctorName,
     })),
   });
 });
