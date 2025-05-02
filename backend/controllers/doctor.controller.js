@@ -1627,26 +1627,26 @@
 //   getChildRecords,
 //   updateAvailability,
 // };
-
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const Doctor = require("../models/doctor.model");
 const User = require("../models/user.model");
 const Child = require("../models/child.model");
 const Appointment = require("../models/appointment.model");
-const Growth = require("../models/growth.model"); // استيراد نموذج Growth
-const History = require("../models/history.model"); // استيراد نموذج History
+const Growth = require("../models/growth.model");
+const History = require("../models/history.model");
 const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
 const { sendNotification } = require("./notifications.controller");
 const moment = require("moment");
+const mongoose = require("mongoose");
 
-// ✅ Get all doctors
+// Get all doctors
 const getAllDoctors = asyncWrapper(async (req, res) => {
   const doctors = await Doctor.find({}, { __v: false, password: false });
   res.json({ status: httpStatusText.SUCCESS, data: { doctors } });
 });
 
-// ✅ Get a single doctor by ID
+// Get a single doctor by ID
 const getSingleDoctor = asyncWrapper(async (req, res, next) => {
   const doctorId = req.params.doctorId;
 
@@ -1663,13 +1663,22 @@ const getSingleDoctor = asyncWrapper(async (req, res, next) => {
   res.json({ status: httpStatusText.SUCCESS, data: { doctor } });
 });
 
-// ✅ Book an appointment
+// Book an appointment
 const bookAppointment = asyncWrapper(async (req, res, next) => {
   const { doctorId, childId } = req.params;
-  const { date, time, visitType } = req.body; // إضافة visitType
+  const { date, time, visitType } = req.body;
   const userId = req.user.id;
 
-  // التحقق من وجود جميع الحقول المطلوبة
+  if (req.user.role !== "patient") {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can book appointments",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
   if (!date || !time || !visitType) {
     return next(
       appError.create(
@@ -1701,12 +1710,16 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     return next(appError.create("User not found", 404, httpStatusText.FAIL));
   }
 
-  const appointmentDateTime = new Date(`${date}T${time}`);
+  // التأكد من تنسيق التاريخ والوقت
+  const appointmentDateTime = moment(
+    `${date} ${time}`,
+    "YYYY-MM-DD HH:mm"
+  ).toDate();
   const now = new Date();
-  if (appointmentDateTime <= now) {
+  if (isNaN(appointmentDateTime) || appointmentDateTime <= now) {
     return next(
       appError.create(
-        "Appointment date and time must be in the future",
+        "Appointment date and time must be in the future and in valid format (YYYY-MM-DD HH:mm)",
         400,
         httpStatusText.FAIL
       )
@@ -1715,8 +1728,8 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
 
   const existingAppointment = await Appointment.findOne({
     doctorId,
-    date,
-    time,
+    date: date,
+    time: time,
   });
   if (existingAppointment) {
     return next(
@@ -1734,27 +1747,29 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
     doctorId,
     date,
     time,
-    visitType, // إضافة visitType إلى الموعد الجديد
+    visitType,
   });
 
   await newAppointment.save();
 
+  // إشعار فوري لليوزر (الطفل المستخدم حاليًا)
   await sendNotification(
     userId,
     childId,
     doctorId,
     "Appointment Booked",
-    `With Dr. ${doctor.firstName} on ${date} at ${time}.`,
+    `You booked an appointment with Dr. ${doctor.firstName} ${doctor.lastName} on ${date} at ${time} (${visitType}).`,
     "appointment",
     "patient"
   );
 
+  // إشعار فوري للدكتور
   await sendNotification(
     doctorId,
     childId,
     userId,
-    "New Appointment",
-    `${child.name} booked on ${date} at ${time}.`,
+    "New Appointment Booked",
+    `${child.name} booked an appointment with you on ${date} at ${time} (${visitType}).`,
     "appointment",
     "doctor"
   );
@@ -1765,11 +1780,21 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Reschedule an appointment
+// Reschedule an appointment
 const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
   const { appointmentId, childId } = req.params;
   const { date, time } = req.body;
   const userId = req.user.id;
+
+  if (req.user.role !== "patient") {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can reschedule appointments",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
 
   if (!date || !time) {
     return next(
@@ -1792,12 +1817,15 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  const appointmentDateTime = new Date(`${date}T${time}`);
+  const appointmentDateTime = moment(
+    `${date} ${time}`,
+    "YYYY-MM-DD HH:mm"
+  ).toDate();
   const now = new Date();
-  if (appointmentDateTime <= now) {
+  if (isNaN(appointmentDateTime) || appointmentDateTime <= now) {
     return next(
       appError.create(
-        "Appointment date and time must be in the future",
+        "Appointment date and time must be in the future and in valid format (YYYY-MM-DD HH:mm)",
         400,
         httpStatusText.FAIL
       )
@@ -1805,7 +1833,7 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
   }
 
   const existingAppointment = await Appointment.findOne({
-    doctorId: appointment.doctorId,
+    doctorId: appointment.doctorId._id,
     date,
     time,
     _id: { $ne: appointmentId },
@@ -1820,7 +1848,6 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // جلب بيانات الطفل لاستخدامها في الإشعار
   const child = await Child.findById(childId);
   if (!child) {
     return next(appError.create("Child not found", 404, httpStatusText.FAIL));
@@ -1856,10 +1883,20 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Cancel an appointment
+// Cancel an appointment
 const cancelAppointment = asyncWrapper(async (req, res, next) => {
   const { appointmentId, childId } = req.params;
   const userId = req.user.id;
+
+  if (req.user.role !== "patient") {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can cancel appointments",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
 
   const appointment = await Appointment.findOne({
     _id: appointmentId,
@@ -1909,15 +1946,15 @@ const cancelAppointment = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Add a doctor to favorites with childId in the path (using toggle logic)
-const addFavoriteDoctor = asyncWrapper(async (req, res, next) => {
+// Toggle favorite doctor with childId in the path
+const toggleFavoriteDoctor = asyncWrapper(async (req, res, next) => {
   const { childId, doctorId } = req.params;
   const userId = req.user.id;
 
   if (req.user.role !== "patient") {
     return next(
       appError.create(
-        "Unauthorized: Only patients can add favorite doctors",
+        "Unauthorized: Only patients can manage favorite doctors",
         403,
         httpStatusText.FAIL
       )
@@ -1975,73 +2012,7 @@ const addFavoriteDoctor = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Remove a doctor from favorites with childId in the path (using toggle logic)
-const removeFavoriteDoctor = asyncWrapper(async (req, res, next) => {
-  const { childId, doctorId } = req.params;
-  const userId = req.user.id;
-
-  if (req.user.role !== "patient") {
-    return next(
-      appError.create(
-        "Unauthorized: Only patients can remove favorite doctors",
-        403,
-        httpStatusText.FAIL
-      )
-    );
-  }
-
-  const child = await Child.findOne({ _id: childId, parentId: userId });
-  if (!child) {
-    return next(
-      appError.create(
-        "Child not found or not associated with this user",
-        404,
-        httpStatusText.FAIL
-      )
-    );
-  }
-
-  const doctor = await Doctor.findById(doctorId);
-  if (!doctor) {
-    return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
-  }
-
-  const isDoctorInFavorites = child.favorite.includes(doctorId);
-  let message, notificationTitle, notificationMessage;
-
-  if (isDoctorInFavorites) {
-    child.favorite = child.favorite.filter(
-      (id) => id.toString() !== doctorId.toString()
-    );
-    message = "Doctor removed from favorites successfully";
-    notificationTitle = "Doctor Unfavorited";
-    notificationMessage = `Dr. ${doctor.firstName} removed from favorites.`;
-  } else {
-    child.favorite.push(doctorId);
-    message = "Doctor added to favorites successfully";
-    notificationTitle = "Doctor Favorited";
-    notificationMessage = `Dr. ${doctor.firstName} added to favorites.`;
-  }
-
-  await child.save();
-
-  await sendNotification(
-    userId,
-    childId,
-    doctorId,
-    notificationTitle,
-    notificationMessage,
-    "favorite",
-    "patient"
-  );
-
-  res.json({
-    status: httpStatusText.SUCCESS,
-    message: message,
-  });
-});
-
-// ✅ جلب الدكاترة المفضلين مع childId في الـ Path
+// جلب الدكاترة المفضلين مع childId في الـ Path
 const getFavoriteDoctors = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
   const userId = req.user.id;
@@ -2087,7 +2058,7 @@ const getFavoriteDoctors = asyncWrapper(async (req, res, next) => {
   }
 
   const currentDay = moment().format("dddd");
-  const today = moment().startOf("day").toDate();
+  const today = moment().startOf("day").format("YYYY-MM-DD");
 
   const doctorsWithStatus = await Promise.all(
     doctors.map(async (doctor) => {
@@ -2175,7 +2146,7 @@ const getFavoriteDoctors = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ جلب بيانات الدكتور (Profile)
+// جلب بيانات الدكتور (Profile)
 const getDoctorProfile = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
 
@@ -2222,7 +2193,7 @@ const getDoctorProfile = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Update doctor profile
+// Update doctor profile
 const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
   const {
@@ -2304,6 +2275,7 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
 
   await doctor.save();
 
+  // إشعار فوري للدكتور عند تعديل الملف الشخصي
   if (changes.length > 0) {
     await sendNotification(
       doctorId,
@@ -2311,7 +2283,7 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
       null,
       "Profile Updated",
       `Updated: ${changes.join(", ")}`,
-      "doctor",
+      "profile",
       "doctor"
     );
   }
@@ -2338,7 +2310,7 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Delete doctor profile
+// Delete doctor profile
 const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
 
@@ -2386,7 +2358,7 @@ const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
       null,
       "Account Deleted",
       "Your account has been deleted.",
-      "doctor",
+      "profile",
       "doctor"
     );
 
@@ -2408,7 +2380,7 @@ const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
   }
 });
 
-// ✅ Logout doctor
+// Logout doctor
 const logoutDoctor = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
 
@@ -2437,7 +2409,7 @@ const logoutDoctor = asyncWrapper(async (req, res, next) => {
     null,
     "Logged Out",
     "You have logged out.",
-    "logout",
+    "general",
     "doctor"
   );
 
@@ -2447,7 +2419,7 @@ const logoutDoctor = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Update doctor availability
+// Update doctor availability
 const updateAvailability = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
   const { availableDays, availableTimes } = req.body;
@@ -2471,6 +2443,7 @@ const updateAvailability = asyncWrapper(async (req, res, next) => {
   doctor.availableTimes = availableTimes;
   await doctor.save();
 
+  // إشعار فوري للدكتور
   await sendNotification(
     doctorId,
     null,
@@ -2481,6 +2454,34 @@ const updateAvailability = asyncWrapper(async (req, res, next) => {
     "doctor"
   );
 
+  // جلب جميع المواعيد المستقبلية للدكتور
+  const now = new Date();
+  const upcomingAppointments = await Appointment.find({
+    doctorId,
+    date: { $gte: now },
+    status: { $in: ["Pending", "Accepted"] },
+  })
+    .populate("childId", "name")
+    .populate("userId", "firstName lastName");
+
+  // إشعار فوري لجميع اليوزرز الذين لديهم مواعيد مستقبلية
+  for (const appointment of upcomingAppointments) {
+    if (!appointment.userId || !appointment.childId) continue; // تخطي إذا لم يكن هناك userId أو childId
+    const userId = appointment.userId._id;
+    const childId = appointment.childId._id;
+    const childName = appointment.childId.name;
+
+    await sendNotification(
+      userId,
+      childId,
+      doctorId,
+      "Doctor Availability Updated",
+      `Dr. ${doctor.firstName} ${doctor.lastName} updated their availability. Please check your upcoming appointment for ${childName} on ${appointment.date} at ${appointment.time}.`,
+      "appointment",
+      "patient"
+    );
+  }
+
   res.json({
     status: httpStatusText.SUCCESS,
     message: "Availability updated successfully",
@@ -2488,7 +2489,7 @@ const updateAvailability = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Get upcoming appointments
+// Get upcoming appointments
 const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
   const now = new Date();
@@ -2505,7 +2506,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
 
   const appointments = await Appointment.find({
     doctorId,
-    date: { $gte: now }, // التأكد من أن التاريخ في المستقبل
+    date: { $gte: now },
   })
     .populate("userId", "firstName lastName")
     .populate("childId", "name");
@@ -2525,11 +2526,11 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
     data: appointments.map((appointment) => ({
       _id: appointment._id,
       user: {
-        firstName: appointment.userId?.firstName,
-        lastName: appointment.userId?.lastName,
+        firstName: appointment.userId?.firstName || "N/A",
+        lastName: appointment.userId?.lastName || "",
       },
       child: {
-        name: appointment.childId?.name,
+        name: appointment.childId?.name || "N/A",
       },
       date: appointment.date,
       time: appointment.time,
@@ -2538,7 +2539,7 @@ const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Get child records (فقط النمو والتاريخ الطبي)
+// Get child records (فقط النمو والتاريخ الطبي)
 const getChildRecords = asyncWrapper(async (req, res, next) => {
   const { childId } = req.body;
   const doctorId = req.user.id;
@@ -2553,17 +2554,21 @@ const getChildRecords = asyncWrapper(async (req, res, next) => {
     );
   }
 
+  if (!childId) {
+    return next(
+      appError.create("Child ID is required", 400, httpStatusText.FAIL)
+    );
+  }
+
   const child = await Child.findById(childId);
   if (!child) {
     return next(appError.create("Child not found", 404, httpStatusText.FAIL));
   }
 
-  // جلب بيانات النمو (Growth)
   const growthRecords = await Growth.find({ childId }).select(
     "weight height headCircumference date time notes notesImage ageInMonths createdAt updatedAt"
   );
 
-  // جلب بيانات التاريخ الطبي (History)
   const historyRecords = await History.find({ childId }).select(
     "diagnosis disease treatment notes date time doctorName notesImage createdAt updatedAt"
   );
@@ -2577,7 +2582,7 @@ const getChildRecords = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Update appointment status
+// Update appointment status
 const updateAppointmentStatus = asyncWrapper(async (req, res, next) => {
   const { appointmentId } = req.params;
   const { status } = req.body;
@@ -2600,7 +2605,10 @@ const updateAppointmentStatus = asyncWrapper(async (req, res, next) => {
   const appointment = await Appointment.findOne({
     _id: appointmentId,
     doctorId,
-  });
+  })
+    .populate("childId", "name")
+    .populate("doctorId", "firstName lastName")
+    .populate("userId", "firstName lastName");
   if (!appointment) {
     return next(
       appError.create("Appointment not found", 404, httpStatusText.FAIL)
@@ -2610,12 +2618,17 @@ const updateAppointmentStatus = asyncWrapper(async (req, res, next) => {
   appointment.status = status;
   await appointment.save();
 
+  // إشعار فوري لليوزر بناءً على حالة الحجز
   await sendNotification(
-    appointment.userId,
-    appointment.childId,
+    appointment.userId._id,
+    appointment.childId._id,
     doctorId,
     "Appointment Status Updated",
-    `Your appointment on ${appointment.date} is now ${status}.`,
+    `Dr. ${appointment.doctorId.firstName} ${
+      appointment.doctorId.lastName
+    } has ${status.toLowerCase()} your appointment for ${
+      appointment.childId.name
+    } on ${appointment.date} at ${appointment.time}.`,
     "appointment",
     "patient"
   );
@@ -2627,10 +2640,20 @@ const updateAppointmentStatus = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Get user appointments
+// Get user appointments
 const getUserAppointments = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
   const userId = req.user.id;
+
+  if (req.user.role !== "patient") {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can view their appointments",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
 
   const appointments = await Appointment.find({ childId, userId })
     .populate("doctorId", "firstName lastName")
@@ -2647,11 +2670,11 @@ const getUserAppointments = asyncWrapper(async (req, res, next) => {
     data: appointments.map((appointment) => ({
       _id: appointment._id,
       doctor: {
-        firstName: appointment.doctorId?.firstName,
-        lastName: appointment.doctorId?.lastName,
+        firstName: appointment.doctorId?.firstName || "N/A",
+        lastName: appointment.doctorId?.lastName || "",
       },
       child: {
-        name: appointment.childId?.name,
+        name: appointment.childId?.name || "N/A",
       },
       date: appointment.date,
       time: appointment.time,
@@ -2660,7 +2683,7 @@ const getUserAppointments = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Save FCM Token
+// Save FCM Token
 const saveFcmToken = asyncWrapper(async (req, res, next) => {
   const { fcmToken } = req.body;
   const doctorId = req.user.id;
@@ -2707,7 +2730,7 @@ const saveFcmToken = asyncWrapper(async (req, res, next) => {
     null,
     "FCM Token Updated",
     "Notification settings updated.",
-    "doctor",
+    "profile",
     "doctor"
   );
 
@@ -2723,8 +2746,7 @@ module.exports = {
   bookAppointment,
   rescheduleAppointment,
   cancelAppointment,
-  addFavoriteDoctor,
-  removeFavoriteDoctor,
+  toggleFavoriteDoctor,
   getFavoriteDoctors,
   getDoctorProfile,
   updateDoctorProfile,

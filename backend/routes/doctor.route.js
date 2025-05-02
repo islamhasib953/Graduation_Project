@@ -107,19 +107,13 @@ router.post(
   doctorController.bookAppointment
 );
 
-// Routes لإضافة وإزالة دكتور من المفضلة
-router
-  .route("/:childId/:doctorId/favorite")
-  .post(
-    verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-    doctorController.addFavoriteDoctor
-  )
-  .delete(
-    verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-    doctorController.removeFavoriteDoctor
-  );
+// Route لإضافة/إزالة دكتور من المفضلة باستخدام toggleFavoriteDoctor
+router.patch(
+  "/:childId/:doctorId/favorite",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+  doctorController.toggleFavoriteDoctor
+);
 
 // Routes لتعديل وإلغاء الحجز
 router

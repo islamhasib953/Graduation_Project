@@ -1,3 +1,99 @@
+طيب دلوقتى عايز اضيف اشعار لليوزر(الطفل المستخدم حاليا) لما يحجز معاد عند الدكتور فيه مثلا انه تم حجز معاد كذا عن دتور كذا وفى نفس الوقت يوصل اشعار للدكتور ده ان مثلا الطفل كذا حجز معاد كذا  فى البيت او انولاين او العيادة حسب ما اليوزر عمل
+ولو الدكتور قبل او رفض الحجز يوصل علوطلو اشعار للويزر(الطفل المستخدم حاليا او الدكتور مثلا كذا قبل او رفض الحجزوكمان عند الدكتور لو الدكتور عدل فى الاوقات المتاح فيها والمواعيد يوصل اشعار لكل الايوزرز (الاطفال ) انه تعديل مثلا تعديل المواعيد الخاصة بدكتور كذا
+وكمان عايز اضيف اشعار للدكتور لو عدل على البروفايل بتاعه (زى ما عملنا على اليوزر)
+اهم حاجة محدش يقدر يشوف اشعارات غيرة يعنى الدكتور المستخدم يشوف اشعاراته الخاص بيه فقط وكذلك اليوزر(الطفل)
+هبعتلك الاكود اللى ممكن تحتاجها وانت معاك اكواد الاشعارات عدل عليها من اخر تحديث عندك ليها
+بس اهم حاجة مش تبوظ لوجيك او كزد لانهم شغالين
+
+
+const express = require("express");
+const usersController = require("../controllers/users.controller");
+const verifyToken = require("../middlewares/virifyToken");
+const allowedTo = require("../middlewares/allowedTo");
+const userRoles = require("../utils/userRoles");
+const { validateRegister, validateLogin } = require("../middlewares/validationschema");
+const multer = require("multer");
+const appError = require("../utils/appError");
+const fs = require("fs");
+const path = require("path");
+
+const diskStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(__dirname, "..", "Uploads");
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const ext = file.mimetype.split("/")[1];
+    cb(null, `user-${Date.now()}.${ext}`);
+  },
+});
+
+const fileFilter = (req, file, cb) => {
+  file.mimetype.startsWith("image")
+    ? cb(null, true)
+    : cb(appError.create("The file must be an image", 400), false);
+};
+
+const upload = multer({
+  storage: diskStorage,
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB حد أقصى
+});
+
+const router = express.Router();
+
+router
+  .route("/")
+  .get(verifyToken, allowedTo(userRoles.ADMIN), usersController.getAllUsers);
+
+router
+  .route("/register")
+  .post(upload.single("avatar"), validateRegister, async (req, res, next) => {
+    if (!req.file) {
+      req.body.avatar = "Uploads/profile.jpg"; // صورة افتراضية
+    }
+    await usersController.registerUser(req, res, next);
+  });
+
+router.route("/login").post(validateLogin, usersController.loginUser);
+
+router
+  .route("/profile")
+  .get(
+    verifyToken,
+    allowedTo(userRoles.PATIENT),
+    usersController.getUserProfile
+  )
+  .patch(
+    verifyToken,
+    allowedTo(userRoles.PATIENT),
+    usersController.updateUserProfile
+  )
+  .delete(
+    verifyToken,
+    allowedTo(userRoles.PATIENT),
+    usersController.deleteUserProfile
+  );
+
+router.post(
+  "/logout",
+  verifyToken,
+  allowedTo(userRoles.PATIENT),
+  usersController.logoutUser
+);
+
+router.post(
+  "/save-fcm-token",
+  verifyToken,
+  allowedTo(userRoles.PATIENT),
+  usersController.saveFcmToken
+);
+
+module.exports = router;
+***************************************
 const express = require("express");
 const router = express.Router();
 const verifyToken = require("../middlewares/virifyToken");
@@ -144,913 +240,1824 @@ router.post(
 );
 
 module.exports = router;
-
-
-
-const express = require("express");
-const router = express.Router();
-const verifyToken = require("../middlewares/virifyToken");
-const allowedTo = require("../middlewares/allowedTo");
+******************************
+const mongoose = require("mongoose");
+const validator = require("validator");
 const userRoles = require("../utils/userRoles");
-// const validationschema = require("../middleware/validationschema");
-const growthController = require("../controllers/growth.controller");
-const { sendNotification } = require("../controllers/notifications.controller");
-const Appointment = require("../models/appointment.model");
 
-router
-  .route("/:childId")
-  .post(
-    verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    // validationschema.validateGrowth,
-    async (req, res, next) => {
-      try {
-        const { childId } = req.params;
-        const userId = req.user.id;
+const userSchema = new mongoose.Schema(
+  {
+    firstName: {
+      type: String,
+      required: true,
+      minlength: 2,
+      maxlength: 255,
+    },
+    lastName: {
+      type: String,
+      required: true,
+      minlength: 2,
+      maxlength: 255,
+    },
+    gender: {
+      type: String,
+      enum: ["Male", "Female"],
+      required: true,
+    },
+    phone: {
+      type: String,
+      required: true,
+      unique: true,
+      validate: {
+        validator: function (value) {
+          return /^01[0-2,5]\d{8}$/.test(value);
+        },
+        message: "Invalid Egyptian phone number",
+      },
+    },
+    address: {
+      type: String,
+      required: true,
+      minlength: 2,
+      maxlength: 255,
+    },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      minlength: 2,
+      maxlength: 255,
+      validate: [validator.isEmail, "Invalid Email"],
+    },
+    password: {
+      type: String,
+      required: true,
+      minlength: 2,
+      maxlength: 255,
+    },
+    token: {
+      type: String,
+      required: false,
+    },
+    role: {
+      type: String,
+      enum: [userRoles.ADMIN, userRoles.PATIENT],
+      default: userRoles.PATIENT,
+      required: true,
+    },
+    fcmToken: { type: String, default: null }, // حقل جديد
+    avatar: {
+      type: String,
+      default: "uploads/profile.jpg",
+    },
+    // created_at: {
+    //   type: Date,
+    //   default: Date.now,
+    // },
+  },
+  { timestamps: true }
+);
 
-        // استدعاء دالة createGrowth
-        const result = await growthController.createGrowth(req, res, next);
-
-        // التأكد إن العملية نجحت وإن الـ response تم إرساله
-        if (res.headersSent) {
-          const growth = result.data; // افتراض إن createGrowth بترجع data
-          if (growth) {
-            console.log(
-              `Sending notification for new growth record: Height ${growth.height}, Weight ${growth.weight}`
-            );
-            await sendNotification(
-              userId,
-              childId,
-              null,
-              "New Growth Record Added",
-              `A new growth record (Height: ${growth.height}, Weight: ${growth.weight}) has been added for your child.`,
-              "growth",
-              "user"
-            );
-
-            // التحقق من انحراف الطول
-            const standardHeight = growth.ageInMonths * 2 + 50;
-            const heightDeviation = Math.abs(growth.height - standardHeight);
-            if (heightDeviation > 10) {
-              console.log(
-                `Sending growth alert for child ${childId}: Height deviation ${heightDeviation}`
-              );
-              await sendNotification(
-                userId,
-                childId,
-                null,
-                "Growth Alert",
-                `The height of your child (${growth.height} cm) deviates significantly from the expected value (${standardHeight} cm).`,
-                "growth_alert",
-                "user"
-              );
-
-              // إشعار للدكتور (مش مفعل افتراضيًا)
-              /*
-              const latestAppointment = await Appointment.findOne({ childId, status: "Accepted" })
-                .sort({ date: -1 })
-                .select("doctorId");
-              if (latestAppointment && latestAppointment.doctorId) {
-                await sendNotification(
-                  null,
-                  childId,
-                  latestAppointment.doctorId,
-                  "Growth Alert for Patient",
-                  `A growth record for a patient shows significant height deviation (Height: ${growth.height} cm, Expected: ${standardHeight} cm).`,
-                  "growth_alert",
-                  "doctor"
-                );
-              }
-              */
-            }
-          }
-        }
-      } catch (error) {
-        console.error(
-          `Error creating growth record for child ${childId}:`,
-          error
-        );
-        return next(
-          appError.create("Failed to create growth record", 500, "error")
-        );
-      }
-    }
-  )
-  .get(
-    verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    growthController.getAllGrowth
-  );
-
-router
-  .route("/:childId/last")
-  .get(
-    verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    growthController.getLastGrowthRecord
-  );
-
-router
-  .route("/:childId/last-change")
-  .get(
-    verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    growthController.getLastGrowthChange
-  );
-
-router
-  .route("/:childId/:growthId")
-  .get(
-    verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    growthController.getSingleGrowth
-  )
-  .patch(
-    verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    // validationschema.validateGrowth,
-    async (req, res, next) => {
-      try {
-        const { childId, growthId } = req.params;
-        const userId = req.user.id;
-
-        // استدعاء دالة updateGrowth
-        const result = await growthController.updateGrowth(req, res, next);
-
-        // التأكد إن العملية نجحت وإن الـ response تم إرساله
-        if (res.headersSent) {
-          const growth = result.data; // افتراض إن updateGrowth بترجع data
-          if (growth) {
-            console.log(
-              `Sending notification for updated growth record: Height ${growth.height}, Weight ${growth.weight}`
-            );
-            await sendNotification(
-              userId,
-              childId,
-              null,
-              "Growth Record Updated",
-              `The growth record (Height: ${growth.height}, Weight: ${growth.weight}) has been updated for your child.`,
-              "growth",
-              "user"
-            );
-
-            // التحقق من انحراف الطول
-            const standardHeight = growth.ageInMonths * 2 + 50;
-            const heightDeviation = Math.abs(growth.height - standardHeight);
-            if (heightDeviation > 10) {
-              console.log(
-                `Sending growth alert for child ${childId}: Height deviation ${heightDeviation}`
-              );
-              await sendNotification(
-                userId,
-                childId,
-                null,
-                "Growth Alert",
-                `The height of your child (${growth.height} cm) deviates significantly from the expected value (${standardHeight} cm).`,
-                "growth_alert",
-                "user"
-              );
-
-              // إشعار للدكتور (مش مفعل افتراضيًا)
-              /*
-              const latestAppointment = await Appointment.findOne({ childId, status: "Accepted" })
-                .sort({ date: -1 })
-                .select("doctorId");
-              if (latestAppointment && latestAppointment.doctorId) {
-                await sendNotification(
-                  null,
-                  childId,
-                  latestAppointment.doctorId,
-                  "Growth Alert for Patient",
-                  `A growth record for a patient shows significant height deviation (Height: ${growth.height} cm, Expected: ${standardHeight} cm).`,
-                  "growth_alert",
-                  "doctor"
-                );
-              }
-              */
-            }
-          }
-        }
-      } catch (error) {
-        console.error(
-          `Error updating growth record ${growthId} for child ${childId}:`,
-          error
-        );
-        return next(
-          appError.create("Failed to update growth record", 500, "error")
-        );
-      }
-    }
-  )
-  .delete(
-    verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    async (req, res, next) => {
-      try {
-        const { childId, growthId } = req.params;
-        const userId = req.user.id;
-
-        // استدعاء دالة deleteGrowth
-        const result = await growthController.deleteGrowth(req, res, next);
-
-        // التأكد إن العملية نجحت وإن الـ response تم إرساله
-        if (res.headersSent) {
-          console.log(
-            `Sending notification for deleted growth record: ${growthId}`
-          );
-          await sendNotification(
-            userId,
-            childId,
-            null,
-            "Growth Record Deleted",
-            `A growth record has been deleted for your child.`,
-            "growth",
-            "user"
-          );
-        }
-      } catch (error) {
-        console.error(
-          `Error deleting growth record ${growthId} for child ${childId}:`,
-          error
-        );
-        return next(
-          appError.create("Failed to delete growth record", 500, "error")
-        );
-      }
-    }
-  );
-
-module.exports = router;
-
-
-const express = require("express");
-const { validationResult } = require("express-validator");
-const router = express.Router();
-const appError = require("../utils/appError");
-const medicineController = require("../controllers/medicine.controller");
-const validationschema = require("../middlewares/validationschema");
-const verifyToken = require("../middlewares/virifyToken");
-const allowedTo = require("../middlewares/allowedTo");
+module.exports = mongoose.model("User", userSchema);
+**************************************
+const mongoose = require("mongoose");
+const validator = require("validator");
 const userRoles = require("../utils/userRoles");
-const { sendNotification } = require("../controllers/notifications.controller");
 
-router
-  .route("/:childId")
-  .get(
-    verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    medicineController.getAllMedicines
-  )
-  .post(
-    verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    validationschema.validateMedicine,
-    async (req, res, next) => {
-      try {
-        const { childId } = req.params;
-        const userId = req.user.id;
+const doctorSchema = new mongoose.Schema({
+  firstName: {
+    type: String,
+    required: true,
+    minlength: 2,
+    maxlength: 255,
+  },
+  lastName: {
+    type: String,
+    required: true,
+    minlength: 2,
+    maxlength: 255,
+  },
+  gender: {
+    type: String,
+    enum: ["Male", "Female"],
+    required: true,
+  },
+  phone: {
+    type: String,
+    required: true,
+    unique: true,
+    validate: {
+      validator: function (value) {
+        return /^01[0-2,5]\d{8}$/.test(value);
+      },
+      message: "Invalid Egyptian phone number",
+    },
+  },
+  address: {
+    type: String,
+    required: true,
+    minlength: 2,
+    maxlength: 255,
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    minlength: 2,
+    maxlength: 255,
+    validate: [validator.isEmail, "Invalid Email"],
+  },
+  password: {
+    type: String,
+    required: true,
+    minlength: 2,
+    maxlength: 255,
+  },
+  token: {
+    type: String,
+    required: false,
+  },
+  role: {
+    type: String,
+    enum: [userRoles.DOCTOR], // تحديد إن الـ role هنا للدكتور بس
+    default: userRoles.DOCTOR, // التأكد إن الـ default مش معلّق
+    required: true, // جعلناه إجباري
+  },
+  fcmToken: { type: String, default: null }, // حقل جديد
+  avatar: {
+    type: String,
+    default: "uploads/doctor.jpg",
+  },
+  specialise: {
+    type: String,
+    required: false,
+    minlength: 2,
+    maxlength: 255,
+    trim: true,
+  },
+  about: {
+    type: String,
+    required: false,
+    minlength: 2,
+    maxlength: 500,
+    trim: true,
+  },
+  rate: {
+    type: Number,
+    required: false,
+    min: 0,
+    max: 5,
+    default: 0,
+  },
+  availableDays: [
+    {
+      type: String,
+      required: false,
+      trim: true,
+    },
+  ],
+  availableTimes: [
+    {
+      type: String,
+      required: false,
+      trim: true,
+    },
+  ],
+  // created_at: {
+  //   type: Date,
+  //   default: Date.now,
+  // },
+},
+  { timestamps: true }
+);
 
-        // استدعاء دالة createMedicine
-        const result = await medicineController.createMedicine(req, res, next);
+module.exports = mongoose.model("Doctor", doctorSchema);
+********************************
 
-        // التأكد إن العملية نجحت وإن الـ response تم إرساله
-        if (res.headersSent) {
-          const medicine = result.data; // افتراض إن createMedicine بترجع data في الـ response
-          if (medicine) {
-            console.log(
-              `Sending notification for new medicine: ${medicine.name}`
-            );
-            await sendNotification(
-              userId,
-              childId,
-              null,
-              "New Medicine Added",
-              `A new medicine "${medicine.name}" has been added for your child.`,
-              "medicine",
-              "user"
-            );
-          }
-        }
-      } catch (error) {
-        console.error(`Error creating medicine for child ${childId}:`, error);
-        return next(appError.create("Failed to create medicine", 500, "error"));
-      }
-    }
-  );
+const mongoose = require("mongoose");
 
-router
-  .route("/:childId/:medicineId")
-  .get(
-    verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    medicineController.getSingleMedicine
-  )
-  .patch(
-    verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    validationschema.validateMedicine,
-    async (req, res, next) => {
-      try {
-        const { childId, medicineId } = req.params;
-        const userId = req.user.id;
+const appointmentSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    doctorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Doctor",
+      required: true,
+    },
+    childId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Child",
+      required: true,
+    },
+    date: {
+      type: Date,
+      required: true,
+    },
+    time: {
+      type: String,
+      required: true,
+    },
+    visitType: {
+      type: String,
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ["Pending", "Accepted", "Closed"],
+      default: "Pending",
+    },
+  },
+  { timestamps: true } // إضافة timestamps عشان يضيف createdAt و updatedAt تلقائياً
+);
 
-        // استدعاء دالة updateMedicine
-        const result = await medicineController.updateMedicine(req, res, next);
+module.exports = mongoose.model("Appointment", appointmentSchema);
 
-        // التأكد إن العملية نجحت وإن الـ response تم إرساله
-        if (res.headersSent) {
-          const medicine = result.data; // افتراض إن updateMedicine بترجع data في الـ response
-          if (medicine) {
-            console.log(
-              `Sending notification for updated medicine: ${medicine.name}`
-            );
-            await sendNotification(
-              userId,
-              childId,
-              null,
-              "Medicine Updated",
-              `The medicine "${medicine.name}" has been updated for your child.`,
-              "medicine",
-              "user"
-            );
-          }
-        }
-      } catch (error) {
-        console.error(
-          `Error updating medicine ${medicineId} for child ${childId}:`,
-          error
-        );
-        return next(appError.create("Failed to update medicine", 500, "error"));
-      }
-    }
-  )
-  .delete(
-    verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    async (req, res, next) => {
-      try {
-        const { childId, medicineId } = req.params;
-        const userId = req.user.id;
+*********************************
 
-        // استدعاء دالة deleteMedicine
-        const result = await medicineController.deleteMedicine(req, res, next);
-
-        // التأكد إن العملية نجحت وإن الـ response تم إرساله
-        if (res.headersSent) {
-          console.log(
-            `Sending notification for deleted medicine: ${medicineId}`
-          );
-          await sendNotification(
-            userId,
-            childId,
-            null,
-            "Medicine Deleted",
-            `The medicine has been deleted for your child.`,
-            "medicine",
-            "user"
-          );
-        }
-      } catch (error) {
-        console.error(
-          `Error deleting medicine ${medicineId} for child ${childId}:`,
-          error
-        );
-        return next(appError.create("Failed to delete medicine", 500, "error"));
-      }
-    }
-  );
-
-module.exports = router;
-
-
-
-const express = require("express");
-const router = express.Router();
-const verifyToken = require("../middlewares/virifyToken");
-const allowedTo = require("../middlewares/allowedTo");
-const userRoles = require("../utils/userRoles");
-const notificationsController = require("../controllers/notifications.controller");
-const User = require("../models/user.model");
+const asyncWrapper = require("../middlewares/asyncWrapper");
 const Doctor = require("../models/doctor.model");
-const { sendPushNotification } = require("../config/firebase-config");
-
-router.get(
-  "/user/:childId",
-  verifyToken,
-  allowedTo(userRoles.PATIENT),
-  notificationsController.getUserNotifications
-);
-
-router.get(
-  "/doctor",
-  verifyToken,
-  allowedTo(userRoles.DOCTOR),
-  notificationsController.getDoctorNotifications
-);
-
-router.patch(
-  "/:notificationId/read",
-  verifyToken,
-  allowedTo(userRoles.PATIENT, userRoles.DOCTOR),
-  notificationsController.markAsRead
-);
-
-// نقطة نهاية لإرسال إشعارات الـ Bracelet
-router.post(
-  "/bracelet",
-  verifyToken,
-  allowedTo(userRoles.PATIENT),
-  async (req, res, next) => {
-    const { childId, title, body } = req.body;
-    const userId = req.user.id;
-
-    if (!childId || !title || !body) {
-      return res.status(400).json({
-        status: "fail",
-        message: "childId, title, and body are required",
-      });
-    }
-
-    try {
-      await notificationsController.sendNotification(
-        userId,
-        childId,
-        null,
-        title,
-        body,
-        "bracelet",
-        "user"
-      );
-
-      res.status(201).json({
-        status: "success",
-        message: "Bracelet notification sent successfully",
-      });
-    } catch (error) {
-      console.error("Error sending bracelet notification:", error);
-      res.status(500).json({
-        status: "error",
-        message: "Failed to send bracelet notification",
-      });
-    }
-  }
-);
-
-// نقطة نهاية لإرسال إشعارات عامة (للأدمن فقط)
-router.post(
-  "/send-general",
-  verifyToken,
-  allowedTo(userRoles.ADMIN),
-  async (req, res, next) => {
-    const { title, body, target } = req.body;
-
-    if (!title || !body || !target) {
-      return res.status(400).json({
-        status: "fail",
-        message: "Title, body, and target are required",
-      });
-    }
-
-    try {
-      let fcmTokens = [];
-      let notifications = [];
-
-      if (target === "user" || target === "all") {
-        const users = await User.find().select("fcmToken _id");
-        fcmTokens.push(
-          ...users.map((user) => user.fcmToken).filter((token) => token)
-        );
-        notifications.push(
-          ...users.map((user) => ({
-            userId: user._id,
-            title,
-            body,
-            type: "general",
-            target: "user",
-            isRead: false,
-          }))
-        );
-      }
-
-      if (target === "doctor" || target === "all") {
-        const doctors = await Doctor.find().select("fcmToken _id");
-        fcmTokens.push(
-          ...doctors.map((doctor) => doctor.fcmToken).filter((token) => token)
-        );
-        notifications.push(
-          ...doctors.map((doctor) => ({
-            doctorId: doctor._id,
-            title,
-            body,
-            type: "general",
-            target: "doctor",
-            isRead: false,
-          }))
-        );
-      }
-
-      if (fcmTokens.length === 0) {
-        return res.status(404).json({
-          status: "fail",
-          message: "No recipients found with FCM tokens",
-        });
-      }
-
-      for (const notification of notifications) {
-        await notificationsController.sendNotification(
-          notification.userId || null,
-          null,
-          notification.doctorId || null,
-          notification.title,
-          notification.body,
-          notification.type,
-          notification.target
-        );
-      }
-
-      res.status(200).json({
-        status: "success",
-        message: "General notification sent successfully",
-      });
-    } catch (error) {
-      console.error("Error sending general notification:", error);
-      res.status(500).json({
-        status: "error",
-        message: "Failed to send general notification",
-      });
-    }
-  }
-);
-
-module.exports = router;
-
-
-const express = require("express");
-const usersController = require("../controllers/users.controller");
-const verifyToken = require("../middlewares/virifyToken");
-const allowedTo = require("../middlewares/allowedTo");
-const userRoles = require("../utils/userRoles");
-const {
-  validateRegister,
-  validateLogin,
-} = require("../middlewares/validationschema");
-
-const multer = require("multer");
-const appError = require("../utils/appError");
-const fs = require("fs");
-const path = require("path");
-
-const diskStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, "..", "Uploads");
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    const ext = file.mimetype.split("/")[1];
-    cb(null, `user-${Date.now()}.${ext}`);
-  },
-});
-
-const fileFilter = (req, file, cb) => {
-  file.mimetype.startsWith("image")
-    ? cb(null, true)
-    : cb(appError.create("The file must be an image", 400), false);
-};
-
-const upload = multer({
-  storage: diskStorage,
-  fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB حد أقصى
-});
-
-const router = express.Router();
-
-router
-  .route("/")
-  .get(verifyToken, allowedTo(userRoles.ADMIN), usersController.getAllUsers);
-
-router
-  .route("/register")
-  .post(upload.single("avatar"), validateRegister, async (req, res, next) => {
-    if (!req.file) {
-      req.body.avatar = "Uploads/profile.jpg"; // صورة افتراضية
-    }
-    await usersController.registerUser(req, res, next);
-  });
-
-router.route("/login").post(validateLogin, usersController.loginUser);
-
-router
-  .route("/profile")
-  .get(
-    verifyToken,
-    allowedTo(userRoles.PATIENT),
-    usersController.getUserProfile
-  )
-  .patch(
-    verifyToken,
-    allowedTo(userRoles.PATIENT),
-    usersController.updateUserProfile
-  )
-  .delete(
-    verifyToken,
-    allowedTo(userRoles.PATIENT),
-    usersController.deleteUserProfile
-  );
-
-router.post(
-  "/logout",
-  verifyToken,
-  allowedTo(userRoles.PATIENT),
-  usersController.logoutUser
-);
-
-router.post(
-  "/save-fcm-token",
-  verifyToken,
-  allowedTo(userRoles.PATIENT),
-  async (req, res, next) => {
-    const { fcmToken } = req.body;
-    const userId = req.user.id;
-
-    if (!fcmToken) {
-      return next(appError.create("FCM Token is required", 400, "fail"));
-    }
-
-    try {
-      const User = require("../models/user.model");
-      const user = await User.findById(userId);
-
-      if (!user) {
-        return next(appError.create("User not found", 404, "fail"));
-      }
-
-      // التحقق من تكرار fcmToken
-      if (user.fcmToken === fcmToken) {
-        return res.status(200).json({
-          status: "success",
-          message: "FCM Token is already up to date",
-        });
-      }
-
-      // تنظيف fcmToken من مستخدمين آخرين
-      await User.updateMany(
-        { fcmToken, _id: { $ne: userId } },
-        { fcmToken: null }
-      );
-
-      user.fcmToken = fcmToken;
-      await user.save();
-
-      // إرسال إشعار لتأكيد التحديث
-      const {
-        sendNotification,
-      } = require("../controllers/notifications.controller");
-      await sendNotification(
-        userId,
-        null,
-        null,
-        "FCM Token Updated",
-        "Your notification settings have been updated successfully.",
-        "profile",
-        "user"
-      );
-
-      res.status(200).json({
-        status: "success",
-        message: "FCM Token saved successfully",
-      });
-    } catch (error) {
-      console.error("Error saving FCM Token:", error);
-      return next(appError.create("Server error", 500, "error"));
-    }
-  }
-);
-
-module.exports = router;
-
-
-const express = require("express");
-const router = express.Router();
-const vaccinationController = require("../controllers/vaccination.controller");
-const verifyToken = require("../middlewares/virifyToken");
-const allowedTo = require("../middlewares/allowedTo");
-const userRoles = require("../utils/userRoles");
-const { sendNotification } = require("../controllers/notifications.controller");
 const User = require("../models/user.model");
 const Child = require("../models/child.model");
+const Appointment = require("../models/appointment.model");
+const Growth = require("../models/growth.model"); // استيراد نموذج Growth
+const History = require("../models/history.model"); // استيراد نموذج History
+const httpStatusText = require("../utils/httpStatusText");
+const appError = require("../utils/appError");
+const { sendNotification } = require("./notifications.controller");
+const moment = require("moment");
 
-router
-  .route("/")
-  .get(
-    verifyToken,
-    allowedTo(userRoles.ADMIN),
-    vaccinationController.getAllVaccinations
-  )
-  .post(verifyToken, allowedTo(userRoles.ADMIN), async (req, res, next) => {
-    try {
-      const adminId = req.user.id;
+// ✅ Get all doctors
+const getAllDoctors = asyncWrapper(async (req, res) => {
+  const doctors = await Doctor.find({}, { __v: false, password: false });
+  res.json({ status: httpStatusText.SUCCESS, data: { doctors } });
+});
 
-      // استدعاء دالة createVaccinationForAllChildren
-      const result =
-        await vaccinationController.createVaccinationForAllChildren(
-          req,
-          res,
-          next
-        );
+// ✅ Get a single doctor by ID
+const getSingleDoctor = asyncWrapper(async (req, res, next) => {
+  const doctorId = req.params.doctorId;
 
-      // التأكد إن العملية نجحت وإن الـ response تم إرساله
-      if (res.headersSent) {
-        const vaccination = result.data; // افتراض إن createVaccinationForAllChildren بترجع data
-        if (vaccination) {
-          console.log(
-            `Sending notifications for new vaccination: ${req.body.disease}`
-          );
-
-          // إشعار للأدمن
-          await sendNotification(
-            adminId,
-            null,
-            null,
-            "New Vaccination Added",
-            `A new vaccination "${req.body.disease}" has been added for all children.`,
-            "vaccination",
-            "user"
-          );
-
-          // إشعار لكل اليوزرز اللي عندهم أطفال
-          const users = await User.find({ role: userRoles.PATIENT }).select(
-            "_id"
-          );
-          const children = await Child.find({
-            parentId: { $in: users.map((user) => user._id) },
-          }).select("_id parentId");
-
-          for (const child of children) {
-            await sendNotification(
-              child.parentId,
-              child._id,
-              null,
-              "New Vaccination Available",
-              `A new vaccination "${req.body.disease}" is now required for your child.`,
-              "vaccination",
-              "user"
-            );
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error creating vaccination for all children:", error);
-      return next(
-        appError.create("Failed to create vaccination", 500, "error")
-      );
-    }
+  const doctor = await Doctor.findById(doctorId, {
+    __v: false,
+    password: false,
   });
 
-router
-  .route("/:vaccinationId")
-  .delete(verifyToken, allowedTo(userRoles.ADMIN), async (req, res, next) => {
-    try {
-      const adminId = req.user.id;
+  if (!doctor) {
+    const error = appError.create("Doctor not found", 404, httpStatusText.FAIL);
+    return next(error);
+  }
 
-      // استدعاء دالة deleteVaccinationForAllChildren
-      const result =
-        await vaccinationController.deleteVaccinationForAllChildren(
-          req,
-          res,
-          next
-        );
+  res.json({ status: httpStatusText.SUCCESS, data: { doctor } });
+});
 
-      // التأكد إن العملية نجحت وإن الـ response تم إرساله
-      if (res.headersSent) {
-        console.log(
-          `Sending notification for deleted vaccination: ${req.params.vaccinationId}`
-        );
-        await sendNotification(
-          adminId,
-          null,
-          null,
-          "Vaccination Deleted",
-          `The vaccination has been deleted for all children.`,
-          "vaccination",
-          "user"
-        );
-      }
-    } catch (error) {
-      console.error(
-        `Error deleting vaccination ${req.params.vaccinationId}:`,
-        error
-      );
-      return next(
-        appError.create("Failed to delete vaccination", 500, "error")
-      );
-    }
+// ✅ Book an appointment
+const bookAppointment = asyncWrapper(async (req, res, next) => {
+  const { doctorId, childId } = req.params;
+  const { date, time, visitType } = req.body; // إضافة visitType
+  const userId = req.user.id;
+
+  // التحقق من وجود جميع الحقول المطلوبة
+  if (!date || !time || !visitType) {
+    return next(
+      appError.create(
+        "Date, time, and visitType are required",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const doctor = await Doctor.findById(doctorId);
+  if (!doctor) {
+    return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
+  }
+
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or you are not authorized",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    return next(appError.create("User not found", 404, httpStatusText.FAIL));
+  }
+
+  const appointmentDateTime = new Date(`${date}T${time}`);
+  const now = new Date();
+  if (appointmentDateTime <= now) {
+    return next(
+      appError.create(
+        "Appointment date and time must be in the future",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const existingAppointment = await Appointment.findOne({
+    doctorId,
+    date,
+    time,
+  });
+  if (existingAppointment) {
+    return next(
+      appError.create(
+        "This time slot is already booked",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const newAppointment = new Appointment({
+    userId,
+    childId,
+    doctorId,
+    date,
+    time,
+    visitType, // إضافة visitType إلى الموعد الجديد
   });
 
-router
-  .route("/:childId")
-  .get(
-    verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    vaccinationController.getVaccinationsByChildId
+  await newAppointment.save();
+
+  await sendNotification(
+    userId,
+    childId,
+    doctorId,
+    "Appointment Booked",
+    `With Dr. ${doctor.firstName} on ${date} at ${time}.`,
+    "appointment",
+    "patient"
   );
 
-router
-  .route("/:childId/:vaccinationId")
-  .get(
-    verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    vaccinationController.getUserVaccination
-  )
-  .patch(
-    verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    async (req, res, next) => {
-      try {
-        const { childId, vaccinationId } = req.params;
-        const userId = req.user.id;
-
-        // استدعاء دالة updateUserVaccination
-        const result = await vaccinationController.updateUserVaccination(
-          req,
-          res,
-          next
-        );
-
-        // التأكد إن العملية نجحت وإن الـ response تم إرساله
-        if (res.headersSent) {
-          const vaccination = result.data; // افتراض إن updateUserVaccination بترجع data
-          if (vaccination) {
-            console.log(
-              `Sending notification for updated vaccination: ${vaccinationId}`
-            );
-            await sendNotification(
-              userId,
-              childId,
-              null,
-              "Vaccination Updated",
-              `The vaccination "${vaccination.vaccineInfoId.disease}" has been updated for your child.`,
-              "vaccination",
-              "user"
-            );
-          }
-        }
-      } catch (error) {
-        console.error(
-          `Error updating vaccination ${vaccinationId} for child ${childId}:`,
-          error
-        );
-        return next(
-          appError.create("Failed to update vaccination", 500, "error")
-        );
-      }
-    }
-  )
-  .delete(
-    verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    async (req, res, next) => {
-      try {
-        const { childId, vaccinationId } = req.params;
-        const userId = req.user.id;
-
-        // استدعاء دالة deleteUserVaccination
-        const result = await vaccinationController.deleteUserVaccination(
-          req,
-          res,
-          next
-        );
-
-        // التأكد إن العملية نجحت وإن الـ response تم إرساله
-        if (res.headersSent) {
-          console.log(
-            `Sending notification for deleted vaccination: ${vaccinationId}`
-          );
-          await sendNotification(
-            userId,
-            childId,
-            null,
-            "Vaccination Deleted",
-            `The vaccination has been deleted for your child.`,
-            "vaccination",
-            "user"
-          );
-        }
-      } catch (error) {
-        console.error(
-          `Error deleting vaccination ${vaccinationId} for child ${childId}:`,
-          error
-        );
-        return next(
-          appError.create("Failed to delete vaccination", 500, "error")
-        );
-      }
-    }
+  await sendNotification(
+    doctorId,
+    childId,
+    userId,
+    "New Appointment",
+    `${child.name} booked on ${date} at ${time}.`,
+    "appointment",
+    "doctor"
   );
 
-module.exports = router;
+  res.status(201).json({
+    status: httpStatusText.SUCCESS,
+    data: { appointment: newAppointment },
+  });
+});
 
-شوف دول لو محتاجين تعديل
+// ✅ Reschedule an appointment
+const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
+  const { appointmentId, childId } = req.params;
+  const { date, time } = req.body;
+  const userId = req.user.id;
+
+  if (!date || !time) {
+    return next(
+      appError.create("Date and time are required", 400, httpStatusText.FAIL)
+    );
+  }
+
+  const appointment = await Appointment.findOne({
+    _id: appointmentId,
+    childId,
+    userId,
+  }).populate("doctorId", "firstName lastName");
+  if (!appointment) {
+    return next(
+      appError.create(
+        "Appointment not found or you are not authorized",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const appointmentDateTime = new Date(`${date}T${time}`);
+  const now = new Date();
+  if (appointmentDateTime <= now) {
+    return next(
+      appError.create(
+        "Appointment date and time must be in the future",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const existingAppointment = await Appointment.findOne({
+    doctorId: appointment.doctorId,
+    date,
+    time,
+    _id: { $ne: appointmentId },
+  });
+  if (existingAppointment) {
+    return next(
+      appError.create(
+        "This time slot is already booked",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  // جلب بيانات الطفل لاستخدامها في الإشعار
+  const child = await Child.findById(childId);
+  if (!child) {
+    return next(appError.create("Child not found", 404, httpStatusText.FAIL));
+  }
+
+  appointment.date = date;
+  appointment.time = time;
+  await appointment.save();
+
+  await sendNotification(
+    userId,
+    childId,
+    appointment.doctorId._id,
+    "Appointment Rescheduled",
+    `With Dr. ${appointment.doctorId.firstName} to ${date} at ${time}.`,
+    "appointment",
+    "patient"
+  );
+
+  await sendNotification(
+    appointment.doctorId._id,
+    childId,
+    userId,
+    "Appointment Rescheduled",
+    `${child.name} to ${date} at ${time}.`,
+    "appointment",
+    "doctor"
+  );
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: { appointment },
+  });
+});
+
+// ✅ Cancel an appointment
+const cancelAppointment = asyncWrapper(async (req, res, next) => {
+  const { appointmentId, childId } = req.params;
+  const userId = req.user.id;
+
+  const appointment = await Appointment.findOne({
+    _id: appointmentId,
+    childId,
+    userId,
+  }).populate("doctorId", "firstName lastName");
+  if (!appointment) {
+    return next(
+      appError.create(
+        "Appointment not found or you are not authorized",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const child = await Child.findById(childId);
+  if (!child) {
+    return next(appError.create("Child not found", 404, httpStatusText.FAIL));
+  }
+
+  await Appointment.deleteOne({ _id: appointmentId });
+
+  await sendNotification(
+    userId,
+    childId,
+    appointment.doctorId._id,
+    "Appointment Cancelled",
+    `With Dr. ${appointment.doctorId.firstName} on ${appointment.date}.`,
+    "appointment",
+    "patient"
+  );
+
+  await sendNotification(
+    appointment.doctorId._id,
+    childId,
+    userId,
+    "Appointment Cancelled",
+    `${child.name} on ${appointment.date}.`,
+    "appointment",
+    "doctor"
+  );
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    message: "Appointment cancelled successfully",
+  });
+});
+
+// ✅ Add a doctor to favorites with childId in the path (using toggle logic)
+const addFavoriteDoctor = asyncWrapper(async (req, res, next) => {
+  const { childId, doctorId } = req.params;
+  const userId = req.user.id;
+
+  if (req.user.role !== "patient") {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can add favorite doctors",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or not associated with this user",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const doctor = await Doctor.findById(doctorId);
+  if (!doctor) {
+    return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
+  }
+
+  const isDoctorInFavorites = child.favorite.includes(doctorId);
+  let message, notificationTitle, notificationMessage;
+
+  if (isDoctorInFavorites) {
+    child.favorite = child.favorite.filter(
+      (id) => id.toString() !== doctorId.toString()
+    );
+    message = "Doctor removed from favorites successfully";
+    notificationTitle = "Doctor Unfavorited";
+    notificationMessage = `Dr. ${doctor.firstName} removed from favorites.`;
+  } else {
+    child.favorite.push(doctorId);
+    message = "Doctor added to favorites successfully";
+    notificationTitle = "Doctor Favorited";
+    notificationMessage = `Dr. ${doctor.firstName} added to favorites.`;
+  }
+
+  await child.save();
+
+  await sendNotification(
+    userId,
+    childId,
+    doctorId,
+    notificationTitle,
+    notificationMessage,
+    "favorite",
+    "patient"
+  );
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    message: message,
+  });
+});
+
+// ✅ Remove a doctor from favorites with childId in the path (using toggle logic)
+const removeFavoriteDoctor = asyncWrapper(async (req, res, next) => {
+  const { childId, doctorId } = req.params;
+  const userId = req.user.id;
+
+  if (req.user.role !== "patient") {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can remove favorite doctors",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or not associated with this user",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const doctor = await Doctor.findById(doctorId);
+  if (!doctor) {
+    return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
+  }
+
+  const isDoctorInFavorites = child.favorite.includes(doctorId);
+  let message, notificationTitle, notificationMessage;
+
+  if (isDoctorInFavorites) {
+    child.favorite = child.favorite.filter(
+      (id) => id.toString() !== doctorId.toString()
+    );
+    message = "Doctor removed from favorites successfully";
+    notificationTitle = "Doctor Unfavorited";
+    notificationMessage = `Dr. ${doctor.firstName} removed from favorites.`;
+  } else {
+    child.favorite.push(doctorId);
+    message = "Doctor added to favorites successfully";
+    notificationTitle = "Doctor Favorited";
+    notificationMessage = `Dr. ${doctor.firstName} added to favorites.`;
+  }
+
+  await child.save();
+
+  await sendNotification(
+    userId,
+    childId,
+    doctorId,
+    notificationTitle,
+    notificationMessage,
+    "favorite",
+    "patient"
+  );
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    message: message,
+  });
+});
+
+// ✅ جلب الدكاترة المفضلين مع childId في الـ Path
+const getFavoriteDoctors = asyncWrapper(async (req, res, next) => {
+  const { childId } = req.params;
+  const userId = req.user.id;
+
+  if (req.user.role !== "patient") {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can view favorite doctors",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or not associated with this user",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const favoriteDoctorIds = child.favorite;
+  if (!favoriteDoctorIds || favoriteDoctorIds.length === 0) {
+    return next(
+      appError.create("No favorite doctors found", 404, httpStatusText.FAIL)
+    );
+  }
+
+  const doctors = await Doctor.find({
+    _id: { $in: favoriteDoctorIds },
+  }).select(
+    "firstName lastName phone availableTimes availableDays created_at address avatar specialise about rate"
+  );
+
+  if (!doctors.length) {
+    return next(
+      appError.create("No favorite doctors found", 404, httpStatusText.FAIL)
+    );
+  }
+
+  const currentDay = moment().format("dddd");
+  const today = moment().startOf("day").toDate();
+
+  const doctorsWithStatus = await Promise.all(
+    doctors.map(async (doctor) => {
+      const hasAvailableDays =
+        doctor.availableDays && doctor.availableDays.length > 0;
+      const hasAvailableTimes =
+        doctor.availableTimes && doctor.availableTimes.length > 0;
+
+      if (!hasAvailableDays || !hasAvailableTimes) {
+        return {
+          _id: doctor._id,
+          firstName: doctor.firstName,
+          lastName: doctor.lastName,
+          phone: doctor.phone,
+          availableTimes: doctor.availableTimes,
+          availableDays: doctor.availableDays,
+          created_at: doctor.created_at,
+          address: doctor.address,
+          avatar: doctor.avatar,
+          specialise: doctor.specialise,
+          about: doctor.about,
+          rate: doctor.rate,
+          status: "Closed",
+          isFavorite: true,
+        };
+      }
+
+      const isDayAvailable = doctor.availableDays.includes(currentDay);
+      if (!isDayAvailable) {
+        return {
+          _id: doctor._id,
+          firstName: doctor.firstName,
+          lastName: doctor.lastName,
+          phone: doctor.phone,
+          availableTimes: doctor.availableTimes,
+          availableDays: doctor.availableDays,
+          created_at: doctor.created_at,
+          address: doctor.address,
+          avatar: doctor.avatar,
+          specialise: doctor.specialise,
+          about: doctor.about,
+          rate: doctor.rate,
+          status: "Closed",
+          isFavorite: true,
+        };
+      }
+
+      const bookedAppointments = await Appointment.find({
+        doctorId: doctor._id,
+        date: today,
+      }).select("time");
+
+      const bookedTimes = bookedAppointments.map(
+        (appointment) => appointment.time
+      );
+
+      const hasAvailableTimeToday = doctor.availableTimes.some(
+        (time) => !bookedTimes.includes(time)
+      );
+
+      const status = hasAvailableTimeToday ? "Open" : "Closed";
+
+      return {
+        _id: doctor._id,
+        firstName: doctor.firstName,
+        lastName: doctor.lastName,
+        phone: doctor.phone,
+        availableTimes: doctor.availableTimes,
+        availableDays: doctor.availableDays,
+        created_at: doctor.created_at,
+        address: doctor.address,
+        avatar: doctor.avatar,
+        specialise: doctor.specialise,
+        about: doctor.about,
+        rate: doctor.rate,
+        status,
+        isFavorite: true,
+      };
+    })
+  );
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: doctorsWithStatus,
+  });
+});
+
+// ✅ جلب بيانات الدكتور (Profile)
+const getDoctorProfile = asyncWrapper(async (req, res, next) => {
+  const doctorId = req.user.id;
+
+  if (!doctorId) {
+    return next(
+      appError.create("User ID not found in token", 401, httpStatusText.FAIL)
+    );
+  }
+
+  if (req.user.role !== "doctor") {
+    return next(
+      appError.create(
+        "Unauthorized: Only doctors can view their profile",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const doctor = await Doctor.findById(doctorId).select("-password -token");
+
+  if (!doctor) {
+    return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
+  }
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: {
+      firstName: doctor.firstName,
+      lastName: doctor.lastName,
+      gender: doctor.gender,
+      phone: doctor.phone,
+      address: doctor.address,
+      email: doctor.email,
+      role: doctor.role,
+      avatar: doctor.avatar,
+      specialise: doctor.specialise,
+      about: doctor.about,
+      rate: doctor.rate,
+      availableDays: doctor.availableDays,
+      availableTimes: doctor.availableTimes,
+      created_at: doctor.created_at,
+    },
+  });
+});
+
+// ✅ Update doctor profile
+const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
+  const doctorId = req.user.id;
+  const {
+    firstName,
+    lastName,
+    email,
+    phone,
+    address,
+    specialise,
+    about,
+    rate,
+    availableDays,
+    availableTimes,
+  } = req.body;
+
+  if (req.user.role !== "doctor") {
+    return next(
+      appError.create(
+        "Unauthorized: Only doctors can update their profile",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const doctor = await Doctor.findById(doctorId);
+
+  if (!doctor) {
+    return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
+  }
+
+  const changes = [];
+  if (firstName && firstName !== doctor.firstName) {
+    changes.push(`name to ${firstName}`);
+    doctor.firstName = firstName;
+  }
+  if (lastName && lastName !== doctor.lastName) {
+    changes.push(`last name to ${lastName}`);
+    doctor.lastName = lastName;
+  }
+  if (email && email !== doctor.email) {
+    changes.push(`email to ${email}`);
+    doctor.email = email;
+  }
+  if (phone && phone !== doctor.phone) {
+    changes.push(`phone to ${phone}`);
+    doctor.phone = phone;
+  }
+  if (address && address !== doctor.address) {
+    changes.push(`address to ${address}`);
+    doctor.address = address;
+  }
+  if (specialise && specialise !== doctor.specialise) {
+    changes.push(`specialization to ${specialise}`);
+    doctor.specialise = specialise;
+  }
+  if (about && about !== doctor.about) {
+    changes.push(`about updated`);
+    doctor.about = about;
+  }
+  if (rate && rate !== doctor.rate) {
+    changes.push(`rate to ${rate}`);
+    doctor.rate = rate;
+  }
+  if (
+    availableDays &&
+    JSON.stringify(availableDays) !== JSON.stringify(doctor.availableDays)
+  ) {
+    changes.push(`available days updated`);
+    doctor.availableDays = availableDays;
+  }
+  if (
+    availableTimes &&
+    JSON.stringify(availableTimes) !== JSON.stringify(doctor.availableTimes)
+  ) {
+    changes.push(`available times updated`);
+    doctor.availableTimes = availableTimes;
+  }
+
+  await doctor.save();
+
+  if (changes.length > 0) {
+    await sendNotification(
+      doctorId,
+      null,
+      null,
+      "Profile Updated",
+      `Updated: ${changes.join(", ")}`,
+      "doctor",
+      "doctor"
+    );
+  }
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    message: "Doctor profile updated successfully",
+    data: {
+      firstName: doctor.firstName,
+      lastName: doctor.lastName,
+      gender: doctor.gender,
+      phone: doctor.phone,
+      address: doctor.address,
+      email: doctor.email,
+      role: doctor.role,
+      specialise: doctor.specialise,
+      about: doctor.about,
+      rate: doctor.rate,
+      availableDays: doctor.availableDays,
+      availableTimes: doctor.availableTimes,
+      avatar: doctor.avatar,
+      created_at: doctor.created_at,
+    },
+  });
+});
+
+// ✅ Delete doctor profile
+const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
+  const doctorId = req.user.id;
+
+  if (req.user.role !== "doctor") {
+    return next(
+      appError.create(
+        "Unauthorized: Only doctors can delete their profile",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const doctor = await Doctor.findById(doctorId);
+  if (!doctor) {
+    return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    await Appointment.deleteMany({ doctorId }, { session });
+
+    doctor.token = null;
+    doctor.fcmToken = null;
+    await doctor.save({ session });
+
+    const deleteResult = await Doctor.deleteOne({ _id: doctorId }, { session });
+    if (deleteResult.deletedCount === 0) {
+      throw new Error("Failed to delete doctor account");
+    }
+
+    await User.updateMany(
+      { favorite: doctorId },
+      { $pull: { favorite: doctorId } },
+      { session }
+    );
+
+    await session.commitTransaction();
+
+    await sendNotification(
+      doctorId,
+      null,
+      null,
+      "Account Deleted",
+      "Your account has been deleted.",
+      "doctor",
+      "doctor"
+    );
+
+    res.json({
+      status: httpStatusText.SUCCESS,
+      message: "Doctor account deleted successfully",
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    return next(
+      appError.create(
+        error.message || "Failed to delete doctor account",
+        500,
+        httpStatusText.ERROR
+      )
+    );
+  } finally {
+    session.endSession();
+  }
+});
+
+// ✅ Logout doctor
+const logoutDoctor = asyncWrapper(async (req, res, next) => {
+  const doctorId = req.user.id;
+
+  if (req.user.role !== "doctor") {
+    return next(
+      appError.create(
+        "Unauthorized: Only doctors can logout",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const doctor = await Doctor.findById(doctorId);
+  if (!doctor) {
+    return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
+  }
+
+  doctor.token = null;
+  doctor.fcmToken = null;
+  await doctor.save();
+
+  await sendNotification(
+    doctorId,
+    null,
+    null,
+    "Logged Out",
+    "You have logged out.",
+    "logout",
+    "doctor"
+  );
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    message: "Doctor logged out successfully",
+  });
+});
+
+// ✅ Update doctor availability
+const updateAvailability = asyncWrapper(async (req, res, next) => {
+  const doctorId = req.user.id;
+  const { availableDays, availableTimes } = req.body;
+
+  if (!availableDays || !availableTimes) {
+    return next(
+      appError.create(
+        "Available days and times are required",
+        400,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const doctor = await Doctor.findById(doctorId);
+  if (!doctor) {
+    return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
+  }
+
+  doctor.availableDays = availableDays;
+  doctor.availableTimes = availableTimes;
+  await doctor.save();
+
+  await sendNotification(
+    doctorId,
+    null,
+    null,
+    "Availability Updated",
+    "Your availability has been updated.",
+    "doctor",
+    "doctor"
+  );
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    message: "Availability updated successfully",
+    data: { availableDays, availableTimes },
+  });
+});
+
+// ✅ Get upcoming appointments
+const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
+  const doctorId = req.user.id;
+  const now = new Date();
+
+  if (req.user.role !== "doctor") {
+    return next(
+      appError.create(
+        "Unauthorized: Only doctors can view their appointments",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const appointments = await Appointment.find({
+    doctorId,
+    date: { $gte: now }, // التأكد من أن التاريخ في المستقبل
+  })
+    .populate("userId", "firstName lastName")
+    .populate("childId", "name");
+
+  if (!appointments.length) {
+    return next(
+      appError.create(
+        "No upcoming appointments found",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: appointments.map((appointment) => ({
+      _id: appointment._id,
+      user: {
+        firstName: appointment.userId?.firstName,
+        lastName: appointment.userId?.lastName,
+      },
+      child: {
+        name: appointment.childId?.name,
+      },
+      date: appointment.date,
+      time: appointment.time,
+      status: appointment.status,
+    })),
+  });
+});
+
+// ✅ Get child records (فقط النمو والتاريخ الطبي)
+const getChildRecords = asyncWrapper(async (req, res, next) => {
+  const { childId } = req.body;
+  const doctorId = req.user.id;
+
+  if (req.user.role !== "doctor") {
+    return next(
+      appError.create(
+        "Unauthorized: Only doctors can view child records",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const child = await Child.findById(childId);
+  if (!child) {
+    return next(appError.create("Child not found", 404, httpStatusText.FAIL));
+  }
+
+  // جلب بيانات النمو (Growth)
+  const growthRecords = await Growth.find({ childId }).select(
+    "weight height headCircumference date time notes notesImage ageInMonths createdAt updatedAt"
+  );
+
+  // جلب بيانات التاريخ الطبي (History)
+  const historyRecords = await History.find({ childId }).select(
+    "diagnosis disease treatment notes date time doctorName notesImage createdAt updatedAt"
+  );
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: {
+      growth: growthRecords,
+      history: historyRecords,
+    },
+  });
+});
+
+// ✅ Update appointment status
+const updateAppointmentStatus = asyncWrapper(async (req, res, next) => {
+  const { appointmentId } = req.params;
+  const { status } = req.body;
+  const doctorId = req.user.id;
+
+  if (!["Pending", "Accepted", "Closed"].includes(status)) {
+    return next(appError.create("Invalid status", 400, httpStatusText.FAIL));
+  }
+
+  if (req.user.role !== "doctor") {
+    return next(
+      appError.create(
+        "Unauthorized: Only doctors can update appointment status",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const appointment = await Appointment.findOne({
+    _id: appointmentId,
+    doctorId,
+  });
+  if (!appointment) {
+    return next(
+      appError.create("Appointment not found", 404, httpStatusText.FAIL)
+    );
+  }
+
+  appointment.status = status;
+  await appointment.save();
+
+  await sendNotification(
+    appointment.userId,
+    appointment.childId,
+    doctorId,
+    "Appointment Status Updated",
+    `Your appointment on ${appointment.date} is now ${status}.`,
+    "appointment",
+    "patient"
+  );
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    message: "Appointment status updated successfully",
+    data: appointment,
+  });
+});
+
+// ✅ Get user appointments
+const getUserAppointments = asyncWrapper(async (req, res, next) => {
+  const { childId } = req.params;
+  const userId = req.user.id;
+
+  const appointments = await Appointment.find({ childId, userId })
+    .populate("doctorId", "firstName lastName")
+    .populate("childId", "name");
+
+  if (!appointments.length) {
+    return next(
+      appError.create("No appointments found", 404, httpStatusText.FAIL)
+    );
+  }
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: appointments.map((appointment) => ({
+      _id: appointment._id,
+      doctor: {
+        firstName: appointment.doctorId?.firstName,
+        lastName: appointment.doctorId?.lastName,
+      },
+      child: {
+        name: appointment.childId?.name,
+      },
+      date: appointment.date,
+      time: appointment.time,
+      status: appointment.status,
+    })),
+  });
+});
+
+// ✅ Save FCM Token
+const saveFcmToken = asyncWrapper(async (req, res, next) => {
+  const { fcmToken } = req.body;
+  const doctorId = req.user.id;
+
+  if (!fcmToken) {
+    return next(
+      appError.create("FCM Token is required", 400, httpStatusText.FAIL)
+    );
+  }
+
+  if (req.user.role !== "doctor") {
+    return next(
+      appError.create(
+        "Unauthorized: Only doctors can save FCM Token",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const doctor = await Doctor.findById(doctorId);
+  if (!doctor) {
+    return next(appError.create("Doctor not found", 404, httpStatusText.FAIL));
+  }
+
+  if (doctor.fcmToken === fcmToken) {
+    return res.status(200).json({
+      status: httpStatusText.SUCCESS,
+      message: "FCM Token is already up to date",
+    });
+  }
+
+  await Doctor.updateMany(
+    { fcmToken, _id: { $ne: doctorId } },
+    { fcmToken: null }
+  );
+
+  doctor.fcmToken = fcmToken;
+  await doctor.save();
+
+  await sendNotification(
+    doctorId,
+    null,
+    null,
+    "FCM Token Updated",
+    "Notification settings updated.",
+    "doctor",
+    "doctor"
+  );
+
+  res.status(200).json({
+    status: httpStatusText.SUCCESS,
+    message: "FCM Token saved successfully",
+  });
+});
+
+module.exports = {
+  getAllDoctors,
+  getSingleDoctor,
+  bookAppointment,
+  rescheduleAppointment,
+  cancelAppointment,
+  addFavoriteDoctor,
+  removeFavoriteDoctor,
+  getFavoriteDoctors,
+  getDoctorProfile,
+  updateDoctorProfile,
+  deleteDoctorProfile,
+  logoutDoctor,
+  updateAvailability,
+  getUpcomingAppointments,
+  getChildRecords,
+  updateAppointmentStatus,
+  getUserAppointments,
+  saveFcmToken,
+};
+************************************
+
+
+const asyncWrapper = require("../middlewares/asyncWrapper");
+const User = require("../models/user.model");
+const Doctor = require("../models/doctor.model");
+const httpStatusText = require("../utils/httpStatusText");
+const appError = require("../utils/appError");
+const bcrypt = require("bcryptjs");
+const genrateJWT = require("../utils/genrate.JWT");
+const userRoles = require("../utils/userRoles");
+const mongoose = require("mongoose");
+const { sendNotification } = require("../controllers/notifications.controller");
+
+// Get all users
+const getAllUsers = asyncWrapper(async (req, res) => {
+  const users = await User.find({}, { __v: 0, password: false });
+  res.json({ status: httpStatusText.SUCCESS, data: { users } });
+});
+
+// جلب بيانات اليوزر (Profile)
+const getUserProfile = asyncWrapper(async (req, res, next) => {
+  const userId = req.user.id;
+  if (!userId) {
+    return next(
+      appError.create("User ID not found in token", 401, httpStatusText.FAIL)
+    );
+  }
+  if (req.user.role !== userRoles.PATIENT) {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can view their profile",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+  const user = await User.findById(userId).select("-password -token");
+  if (!user) {
+    return next(appError.create("User not found", 404, httpStatusText.FAIL));
+  }
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: {
+      firstName: user.firstName,
+      lastName: user.lastName,
+      gender: user.gender,
+      phone: user.phone,
+      address: user.address,
+      email: user.email,
+      role: user.role,
+      avatar: user.avatar,
+      favorite: user.favorite,
+      created_at: user.created_at,
+    },
+  });
+});
+
+// تعديل بيانات اليوزر (Profile)
+const updateUserProfile = asyncWrapper(async (req, res, next) => {
+  const userId = req.user.id;
+  const { firstName, lastName, email, phone, address } = req.body;
+  if (req.user.role !== userRoles.PATIENT) {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can update their profile",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+  const user = await User.findById(userId);
+  if (!user) {
+    return next(appError.create("User not found", 404, httpStatusText.FAIL));
+  }
+  const changes = [];
+  if (firstName && firstName !== user.firstName) {
+    changes.push(`name to ${firstName}`);
+    user.firstName = firstName;
+  }
+  if (lastName && lastName !== user.lastName) {
+    changes.push(`last name to ${lastName}`);
+    user.lastName = lastName;
+  }
+  if (email && email !== user.email) {
+    const existingUser = await User.findOne({ email });
+    if (existingUser && existingUser._id.toString() !== userId.toString()) {
+      return next(
+        appError.create("Email already exists", 400, httpStatusText.FAIL)
+      );
+    }
+    changes.push(`email to ${email}`);
+    user.email = email;
+  }
+  if (phone && phone !== user.phone) {
+    changes.push(`phone to ${phone}`);
+    user.phone = phone;
+  }
+  if (address && address !== user.address) {
+    changes.push(`address to ${address}`);
+    user.address = address;
+  }
+  await user.save();
+  if (changes.length > 0) {
+    await sendNotification(
+      userId,
+      null,
+      null,
+      "Profile Updated",
+      `Updated: ${changes.join(", ")}`,
+      "profile", // تحديث type ليطابق enum
+      "patient"
+    );
+  }
+  res.json({
+    status: httpStatusText.SUCCESS,
+    message: "Profile updated successfully",
+    data: {
+      firstName: user.firstName,
+      lastName: user.lastName,
+      gender: user.gender,
+      phone: user.phone,
+      address: user.address,
+      email: user.email,
+      role: user.role,
+      avatar: user.avatar,
+      favorite: user.favorite,
+      created_at: user.created_at,
+    },
+  });
+});
+
+// حذف الأكونت بتاع اليوزر
+const deleteUserProfile = asyncWrapper(async (req, res, next) => {
+  const userId = req.user.id;
+  const userEmail = req.user.email;
+  if (!userId) {
+    return next(
+      appError.create("User ID not found in token", 401, httpStatusText.FAIL)
+    );
+  }
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    return next(
+      appError.create("Invalid User ID in token", 400, httpStatusText.FAIL)
+    );
+  }
+  if (req.user.role !== userRoles.PATIENT) {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can delete their profile",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+  const user = await User.findById(userId);
+  if (!user) {
+    return next(appError.create("User not found", 404, httpStatusText.FAIL));
+  }
+  if (user.email !== userEmail) {
+    return next(
+      appError.create("Unauthorized: Email mismatch", 403, httpStatusText.FAIL)
+    );
+  }
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    user.token = null;
+    await user.save({ session });
+    const deleteResult = await User.deleteOne({ _id: userId }, { session });
+    if (deleteResult.deletedCount === 0) {
+      throw new Error("Failed to delete user account");
+    }
+    await sendNotification(
+      userId,
+      null,
+      null,
+      "Account Deleted",
+      "Your account has been deleted.",
+      "profile", // تحديث type ليطابق enum
+      "patient"
+    );
+    await session.commitTransaction();
+    res.json({
+      status: httpStatusText.SUCCESS,
+      message: "User account deleted successfully",
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    return next(
+      appError.create(
+        error.message || "Failed to delete user account",
+        500,
+        httpStatusText.ERROR
+      )
+    );
+  } finally {
+    session.endSession();
+  }
+});
+
+// تسجيل الخروج لليوزر
+const logoutUser = asyncWrapper(async (req, res, next) => {
+  const userId = req.user.id;
+  if (req.user.role !== userRoles.PATIENT) {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can logout",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+  const user = await User.findById(userId);
+  if (!user) {
+    return next(appError.create("User not found", 404, httpStatusText.FAIL));
+  }
+  user.token = null;
+  await user.save();
+  await sendNotification(
+    userId,
+    null,
+    null,
+    "Logged Out",
+    "You have logged out.",
+    "general", // تحديث type ليطابق enum
+    "patient"
+  );
+  res.json({
+    status: httpStatusText.SUCCESS,
+    message: "Logged out successfully",
+  });
+});
+
+// Register New User or Doctor
+const registerUser = asyncWrapper(async (req, res, next) => {
+  const {
+    firstName,
+    lastName,
+    gender,
+    phone,
+    address,
+    email,
+    password,
+    role,
+    specialise,
+    about,
+    rate,
+    availableDays,
+    availableTimes,
+  } = req.body;
+  const oldUser = await User.findOne({ email });
+  const oldDoctor = await Doctor.findOne({ email });
+  if (oldUser || oldDoctor) {
+    return next(
+      appError.create("Email already exists", 400, httpStatusText.FAIL)
+    );
+  }
+  const hashedPassword = await bcrypt.hash(password, 12);
+  if (role === userRoles.DOCTOR) {
+    const newDoctor = new Doctor({
+      firstName,
+      lastName,
+      gender,
+      phone,
+      address,
+      email,
+      password: hashedPassword,
+      role: userRoles.DOCTOR,
+      specialise,
+      about,
+      rate,
+      availableDays,
+      availableTimes,
+      avatar: req.file ? req.file.filename : "uploads/doctor.jpg",
+    });
+    const token = await genrateJWT(
+      { email: newDoctor.email, id: newDoctor._id, role: newDoctor.role },
+      "7d"
+    );
+    newDoctor.token = token;
+    await newDoctor.save();
+    const doctorData = {
+      _id: newDoctor._id,
+      firstName: newDoctor.firstName,
+      lastName: newDoctor.lastName,
+      gender: newDoctor.gender,
+      phone: newDoctor.phone,
+      address: newDoctor.address,
+      email: newDoctor.email,
+      role: newDoctor.role,
+      specialise: newDoctor.specialise,
+      about: newDoctor.about,
+      rate: newDoctor.rate,
+      availableDays: newDoctor.availableDays,
+      availableTimes: newDoctor.availableTimes,
+      avatar: newDoctor.avatar,
+      created_at: newDoctor.created_at,
+      token: newDoctor.token,
+    };
+    await sendNotification(
+      newDoctor._id,
+      null,
+      null,
+      "Account Created",
+      "Welcome! Your account has been created.",
+      "profile", // تحديث type ليطابق enum
+      "doctor"
+    );
+    res.status(201).json({
+      status: httpStatusText.SUCCESS,
+      message: "Doctor registered successfully",
+      data: { user: doctorData },
+    });
+  } else {
+    const newUser = new User({
+      firstName,
+      lastName,
+      gender,
+      phone,
+      address,
+      email,
+      password: hashedPassword,
+      role: userRoles.PATIENT,
+      avatar: req.file ? req.file.filename : "uploads/profile.jpg",
+    });
+    const token = await genrateJWT(
+      { email: newUser.email, id: newUser._id, role: newUser.role },
+      "7d"
+    );
+    newUser.token = token;
+    await newUser.save();
+    const userData = {
+      _id: newUser._id,
+      firstName: newUser.firstName,
+      lastName: newUser.lastName,
+      gender: newUser.gender,
+      phone: newUser.phone,
+      address: newUser.address,
+      email: newUser.email,
+      role: newUser.role,
+      avatar: newUser.avatar,
+      favorite: newUser.favorite,
+      created_at: newUser.created_at,
+      token: newUser.token,
+    };
+    await sendNotification(
+      newUser._id,
+      null,
+      null,
+      "Account Created",
+      "Welcome! Your account has been created.",
+      "profile", // تحديث type ليطابق enum
+      "patient"
+    );
+    res.status(201).json({
+      status: httpStatusText.SUCCESS,
+      message: "User registered successfully",
+      data: { user: userData },
+    });
+  }
+});
+
+// Login User or Doctor
+const loginUser = asyncWrapper(async (req, res, next) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return next(
+      appError.create("Email and Password are required", 400, httpStatusText.FAIL)
+    );
+  }
+  let user = await User.findOne({ email });
+  let role;
+  if (user) {
+    role = user.role;
+  } else {
+    user = await Doctor.findOne({ email });
+    if (user) {
+      role = user.role;
+    }
+  }
+  if (!user) {
+    return next(appError.create("User not found", 400, httpStatusText.FAIL));
+  }
+  const isPasswordCorrect = await bcrypt.compare(password, user.password);
+  if (isPasswordCorrect && user) {
+    const token = await genrateJWT(
+      { email: user.email, id: user._id, role: role },
+      "7d"
+    );
+    user.token = token;
+    await user.save();
+    await sendNotification(
+      user._id,
+      null,
+      null,
+      "Logged In",
+      "You have logged in successfully.",
+      "general", // تحديث type ليطابق enum
+      role === userRoles.DOCTOR ? "doctor" : "patient"
+    );
+    res.status(200).json({
+      status: httpStatusText.SUCCESS,
+      data: {
+        token: token,
+        role: role,
+      },
+    });
+  } else {
+    return next(
+      appError.create("Email or Password are incorrect", 500, httpStatusText.ERROR)
+    );
+  }
+});
+
+// Save FCM Token for user
+const saveFcmToken = asyncWrapper(async (req, res, next) => {
+  const { fcmToken } = req.body;
+  const userId = req.user.id;
+  if (!fcmToken) {
+    return next(
+      appError.create("FCM Token is required", 400, httpStatusText.FAIL)
+    );
+  }
+  if (req.user.role !== userRoles.PATIENT) {
+    return next(
+      appError.create(
+        "Unauthorized: Only patients can save FCM Token",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+  const user = await User.findById(userId);
+  if (!user) {
+    return next(appError.create("User not found", 404, httpStatusText.FAIL));
+}
+if (user.fcmToken === fcmToken) {
+return res.status(200).json({
+status: httpStatusText.SUCCESS,
+message: "FCM Token is already up to date",
+});
+}
+await User.updateMany({ fcmToken, _id: { $ne: userId } }, { fcmToken: null });
+user.fcmToken = fcmToken;
+await user.save();
+await sendNotification(
+userId,
+null,
+null,
+"FCM Token Updated",
+"Notification settings updated.",
+"profile", // تحديث type ليطابق enum
+"patient"
+);
+res.status(200).json({
+status: httpStatusText.SUCCESS,
+message: "FCM Token saved successfully",
+});
+});
+
+module.exports = {
+getAllUsers,
+registerUser,
+loginUser,
+getUserProfile,
+updateUserProfile,
+deleteUserProfile,
+logoutUser,
+saveFcmToken,
+};
+****************************
+وانت معاد كل اكواد الخاصة بالاشعارات
+واستخدم كذلك لوجيك الوقت
