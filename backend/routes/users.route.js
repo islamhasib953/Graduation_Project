@@ -209,16 +209,14 @@
 
 // module.exports = router;
 
+
+
 const express = require("express");
 const usersController = require("../controllers/users.controller");
 const verifyToken = require("../middlewares/virifyToken");
 const allowedTo = require("../middlewares/allowedTo");
 const userRoles = require("../utils/userRoles");
-const {
-  validateRegister,
-  validateLogin,
-} = require("../middlewares/validationschema");
-
+const { validateRegister, validateLogin } = require("../middlewares/validationschema");
 const multer = require("multer");
 const appError = require("../utils/appError");
 const fs = require("fs");
@@ -296,62 +294,7 @@ router.post(
   "/save-fcm-token",
   verifyToken,
   allowedTo(userRoles.PATIENT),
-  async (req, res, next) => {
-    const { fcmToken } = req.body;
-    const userId = req.user.id;
-
-    if (!fcmToken) {
-      return next(appError.create("FCM Token is required", 400, "fail"));
-    }
-
-    try {
-      const User = require("../models/user.model");
-      const user = await User.findById(userId);
-
-      if (!user) {
-        return next(appError.create("User not found", 404, "fail"));
-      }
-
-      // التحقق من تكرار fcmToken
-      if (user.fcmToken === fcmToken) {
-        return res.status(200).json({
-          status: "success",
-          message: "FCM Token is already up to date",
-        });
-      }
-
-      // تنظيف fcmToken من مستخدمين آخرين
-      await User.updateMany(
-        { fcmToken, _id: { $ne: userId } },
-        { fcmToken: null }
-      );
-
-      user.fcmToken = fcmToken;
-      await user.save();
-
-      // إرسال إشعار لتأكيد التحديث
-      const {
-        sendNotification,
-      } = require("../controllers/notifications.controller");
-      await sendNotification(
-        userId,
-        null,
-        null,
-        "FCM Token Updated",
-        "Your notification settings have been updated successfully.",
-        "profile",
-        "patient"
-      );
-
-      res.status(200).json({
-        status: "success",
-        message: "FCM Token saved successfully",
-      });
-    } catch (error) {
-      console.error("Error saving FCM Token:", error);
-      return next(appError.create("Server error", 500, "error"));
-    }
-  }
+  usersController.saveFcmToken
 );
 
 module.exports = router;

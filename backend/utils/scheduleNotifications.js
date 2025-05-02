@@ -328,7 +328,12 @@ const scheduleNotifications = () => {
       const currentDate = now.startOf("day").toDate();
       const notificationKey = `${currentDate.toISOString()}-${currentDay}-${currentTime}-medicine`;
 
+      console.log(
+        `Checking medicine notifications at ${currentTime} on ${currentDay}`
+      );
+
       if (sentNotifications.has(notificationKey)) {
+        console.log(`Notification already sent for ${notificationKey}`);
         return;
       }
 
@@ -337,24 +342,40 @@ const scheduleNotifications = () => {
         times: currentTime,
       }).populate("childId");
 
+      if (medicines.length === 0) {
+        console.log("No medicines found for this time and day.");
+        return;
+      }
+
       for (const medicine of medicines) {
         const userId = medicine.userId;
         const childId = medicine.childId._id;
         const childName = medicine.childId.name;
 
-        await sendNotification(
-          userId,
-          childId,
-          null,
-          `Medicine Reminder for ${childName}`,
-          `It's time to give ${childName} the medicine: ${medicine.name}.`,
-          "medicine",
-          "patient" // تغيير من "user" إلى "patient"
-        );
+        try {
+          await sendNotification(
+            userId,
+            childId,
+            null,
+            `Medicine Reminder for ${childName}`,
+            `It's time to give ${childName} the medicine: ${medicine.name}.`,
+            "medicine",
+            "patient"
+          );
+          console.log(
+            `Medicine reminder sent successfully for ${childName} at ${currentTime}: ${medicine.name}`
+          );
+        } catch (error) {
+          console.error(
+            `Failed to send medicine reminder for ${childName}: ${medicine.name}`,
+            error
+          );
+        }
       }
 
       if (medicines.length > 0) {
         sentNotifications.add(notificationKey);
+        console.log(`Added notification key: ${notificationKey}`);
       }
 
       const yesterday = moment().subtract(1, "day").startOf("day").toDate();
@@ -362,6 +383,7 @@ const scheduleNotifications = () => {
         const keyDate = new Date(key.split("-")[0]);
         if (keyDate < yesterday) {
           sentNotifications.delete(key);
+          console.log(`Removed old notification key: ${key}`);
         }
       }
     } catch (error) {
@@ -369,7 +391,7 @@ const scheduleNotifications = () => {
     }
   });
 
-  // إشعارات التطعيمات: تذكير يومي في الوقت المحدد
+  // إشعارات التطعيمات: تذكير يومي في الوقت المحدد (الساعة 8:00 صباحًا)
   cron.schedule("0 8 * * *", async () => {
     try {
       const now = moment();
@@ -398,7 +420,7 @@ const scheduleNotifications = () => {
           `Vaccination Reminder for ${childName}`,
           `Today is the due date for ${childName}'s ${vaccineDisease} vaccination.`,
           "vaccination",
-          "patient" // تغيير من "user" إلى "patient"
+          "patient"
         );
       }
 
@@ -410,7 +432,7 @@ const scheduleNotifications = () => {
     }
   });
 
-  // تذكير قبل يوم من التطعيم
+  // تذكير قبل يوم من التطعيم (الساعة 8:00 صباحًا)
   cron.schedule("0 8 * * *", async () => {
     try {
       const tomorrow = moment().add(1, "day").startOf("day").toDate();
@@ -441,7 +463,7 @@ const scheduleNotifications = () => {
           `Vaccination Reminder for ${childName}`,
           `Reminder: ${childName}'s ${vaccineDisease} vaccination is due tomorrow.`,
           "vaccination",
-          "patient" // تغيير من "user" إلى "patient"
+          "patient"
         );
       }
 
@@ -453,18 +475,21 @@ const scheduleNotifications = () => {
     }
   });
 
-  // تنبيه التأخير في التطعيمات
-  cron.schedule("0 9 * * *", async () => {
+  // تذكير جديد: إشعار قبل يوم من التطعيم للطفل المستخدم حاليًا (الساعة 8:00 صباحًا)
+  cron.schedule("0 8 * * *", async () => {
     try {
-      const today = moment().startOf("day").toDate();
-      const notificationKey = `${today.toISOString()}-vaccination-delayed`;
+      const tomorrow = moment().add(1, "day").startOf("day").toDate();
+      const notificationKey = `${moment()
+        .startOf("day")
+        .toDate()
+        .toISOString()}-vaccination-user-reminder`;
 
       if (sentNotifications.has(notificationKey)) {
         return;
       }
 
       const vaccinations = await UserVaccination.find({
-        dueDate: { $lt: today },
+        dueDate: tomorrow,
         status: "Pending",
       }).populate("childId vaccineInfoId");
 
@@ -474,14 +499,61 @@ const scheduleNotifications = () => {
         const childName = vaccination.childId.name;
         const vaccineDisease = vaccination.vaccineInfoId.disease;
 
+        // إرسال إشعار للمستخدم (الوالد) مع اسم الطفل
+        await sendNotification(
+          userId,
+          childId,
+          null,
+          `Vaccination Reminder for ${childName}`,
+          `Reminder: Tomorrow is the due date for ${childName}'s ${vaccineDisease} vaccination.`,
+          "vaccination",
+          "patient"
+        );
+      }
+
+      if (vaccinations.length > 0) {
+        sentNotifications.add(notificationKey);
+      }
+    } catch (error) {
+      console.error("Error in vaccination user reminder cron job:", error);
+    }
+  });
+
+  // تنبيه التأخير في التطعيمات (الساعة 9:00 صباحًا) - يستمر لمدة أسبوع
+  cron.schedule("0 9 * * *", async () => {
+    try {
+      const today = moment().startOf("day").toDate();
+      const oneWeekAgo = moment().subtract(7, "days").startOf("day").toDate();
+      const notificationKey = `${today.toISOString()}-vaccination-delayed`;
+
+      if (sentNotifications.has(notificationKey)) {
+        return;
+      }
+
+      // البحث عن التطعيمات المتأخرة (التي مر عليها أقل من أسبوع)
+      const vaccinations = await UserVaccination.find({
+        dueDate: { $lt: today, $gte: oneWeekAgo }, // التطعيمات المتأخرة خلال الأسبوع الماضي
+        status: "Pending",
+      }).populate("childId vaccineInfoId");
+
+      for (const vaccination of vaccinations) {
+        const userId = vaccination.childId.parentId;
+        const childId = vaccination.childId._id;
+        const childName = vaccination.childId.name;
+        const vaccineDisease = vaccination.vaccineInfoId.disease;
+        const daysLate = moment(today).diff(
+          moment(vaccination.dueDate),
+          "days"
+        );
+
         await sendNotification(
           userId,
           childId,
           null,
           `Delayed Vaccination for ${childName}`,
-          `${childName}'s ${vaccineDisease} vaccination is overdue. Please schedule it soon.`,
+          `${childName}'s ${vaccineDisease} vaccination is overdue by ${daysLate} day(s). Please schedule it soon.`,
           "vaccination",
-          "patient" // تغيير من "user" إلى "patient"
+          "patient"
         );
       }
 
@@ -493,7 +565,53 @@ const scheduleNotifications = () => {
     }
   });
 
-  // إشعارات النمو
+  // تنبيه التأخير بعد أسبوع (الساعة 9:00 صباحًا) - تحديث الحالة إلى Missed
+  cron.schedule("0 9 * * *", async () => {
+    try {
+      const today = moment().startOf("day").toDate();
+      const oneWeekAgo = moment().subtract(7, "days").startOf("day").toDate();
+      const notificationKey = `${today.toISOString()}-vaccination-missed`;
+
+      if (sentNotifications.has(notificationKey)) {
+        return;
+      }
+
+      // البحث عن التطعيمات المتأخرة بأكثر من أسبوع
+      const vaccinations = await UserVaccination.find({
+        dueDate: { $lt: oneWeekAgo },
+        status: "Pending",
+      }).populate("childId vaccineInfoId");
+
+      for (const vaccination of vaccinations) {
+        const userId = vaccination.childId.parentId;
+        const childId = vaccination.childId._id;
+        const childName = vaccination.childId.name;
+        const vaccineDisease = vaccination.vaccineInfoId.disease;
+
+        // تحديث الحالة إلى Missed
+        vaccination.status = "Missed";
+        await vaccination.save();
+
+        await sendNotification(
+          userId,
+          childId,
+          null,
+          `Missed Vaccination for ${childName}`,
+          `${childName}'s ${vaccineDisease} vaccination was missed. Please consult your doctor.`,
+          "vaccination",
+          "patient"
+        );
+      }
+
+      if (vaccinations.length > 0) {
+        sentNotifications.add(notificationKey);
+      }
+    } catch (error) {
+      console.error("Error in missed vaccination cron job:", error);
+    }
+  });
+
+  // إشعارات النمو (الساعة 10:00 صباحًا)
   cron.schedule("0 10 * * *", async () => {
     try {
       const today = moment().startOf("day").toDate();
@@ -520,7 +638,7 @@ const scheduleNotifications = () => {
           `Growth Update for ${childName}`,
           `A new growth record for ${childName} has been added: Height: ${record.height}, Weight: ${record.weight}.`,
           "growth",
-          "patient" // تغيير من "user" إلى "patient"
+          "patient"
         );
 
         const standardHeight = record.ageInMonths * 2 + 50;
@@ -534,7 +652,7 @@ const scheduleNotifications = () => {
             `Growth Alert for ${childName}`,
             `The height of ${childName} (${record.height} cm) deviates significantly from the expected value (${standardHeight} cm) for their age.`,
             "growth_alert",
-            "patient" // تغيير من "user" إلى "patient"
+            "patient"
           );
         }
       }
@@ -543,11 +661,11 @@ const scheduleNotifications = () => {
         sentNotifications.add(notificationKey);
       }
     } catch (error) {
-      console.error("Error in growth notification cron job:", error);
+      console.error(" discord in growth notification cron job:", error);
     }
   });
 
-  // تذكير المواعيد قبل يوم
+  // تذكير المواعيد قبل يوم (الساعة 8:00 صباحًا)
   cron.schedule("0 8 * * *", async () => {
     try {
       const tomorrow = moment().add(1, "day").startOf("day").toDate();
@@ -570,7 +688,6 @@ const scheduleNotifications = () => {
         const childId = appointment.childId._id;
         const childName = appointment.childId.name;
 
-        // إرسال الإشعار للمستخدم (الوالد)
         await sendNotification(
           userId,
           childId,
@@ -578,10 +695,9 @@ const scheduleNotifications = () => {
           `Appointment Reminder for ${childName}`,
           `Reminder: You have an appointment for ${childName} tomorrow at ${appointment.time}.`,
           "appointment_reminder",
-          "patient" // تغيير من "user" إلى "patient"
+          "patient"
         );
 
-        // إرسال الإشعار للطبيب (إذا كان هناك doctorId)
         if (appointment.doctorId) {
           await sendNotification(
             null,
@@ -601,6 +717,13 @@ const scheduleNotifications = () => {
     } catch (error) {
       console.error("Error in appointment reminder cron job:", error);
     }
+  });
+
+  // تنظيف الإشعارات القديمة (كل يوم في منتصف الليل)
+  cron.schedule("0 0 * * *", async () => {
+    const oneMonthAgo = moment().subtract(1, "month").toDate();
+    await Notification.deleteMany({ createdAt: { $lt: oneMonthAgo } });
+    console.log("Old notifications deleted (older than 1 month)");
   });
 };
 
