@@ -10,7 +10,7 @@ const notificationSchema = new mongoose.Schema(
     childId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Child",
-      required: true, // جعلته إجباريًا
+      required: false,
     },
     doctorId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -21,7 +21,7 @@ const notificationSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    body: {
+    message: {
       type: String,
       required: true,
     },
@@ -32,22 +32,24 @@ const notificationSchema = new mongoose.Schema(
         "vaccination",
         "growth",
         "growth_alert",
+        "appointment",
         "appointment_reminder",
-        "child",
-        "doctor",
         "favorite",
         "general",
+        "profile",
+        "logout",
+        "doctor",
       ],
       required: true,
     },
-    target: {
+    recipientId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: false, // اختياري للتوافق مع الإشعارات القديمة
+    },
+    recipientType: {
       type: String,
       enum: ["patient", "doctor"],
-      required: true,
-    },
-    isRead: {
-      type: Boolean,
-      default: false,
+      required: false, // اختياري للتوافق مع الإشعارات القديمة
     },
   },
   { timestamps: true }

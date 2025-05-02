@@ -7,6 +7,7 @@ const appError = require("../utils/appError");
 const userRoles = require("../utils/userRoles");
 const { sendPushNotification } = require("../config/firebase-config");
 
+// إرسال إشعار
 const sendNotification = async (
   userId,
   childId,
@@ -20,6 +21,7 @@ const sendNotification = async (
     let fcmToken = null;
     let recipientId = null;
     let role = null;
+    let recipientType = null;
 
     if (userId && target === "patient") {
       const user = await User.findById(userId).select("fcmToken");
@@ -27,6 +29,7 @@ const sendNotification = async (
         fcmToken = user.fcmToken;
         recipientId = userId;
         role = userRoles.PATIENT;
+        recipientType = "patient";
       }
     } else if (doctorId && target === "doctor") {
       const doctor = await Doctor.findById(doctorId).select("fcmToken");
@@ -34,6 +37,7 @@ const sendNotification = async (
         fcmToken = doctor.fcmToken;
         recipientId = doctorId;
         role = userRoles.DOCTOR;
+        recipientType = "doctor";
       }
     }
 
@@ -59,6 +63,7 @@ const sendNotification = async (
       return;
     }
 
+    // إنشاء الإشعار مع دعم الحقول الجديدة (recipientId وrecipientType)
     const notification = new Notification({
       userId: role === userRoles.PATIENT ? recipientId : null,
       childId: childId || null,
@@ -67,6 +72,8 @@ const sendNotification = async (
       body,
       type,
       target,
+      recipientId,
+      recipientType,
       isRead: false,
     });
 
@@ -103,12 +110,23 @@ const getUserNotifications = asyncWrapper(async (req, res, next) => {
   }
 
   const notifications = await Notification.find({
-    userId,
-    childId,
-    target: "patient",
+    $or: [
+      { userId, target: "patient" },
+      { recipientId: userId, recipientType: "patient" },
+    ],
+    $or: [{ childId }, { childId: null }],
   })
     .sort({ createdAt: -1 })
-    .select("title body type target isRead createdAt");
+    .select("title body type target isRead createdAt")
+    .populate("childId", "name")
+    .populate("userId", "firstName lastName")
+    .populate("doctorId", "firstName lastName");
+
+  if (!notifications.length) {
+    return next(
+      appError.create("No notifications found", 404, httpStatusText.FAIL)
+    );
+  }
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -131,11 +149,22 @@ const getDoctorNotifications = asyncWrapper(async (req, res, next) => {
   }
 
   const notifications = await Notification.find({
-    doctorId,
-    target: "doctor",
+    $or: [
+      { doctorId, target: "doctor" },
+      { recipientId: doctorId, recipientType: "doctor" },
+    ],
   })
     .sort({ createdAt: -1 })
-    .select("title body type target isRead createdAt childId");
+    .select("title body type target isRead createdAt childId")
+    .populate("childId", "name")
+    .populate("userId", "firstName lastName")
+    .populate("doctorId", "firstName lastName");
+
+  if (!notifications.length) {
+    return next(
+      appError.create("No notifications found", 404, httpStatusText.FAIL)
+    );
+  }
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -143,6 +172,7 @@ const getDoctorNotifications = asyncWrapper(async (req, res, next) => {
   });
 });
 
+// وضع علامة على الإشعار كمقروء
 const markAsRead = asyncWrapper(async (req, res, next) => {
   const { notificationId } = req.params;
   const userId = req.user.id;
@@ -157,8 +187,10 @@ const markAsRead = asyncWrapper(async (req, res, next) => {
 
   if (
     (role === userRoles.PATIENT &&
+      notification.recipientId?.toString() !== userId.toString() &&
       notification.userId?.toString() !== userId.toString()) ||
     (role === userRoles.DOCTOR &&
+      notification.recipientId?.toString() !== userId.toString() &&
       notification.doctorId?.toString() !== userId.toString())
   ) {
     return next(

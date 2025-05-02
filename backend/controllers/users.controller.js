@@ -614,6 +614,7 @@ const getUserProfile = asyncWrapper(async (req, res, next) => {
 const updateUserProfile = asyncWrapper(async (req, res, next) => {
   const userId = req.user.id;
   const { firstName, lastName, email, phone, address } = req.body;
+
   if (req.user.role !== userRoles.PATIENT) {
     return next(
       appError.create(
@@ -623,10 +624,12 @@ const updateUserProfile = asyncWrapper(async (req, res, next) => {
       )
     );
   }
+
   const user = await User.findById(userId);
   if (!user) {
     return next(appError.create("User not found", 404, httpStatusText.FAIL));
   }
+
   const changes = [];
   if (firstName && firstName !== user.firstName) {
     changes.push(`name to ${firstName}`);
@@ -654,18 +657,26 @@ const updateUserProfile = asyncWrapper(async (req, res, next) => {
     changes.push(`address to ${address}`);
     user.address = address;
   }
+
   await user.save();
+
   if (changes.length > 0) {
-    await sendNotification(
-      userId,
-      null,
-      null,
-      "Profile Updated",
-      `Updated: ${changes.join(", ")}`,
-      "profile", // تحديث type ليطابق enum
-      "patient"
-    );
+    try {
+      await sendNotification(
+        userId,
+        null,
+        null,
+        "Profile Updated",
+        `Updated: ${changes.join(", ")}`,
+        "profile",
+        "patient"
+      );
+      console.log(`Notification sent for profile update: ${changes.join(", ")}`);
+    } catch (error) {
+      console.error(`Failed to send profile update notification: ${error.message}`);
+    }
   }
+
   res.json({
     status: httpStatusText.SUCCESS,
     message: "Profile updated successfully",
