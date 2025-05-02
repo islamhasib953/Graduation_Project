@@ -313,9 +313,9 @@ const UserVaccination = require("../models/UserVaccination.model");
 const Growth = require("../models/growth.model");
 const Appointment = require("../models/appointment.model");
 const Child = require("../models/child.model");
+const Notification = require("../models/notification.model"); // افتراض أن هناك نموذج للإشعارات
 const { sendNotification } = require("../controllers/notifications.controller");
 
-// تخزين مؤقت للأيام والأوقات التي تم إرسال الإشعارات لها
 const sentNotifications = new Set();
 
 const scheduleNotifications = () => {
@@ -326,56 +326,67 @@ const scheduleNotifications = () => {
       const currentDay = now.format("dddd");
       const currentTime = now.format("h:mm A");
       const currentDate = now.startOf("day").toDate();
-      const notificationKey = `${currentDate.toISOString()}-${currentDay}-${currentTime}-medicine`;
 
       console.log(
         `Checking medicine notifications at ${currentTime} on ${currentDay}`
       );
 
-      if (sentNotifications.has(notificationKey)) {
-        console.log(`Notification already sent for ${notificationKey}`);
-        return;
-      }
-
       const medicines = await Medicine.find({
         days: currentDay,
-        times: currentTime,
       }).populate("childId");
 
       if (medicines.length === 0) {
-        console.log("No medicines found for this time and day.");
+        console.log("No medicines found for this day.");
         return;
       }
+
+      const currentMoment = moment(now.format("h:mm A"), "h:mm A");
 
       for (const medicine of medicines) {
         const userId = medicine.userId;
         const childId = medicine.childId._id;
         const childName = medicine.childId.name;
 
-        try {
-          await sendNotification(
-            userId,
-            childId,
-            null,
-            `Medicine Reminder for ${childName}`,
-            `It's time to give ${childName} the medicine: ${medicine.name}.`,
-            "medicine",
-            "patient"
-          );
-          console.log(
-            `Medicine reminder sent successfully for ${childName} at ${currentTime}: ${medicine.name}`
-          );
-        } catch (error) {
-          console.error(
-            `Failed to send medicine reminder for ${childName}: ${medicine.name}`,
-            error
-          );
-        }
-      }
+        for (const time of medicine.times) {
+          const notificationKey = `${currentDate.toISOString()}-${currentDay}-${
+            medicine._id
+          }-${time}-medicine`;
 
-      if (medicines.length > 0) {
-        sentNotifications.add(notificationKey);
-        console.log(`Added notification key: ${notificationKey}`);
+          if (sentNotifications.has(notificationKey)) {
+            console.log(`Notification already sent for ${notificationKey}`);
+            continue;
+          }
+
+          const medicineTime = moment(time, "h:mm A");
+          const timeDiffMinutes = Math.abs(
+            currentMoment.diff(medicineTime, "minutes")
+          );
+
+          if (timeDiffMinutes <= 5) {
+            try {
+              await sendNotification(
+                userId,
+                childId,
+                null,
+                `Medicine Reminder for ${childName}`,
+                `It's time to give ${childName} the medicine: ${medicine.name}.`,
+                "medicine",
+                "patient"
+              );
+              console.log(
+                `Medicine reminder sent successfully for ${childName} at ${currentTime}: ${medicine.name}`
+              );
+
+              sentNotifications.add(notificationKey);
+              console.log(`Added notification key: ${notificationKey}`);
+            } catch (error) {
+              console.error(
+                `Failed to send medicine reminder for ${childName}: ${medicine.name}`,
+                error
+              );
+            }
+          }
+        }
       }
 
       const yesterday = moment().subtract(1, "day").startOf("day").toDate();
@@ -499,7 +510,6 @@ const scheduleNotifications = () => {
         const childName = vaccination.childId.name;
         const vaccineDisease = vaccination.vaccineInfoId.disease;
 
-        // إرسال إشعار للمستخدم (الوالد) مع اسم الطفل
         await sendNotification(
           userId,
           childId,
@@ -530,9 +540,8 @@ const scheduleNotifications = () => {
         return;
       }
 
-      // البحث عن التطعيمات المتأخرة (التي مر عليها أقل من أسبوع)
       const vaccinations = await UserVaccination.find({
-        dueDate: { $lt: today, $gte: oneWeekAgo }, // التطعيمات المتأخرة خلال الأسبوع الماضي
+        dueDate: { $lt: today, $gte: oneWeekAgo },
         status: "Pending",
       }).populate("childId vaccineInfoId");
 
@@ -576,7 +585,6 @@ const scheduleNotifications = () => {
         return;
       }
 
-      // البحث عن التطعيمات المتأخرة بأكثر من أسبوع
       const vaccinations = await UserVaccination.find({
         dueDate: { $lt: oneWeekAgo },
         status: "Pending",
@@ -588,7 +596,6 @@ const scheduleNotifications = () => {
         const childName = vaccination.childId.name;
         const vaccineDisease = vaccination.vaccineInfoId.disease;
 
-        // تحديث الحالة إلى Missed
         vaccination.status = "Missed";
         await vaccination.save();
 
@@ -661,7 +668,7 @@ const scheduleNotifications = () => {
         sentNotifications.add(notificationKey);
       }
     } catch (error) {
-      console.error(" discord in growth notification cron job:", error);
+      console.error("Error in growth notification cron job:", error);
     }
   });
 

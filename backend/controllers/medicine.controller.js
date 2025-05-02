@@ -470,8 +470,15 @@ const { sendNotification } = require("../controllers/notifications.controller");
 // ✅ Create a new medicine for a specific child
 const createMedicine = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
-  const userId = req.user?.id; // جعل userId اختياريًا (بناءً على التعديلات السابقة)
+  const userId = req.user?.id;
   const { name, description, days, times } = req.body;
+
+  // التحقق من وجود userId
+  if (!userId) {
+    return next(
+      appError.create("User not authenticated", 401, httpStatusText.FAIL)
+    );
+  }
 
   if (!name || !days || !times) {
     return next(
@@ -505,24 +512,25 @@ const createMedicine = asyncWrapper(async (req, res, next) => {
 
   await newMedicine.save();
 
-  // إرسال إشعار مختصر إذا كان userId موجودًا
-  if (userId) {
-    try {
-      await sendNotification(
-        userId,
-        childId,
-        null,
-        "Medicine Added",
-        `${child.name}: ${name} added.`,
-        "medicine",
-        "patient"
-      );
-      console.log(`Notification sent for new medicine: ${name} for child: ${child.name}`);
-    } catch (error) {
-      console.error(`Failed to send notification for new medicine: ${name}`, error);
-    }
-  } else {
-    console.warn("No userId found, skipping notification for new medicine.");
+  // إرسال إشعار
+  try {
+    await sendNotification(
+      userId,
+      childId,
+      null,
+      "Medicine Added",
+      `${child.name}: ${name} added.`,
+      "medicine",
+      "patient"
+    );
+    console.log(
+      `Notification sent for new medicine: ${name} for child: ${child.name}`
+    );
+  } catch (error) {
+    console.error(
+      `Failed to send notification for new medicine: ${name}`,
+      error
+    );
   }
 
   res.status(201).json({
@@ -656,15 +664,25 @@ const updateMedicine = asyncWrapper(async (req, res, next) => {
   }
 
   // إرسال إشعار مختصر
-  await sendNotification(
-    userId,
-    childId,
-    null,
-    "Medicine Updated",
-    `${child.name}: ${updatedMedicine.name} updated.`,
-    "medicine",
-    "patient" // تغيير من "user" إلى "patient"
-  );
+  try {
+    await sendNotification(
+      userId,
+      childId,
+      null,
+      "Medicine Updated",
+      `${child.name}: ${updatedMedicine.name} updated.`,
+      "medicine",
+      "patient"
+    );
+    console.log(
+      `Notification sent for updated medicine: ${updatedMedicine.name} for child: ${child.name}`
+    );
+  } catch (error) {
+    console.error(
+      `Failed to send notification for updated medicine: ${updatedMedicine.name}`,
+      error
+    );
+  }
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -708,15 +726,25 @@ const deleteMedicine = asyncWrapper(async (req, res, next) => {
   }
 
   // إرسال إشعار مختصر
-  await sendNotification(
-    userId,
-    childId,
-    null,
-    "Medicine Removed",
-    `${child.name}: ${deletedMedicine.name} removed.`,
-    "medicine",
-    "patient" // تغيير من "user" إلى "patient"
-  );
+  try {
+    await sendNotification(
+      userId,
+      childId,
+      null,
+      "Medicine Removed",
+      `${child.name}: ${deletedMedicine.name} removed.`,
+      "medicine",
+      "patient"
+    );
+    console.log(
+      `Notification sent for deleted medicine: ${deletedMedicine.name} for child: ${child.name}`
+    );
+  } catch (error) {
+    console.error(
+      `Failed to send notification for deleted medicine: ${deletedMedicine.name}`,
+      error
+    );
+  }
 
   res.json({
     status: httpStatusText.SUCCESS,
