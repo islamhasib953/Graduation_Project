@@ -264,7 +264,6 @@
 //   filterHistory,
 // };
 
-
 const History = require("../models/history.model");
 const Child = require("../models/child.model");
 const asyncWrapper = require("../middlewares/asyncWrapper");
@@ -275,7 +274,7 @@ const { sendNotification } = require("../controllers/notifications.controller");
 // ✅ Create a new history record
 const createHistory = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
-  const userId = req.user.id;
+  const userId = req.user?.id; // جعل userId اختياريًا
   const {
     diagnosis,
     disease,
@@ -297,15 +296,10 @@ const createHistory = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  const child = await Child.findOne({ _id: childId, parentId: userId });
+  // التحقق من وجود الطفل فقط (بدون التحقق من parentId)
+  const child = await Child.findById(childId);
   if (!child) {
-    return next(
-      appError.create(
-        "Child not found or you are not authorized",
-        404,
-        httpStatusText.FAIL
-      )
-    );
+    return next(appError.create("Child not found", 404, httpStatusText.FAIL));
   }
 
   const newHistory = new History({
@@ -322,16 +316,18 @@ const createHistory = asyncWrapper(async (req, res, next) => {
 
   await newHistory.save();
 
-  // إرسال إشعار مختصر
-  await sendNotification(
-    userId,
-    childId,
-    null,
-    "History Added",
-    `${child.name}: ${disease} added.`,
-    "history",
-    "patient" // تغيير من "user" إلى "patient"
-  );
+  // إرسال الإشعار فقط إذا كان userId موجودًا
+  if (userId) {
+    await sendNotification(
+      userId,
+      childId,
+      null,
+      "History Added",
+      `${child.name}: ${disease} added.`,
+      "history",
+      "patient"
+    );
+  }
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -352,17 +348,11 @@ const createHistory = asyncWrapper(async (req, res, next) => {
 // ✅ Get all history records for a specific child
 const getAllHistory = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
-  const userId = req.user.id;
 
-  const child = await Child.findOne({ _id: childId, parentId: userId });
+  // التحقق من وجود الطفل فقط (بدون التحقق من parentId)
+  const child = await Child.findById(childId);
   if (!child) {
-    return next(
-      appError.create(
-        "Child not found or you are not authorized",
-        404,
-        httpStatusText.FAIL
-      )
-    );
+    return next(appError.create("Child not found", 404, httpStatusText.FAIL));
   }
 
   const history = await History.find({ childId }).select(
@@ -398,17 +388,11 @@ const getAllHistory = asyncWrapper(async (req, res, next) => {
 // ✅ Get a single history record for a specific child
 const getSingleHistory = asyncWrapper(async (req, res, next) => {
   const { childId, historyId } = req.params;
-  const userId = req.user.id;
 
-  const child = await Child.findOne({ _id: childId, parentId: userId });
+  // التحقق من وجود الطفل فقط (بدون التحقق من parentId)
+  const child = await Child.findById(childId);
   if (!child) {
-    return next(
-      appError.create(
-        "Child not found or you are not authorized",
-        404,
-        httpStatusText.FAIL
-      )
-    );
+    return next(appError.create("Child not found", 404, httpStatusText.FAIL));
   }
 
   const history = await History.findOne({ _id: historyId, childId }).select(
@@ -440,7 +424,7 @@ const getSingleHistory = asyncWrapper(async (req, res, next) => {
 // ✅ Update a history record
 const updateHistory = asyncWrapper(async (req, res, next) => {
   const { childId, historyId } = req.params;
-  const userId = req.user.id;
+  const userId = req.user?.id; // جعل userId اختياريًا
   const {
     diagnosis,
     disease,
@@ -452,15 +436,10 @@ const updateHistory = asyncWrapper(async (req, res, next) => {
     doctorName,
   } = req.body;
 
-  const child = await Child.findOne({ _id: childId, parentId: userId });
+  // التحقق من وجود الطفل فقط (بدون التحقق من parentId)
+  const child = await Child.findById(childId);
   if (!child) {
-    return next(
-      appError.create(
-        "Child not found or you are not authorized",
-        404,
-        httpStatusText.FAIL
-      )
-    );
+    return next(appError.create("Child not found", 404, httpStatusText.FAIL));
   }
 
   const updatedHistory = await History.findOneAndUpdate(
@@ -484,16 +463,18 @@ const updateHistory = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // إرسال إشعار مختصر
-  await sendNotification(
-    userId,
-    childId,
-    null,
-    "History Updated",
-    `${child.name}: ${updatedHistory.disease} updated.`,
-    "history",
-    "patient" // تغيير من "user" إلى "patient"
-  );
+  // إرسال الإشعار فقط إذا كان userId موجودًا
+  if (userId) {
+    await sendNotification(
+      userId,
+      childId,
+      null,
+      "History Updated",
+      `${child.name}: ${updatedHistory.disease} updated.`,
+      "history",
+      "patient"
+    );
+  }
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -516,17 +497,12 @@ const updateHistory = asyncWrapper(async (req, res, next) => {
 // ✅ Delete a history record
 const deleteHistory = asyncWrapper(async (req, res, next) => {
   const { childId, historyId } = req.params;
-  const userId = req.user.id;
+  const userId = req.user?.id; // جعل userId اختياريًا
 
-  const child = await Child.findOne({ _id: childId, parentId: userId });
+  // التحقق من وجود الطفل فقط (بدون التحقق من parentId)
+  const child = await Child.findById(childId);
   if (!child) {
-    return next(
-      appError.create(
-        "Child not found or you are not authorized",
-        404,
-        httpStatusText.FAIL
-      )
-    );
+    return next(appError.create("Child not found", 404, httpStatusText.FAIL));
   }
 
   const deletedHistory = await History.findOneAndDelete({
@@ -540,16 +516,18 @@ const deleteHistory = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // إرسال إشعار مختصر
-  await sendNotification(
-    userId,
-    childId,
-    null,
-    "History Removed",
-    `${child.name}: Record removed.`,
-    "history",
-    "patient" // تغيير من "user" إلى "patient"
-  );
+  // إرسال الإشعار فقط إذا كان userId موجودًا
+  if (userId) {
+    await sendNotification(
+      userId,
+      childId,
+      null,
+      "History Removed",
+      `${child.name}: Record removed.`,
+      "history",
+      "patient"
+    );
+  }
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -560,19 +538,14 @@ const deleteHistory = asyncWrapper(async (req, res, next) => {
 // ✅ Filter history records using query parameters
 const filterHistory = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
-  const userId = req.user.id;
-  const { diagnosis, disease, treatment, fromDate, toDate, sortBy } = req.query;
 
-  const child = await Child.findOne({ _id: childId, parentId: userId });
+  // التحقق من وجود الطفل فقط (بدون التحقق من parentId)
+  const child = await Child.findById(childId);
   if (!child) {
-    return next(
-      appError.create(
-        "Child not found or you are not authorized",
-        404,
-        httpStatusText.FAIL
-      )
-    );
+    return next(appError.create("Child not found", 404, httpStatusText.FAIL));
   }
+
+  const { diagnosis, disease, treatment, fromDate, toDate, sortBy } = req.query;
 
   let query = { childId };
 
