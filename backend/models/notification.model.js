@@ -10,7 +10,7 @@ const notificationSchema = new mongoose.Schema(
     childId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Child",
-      required: false,
+      required: true, // جعلته إجباريًا
     },
     doctorId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -42,7 +42,7 @@ const notificationSchema = new mongoose.Schema(
     },
     target: {
       type: String,
-      enum: ["patient", "doctor"], // تغيير من "user" إلى "patient"
+      enum: ["patient", "doctor"],
       required: true,
     },
     isRead: {

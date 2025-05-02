@@ -7,26 +7,13 @@
 // const genrateJWT = require("../utils/genrate.JWT");
 // const userRoles = require("../utils/userRoles");
 // const mongoose = require("mongoose");
+// const { sendNotification } = require("../controllers/notifications.controller");
 
 // // Get all users
 // const getAllUsers = asyncWrapper(async (req, res) => {
 //   const users = await User.find({}, { __v: 0, password: false });
 //   res.json({ status: httpStatusText.SUCCESS, data: { users } });
 // });
-
-
-// // // Get a single user by ID
-// // const getUserById = asyncWrapper(async (req, res, next) => {
-// //   const { userId } = req.params;
-
-// //   const user = await User.findById(userId);
-
-// //   if (!user) {
-// //     return next(appError.create("User not found", 404, httpStatusText.FAIL));
-// //   }
-
-// //   res.json({ status: httpStatusText.SUCCESS, data: { user } });
-// // });
 
 // // ✅ جلب بيانات اليوزر (Profile)
 // const getUserProfile = asyncWrapper(async (req, res, next) => {
@@ -92,13 +79,48 @@
 //     return next(appError.create("User not found", 404, httpStatusText.FAIL));
 //   }
 
-//   if (firstName) user.firstName = firstName;
-//   if (lastName) user.lastName = lastName;
-//   if (email) user.email = email;
-//   if (phone) user.phone = phone;
-//   if (address) user.address = address;
+//   const changes = [];
+//   if (firstName && firstName !== user.firstName) {
+//     changes.push(`name to ${firstName}`);
+//     user.firstName = firstName;
+//   }
+//   if (lastName && lastName !== user.lastName) {
+//     changes.push(`last name to ${lastName}`);
+//     user.lastName = lastName;
+//   }
+//   if (email && email !== user.email) {
+//     const existingUser = await User.findOne({ email });
+//     if (existingUser && existingUser._id.toString() !== userId.toString()) {
+//       return next(
+//         appError.create("Email already exists", 400, httpStatusText.FAIL)
+//       );
+//     }
+//     changes.push(`email to ${email}`);
+//     user.email = email;
+//   }
+//   if (phone && phone !== user.phone) {
+//     changes.push(`phone to ${phone}`);
+//     user.phone = phone;
+//   }
+//   if (address && address !== user.address) {
+//     changes.push(`address to ${address}`);
+//     user.address = address;
+//   }
 
 //   await user.save();
+
+//   // إرسال إشعار مختصر مع التغييرات فقط
+//   if (changes.length > 0) {
+//     await sendNotification(
+//       userId,
+//       null,
+//       null,
+//       "Profile Updated",
+//       `Updated: ${changes.join(", ")}`,
+//       "user",
+//       "patient"
+//     );
+//   }
 
 //   res.json({
 //     status: httpStatusText.SUCCESS,
@@ -169,6 +191,17 @@
 //       throw new Error("Failed to delete user account");
 //     }
 
+//     // إرسال إشعار مختصر
+//     await sendNotification(
+//       userId,
+//       null,
+//       null,
+//       "Account Deleted",
+//       "Your account has been deleted.",
+//       "user",
+//       "patient"
+//     );
+
 //     // Commit الـ Transaction
 //     await session.commitTransaction();
 
@@ -213,13 +246,24 @@
 //   user.token = null;
 //   await user.save();
 
+//   // إرسال إشعار مختصر
+//   await sendNotification(
+//     userId,
+//     null,
+//     null,
+//     "Logged Out",
+//     "You have logged out.",
+//     "logout",
+//     "patient"
+//   );
+
 //   res.json({
 //     status: httpStatusText.SUCCESS,
 //     message: "Logged out successfully",
 //   });
 // });
 
-// // Register New User or Doctor
+// // ✅ Register New User or Doctor
 // const registerUser = asyncWrapper(async (req, res, next) => {
 //   const {
 //     firstName,
@@ -299,6 +343,17 @@
 //       token: newDoctor.token,
 //     };
 
+//     // إرسال إشعار للدكتور
+//     await sendNotification(
+//       newDoctor._id,
+//       null,
+//       null,
+//       "Account Created",
+//       "Welcome! Your account has been created.",
+//       "user",
+//       "doctor"
+//     );
+
 //     res.status(201).json({
 //       status: httpStatusText.SUCCESS,
 //       message: "Doctor registered successfully",
@@ -344,6 +399,17 @@
 //       token: newUser.token,
 //     };
 
+//     // إرسال إشعار للمستخدم
+//     await sendNotification(
+//       newUser._id,
+//       null,
+//       null,
+//       "Account Created",
+//       "Welcome! Your account has been created.",
+//       "user",
+//       "patient"
+//     );
+
 //     res.status(201).json({
 //       status: httpStatusText.SUCCESS,
 //       message: "User registered successfully",
@@ -352,7 +418,7 @@
 //   }
 // });
 
-// // Login User or Doctor
+// // ✅ Login User or Doctor
 // const loginUser = asyncWrapper(async (req, res, next) => {
 //   const { email, password } = req.body;
 //   if (!email || !password) {
@@ -392,6 +458,20 @@
 //       "7d"
 //     );
 
+//     user.token = token;
+//     await user.save();
+
+//     // إرسال إشعار بناءً على دور المستخدم
+//     await sendNotification(
+//       user._id,
+//       null,
+//       null,
+//       "Logged In",
+//       "You have logged in successfully.",
+//       "login",
+//       role === userRoles.DOCTOR ? "doctor" : "patient"
+//     );
+
 //     res.status(200).json({
 //       status: httpStatusText.SUCCESS,
 //       data: {
@@ -409,61 +489,71 @@
 //   }
 // });
 
-// // Update user details
-// // const updateUser = asyncWrapper(async (req, res, next) => {
-// //   const { userId } = req.params;
-// //   const { firstName, lastName, gender, phone, address, password, avatar } =
-// //     req.body;
+// // ✅ Save FCM Token for user
+// const saveFcmToken = asyncWrapper(async (req, res, next) => {
+//   const { fcmToken } = req.body;
+//   const userId = req.user.id;
 
-// //   let updateData = { firstName, lastName, gender, phone, address };
+//   if (!fcmToken) {
+//     return next(
+//       appError.create("FCM Token is required", 400, httpStatusText.FAIL)
+//     );
+//   }
 
-// //   if (password) {
-// //     const hashedPassword = await bcrypt.hash(password, 12);
-// //     updateData.password = hashedPassword;
-// //   }
+//   if (req.user.role !== userRoles.PATIENT) {
+//     return next(
+//       appError.create(
+//         "Unauthorized: Only patients can save FCM Token",
+//         403,
+//         httpStatusText.FAIL
+//       )
+//     );
+//   }
 
-// //   if (req.file) {
-// //     updateData.avatar = req.file.filename;
-// //   }
+//   const user = await User.findById(userId);
+//   if (!user) {
+//     return next(appError.create("User not found", 404, httpStatusText.FAIL));
+//   }
 
-// //   const updatedUser = await User.findByIdAndUpdate(userId, updateData, {
-// //     new: true,
-// //   });
+//   if (user.fcmToken === fcmToken) {
+//     return res.status(200).json({
+//       status: httpStatusText.SUCCESS,
+//       message: "FCM Token is already up to date",
+//     });
+//   }
 
-// //   if (!updatedUser) {
-// //     return next(appError.create("User not found", 404, httpStatusText.FAIL));
-// //   }
+//   await User.updateMany({ fcmToken, _id: { $ne: userId } }, { fcmToken: null });
 
-// //   res.json({ status: httpStatusText.SUCCESS, data: { user: updatedUser } });
-// // });
+//   user.fcmToken = fcmToken;
+//   await user.save();
 
-// // // Delete a user
-// // const deleteUser = asyncWrapper(async (req, res, next) => {
-// //   const { userId } = req.params;
-// //   const deletedUser = await User.findByIdAndDelete(userId);
+//   await sendNotification(
+//     userId,
+//     null,
+//     null,
+//     "FCM Token Updated",
+//     "Notification settings updated.",
+//     "user",
+//     "patient"
+//   );
 
-// //   if (!deletedUser) {
-// //     return next(appError.create("User not found", 404, httpStatusText.FAIL));
-// //   }
-
-// //   res.json({
-// //     status: httpStatusText.SUCCESS,
-// //     message: "User deleted successfully",
-// //   });
-// // });
+//   res.status(200).json({
+//     status: httpStatusText.SUCCESS,
+//     message: "FCM Token saved successfully",
+//   });
+// });
 
 // module.exports = {
 //   getAllUsers,
 //   registerUser,
 //   loginUser,
-//   // getUserById,
-//   // updateUser,
-//   // deleteUser,
 //   getUserProfile,
 //   updateUserProfile,
 //   deleteUserProfile,
 //   logoutUser,
+//   saveFcmToken,
 // };
+
 
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const User = require("../models/user.model");
@@ -482,16 +572,14 @@ const getAllUsers = asyncWrapper(async (req, res) => {
   res.json({ status: httpStatusText.SUCCESS, data: { users } });
 });
 
-// ✅ جلب بيانات اليوزر (Profile)
+// جلب بيانات اليوزر (Profile)
 const getUserProfile = asyncWrapper(async (req, res, next) => {
   const userId = req.user.id;
-
   if (!userId) {
     return next(
       appError.create("User ID not found in token", 401, httpStatusText.FAIL)
     );
   }
-
   if (req.user.role !== userRoles.PATIENT) {
     return next(
       appError.create(
@@ -501,13 +589,10 @@ const getUserProfile = asyncWrapper(async (req, res, next) => {
       )
     );
   }
-
   const user = await User.findById(userId).select("-password -token");
-
   if (!user) {
     return next(appError.create("User not found", 404, httpStatusText.FAIL));
   }
-
   res.json({
     status: httpStatusText.SUCCESS,
     data: {
@@ -525,11 +610,10 @@ const getUserProfile = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ تعديل بيانات اليوزر (Profile)
+// تعديل بيانات اليوزر (Profile)
 const updateUserProfile = asyncWrapper(async (req, res, next) => {
   const userId = req.user.id;
   const { firstName, lastName, email, phone, address } = req.body;
-
   if (req.user.role !== userRoles.PATIENT) {
     return next(
       appError.create(
@@ -539,13 +623,10 @@ const updateUserProfile = asyncWrapper(async (req, res, next) => {
       )
     );
   }
-
   const user = await User.findById(userId);
-
   if (!user) {
     return next(appError.create("User not found", 404, httpStatusText.FAIL));
   }
-
   const changes = [];
   if (firstName && firstName !== user.firstName) {
     changes.push(`name to ${firstName}`);
@@ -573,10 +654,7 @@ const updateUserProfile = asyncWrapper(async (req, res, next) => {
     changes.push(`address to ${address}`);
     user.address = address;
   }
-
   await user.save();
-
-  // إرسال إشعار مختصر مع التغييرات فقط
   if (changes.length > 0) {
     await sendNotification(
       userId,
@@ -584,11 +662,10 @@ const updateUserProfile = asyncWrapper(async (req, res, next) => {
       null,
       "Profile Updated",
       `Updated: ${changes.join(", ")}`,
-      "user",
+      "profile", // تحديث type ليطابق enum
       "patient"
     );
   }
-
   res.json({
     status: httpStatusText.SUCCESS,
     message: "Profile updated successfully",
@@ -607,23 +684,20 @@ const updateUserProfile = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ حذف الأكونت بتاع اليوزر (مع مسح الـ Token)
+// حذف الأكونت بتاع اليوزر
 const deleteUserProfile = asyncWrapper(async (req, res, next) => {
   const userId = req.user.id;
   const userEmail = req.user.email;
-
   if (!userId) {
     return next(
       appError.create("User ID not found in token", 401, httpStatusText.FAIL)
     );
   }
-
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     return next(
       appError.create("Invalid User ID in token", 400, httpStatusText.FAIL)
     );
   }
-
   if (req.user.role !== userRoles.PATIENT) {
     return next(
       appError.create(
@@ -633,51 +707,39 @@ const deleteUserProfile = asyncWrapper(async (req, res, next) => {
       )
     );
   }
-
   const user = await User.findById(userId);
   if (!user) {
     return next(appError.create("User not found", 404, httpStatusText.FAIL));
   }
-
   if (user.email !== userEmail) {
     return next(
       appError.create("Unauthorized: Email mismatch", 403, httpStatusText.FAIL)
     );
   }
-
-  // استخدام Transaction للتأكد من إن كل العمليات بتتم مع بعض
   const session = await mongoose.startSession();
   session.startTransaction();
-
   try {
     user.token = null;
     await user.save({ session });
-
     const deleteResult = await User.deleteOne({ _id: userId }, { session });
     if (deleteResult.deletedCount === 0) {
       throw new Error("Failed to delete user account");
     }
-
-    // إرسال إشعار مختصر
     await sendNotification(
       userId,
       null,
       null,
       "Account Deleted",
       "Your account has been deleted.",
-      "user",
+      "profile", // تحديث type ليطابق enum
       "patient"
     );
-
-    // Commit الـ Transaction
     await session.commitTransaction();
-
     res.json({
       status: httpStatusText.SUCCESS,
       message: "User account deleted successfully",
     });
   } catch (error) {
-    // Rollback الـ Transaction لو حصل أي خطأ
     await session.abortTransaction();
     return next(
       appError.create(
@@ -691,10 +753,9 @@ const deleteUserProfile = asyncWrapper(async (req, res, next) => {
   }
 });
 
-// ✅ تسجيل الخروج لليوزر
+// تسجيل الخروج لليوزر
 const logoutUser = asyncWrapper(async (req, res, next) => {
   const userId = req.user.id;
-
   if (req.user.role !== userRoles.PATIENT) {
     return next(
       appError.create(
@@ -704,33 +765,28 @@ const logoutUser = asyncWrapper(async (req, res, next) => {
       )
     );
   }
-
   const user = await User.findById(userId);
   if (!user) {
     return next(appError.create("User not found", 404, httpStatusText.FAIL));
   }
-
   user.token = null;
   await user.save();
-
-  // إرسال إشعار مختصر
   await sendNotification(
     userId,
     null,
     null,
     "Logged Out",
     "You have logged out.",
-    "logout",
+    "general", // تحديث type ليطابق enum
     "patient"
   );
-
   res.json({
     status: httpStatusText.SUCCESS,
     message: "Logged out successfully",
   });
 });
 
-// ✅ Register New User or Doctor
+// Register New User or Doctor
 const registerUser = asyncWrapper(async (req, res, next) => {
   const {
     firstName,
@@ -747,20 +803,14 @@ const registerUser = asyncWrapper(async (req, res, next) => {
     availableDays,
     availableTimes,
   } = req.body;
-
   const oldUser = await User.findOne({ email });
   const oldDoctor = await Doctor.findOne({ email });
   if (oldUser || oldDoctor) {
-    const error = appError.create(
-      "Email already exists",
-      400,
-      httpStatusText.FAIL
+    return next(
+      appError.create("Email already exists", 400, httpStatusText.FAIL)
     );
-    return next(error);
   }
-
   const hashedPassword = await bcrypt.hash(password, 12);
-
   if (role === userRoles.DOCTOR) {
     const newDoctor = new Doctor({
       firstName,
@@ -778,19 +828,12 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       availableTimes,
       avatar: req.file ? req.file.filename : "uploads/doctor.jpg",
     });
-
     const token = await genrateJWT(
-      {
-        email: newDoctor.email,
-        id: newDoctor._id,
-        role: newDoctor.role,
-      },
+      { email: newDoctor.email, id: newDoctor._id, role: newDoctor.role },
       "7d"
     );
     newDoctor.token = token;
-
     await newDoctor.save();
-
     const doctorData = {
       _id: newDoctor._id,
       firstName: newDoctor.firstName,
@@ -809,18 +852,15 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       created_at: newDoctor.created_at,
       token: newDoctor.token,
     };
-
-    // إرسال إشعار للدكتور
     await sendNotification(
       newDoctor._id,
       null,
       null,
       "Account Created",
       "Welcome! Your account has been created.",
-      "user",
+      "profile", // تحديث type ليطابق enum
       "doctor"
     );
-
     res.status(201).json({
       status: httpStatusText.SUCCESS,
       message: "Doctor registered successfully",
@@ -838,19 +878,12 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       role: userRoles.PATIENT,
       avatar: req.file ? req.file.filename : "uploads/profile.jpg",
     });
-
     const token = await genrateJWT(
-      {
-        email: newUser.email,
-        id: newUser._id,
-        role: newUser.role,
-      },
+      { email: newUser.email, id: newUser._id, role: newUser.role },
       "7d"
     );
     newUser.token = token;
-
     await newUser.save();
-
     const userData = {
       _id: newUser._id,
       firstName: newUser.firstName,
@@ -865,18 +898,15 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       created_at: newUser.created_at,
       token: newUser.token,
     };
-
-    // إرسال إشعار للمستخدم
     await sendNotification(
       newUser._id,
       null,
       null,
       "Account Created",
       "Welcome! Your account has been created.",
-      "user",
+      "profile", // تحديث type ليطابق enum
       "patient"
     );
-
     res.status(201).json({
       status: httpStatusText.SUCCESS,
       message: "User registered successfully",
@@ -885,21 +915,16 @@ const registerUser = asyncWrapper(async (req, res, next) => {
   }
 });
 
-// ✅ Login User or Doctor
+// Login User or Doctor
 const loginUser = asyncWrapper(async (req, res, next) => {
   const { email, password } = req.body;
   if (!email || !password) {
-    const error = appError.create(
-      "Email and Password are required",
-      400,
-      httpStatusText.FAIL
+    return next(
+      appError.create("Email and Password are required", 400, httpStatusText.FAIL)
     );
-    return next(error);
   }
-
   let user = await User.findOne({ email });
   let role;
-
   if (user) {
     role = user.role;
   } else {
@@ -908,37 +933,26 @@ const loginUser = asyncWrapper(async (req, res, next) => {
       role = user.role;
     }
   }
-
   if (!user) {
-    const error = appError.create("User not found", 400, httpStatusText.FAIL);
-    return next(error);
+    return next(appError.create("User not found", 400, httpStatusText.FAIL));
   }
-
   const isPasswordCorrect = await bcrypt.compare(password, user.password);
   if (isPasswordCorrect && user) {
     const token = await genrateJWT(
-      {
-        email: user.email,
-        id: user._id,
-        role: role,
-      },
+      { email: user.email, id: user._id, role: role },
       "7d"
     );
-
     user.token = token;
     await user.save();
-
-    // إرسال إشعار بناءً على دور المستخدم
     await sendNotification(
       user._id,
       null,
       null,
       "Logged In",
       "You have logged in successfully.",
-      "login",
+      "general", // تحديث type ليطابق enum
       role === userRoles.DOCTOR ? "doctor" : "patient"
     );
-
     res.status(200).json({
       status: httpStatusText.SUCCESS,
       data: {
@@ -947,26 +961,21 @@ const loginUser = asyncWrapper(async (req, res, next) => {
       },
     });
   } else {
-    const error = appError.create(
-      "Email or Password are incorrect",
-      500,
-      httpStatusText.ERROR
+    return next(
+      appError.create("Email or Password are incorrect", 500, httpStatusText.ERROR)
     );
-    return next(error);
   }
 });
 
-// ✅ Save FCM Token for user
+// Save FCM Token for user
 const saveFcmToken = asyncWrapper(async (req, res, next) => {
   const { fcmToken } = req.body;
   const userId = req.user.id;
-
   if (!fcmToken) {
     return next(
       appError.create("FCM Token is required", 400, httpStatusText.FAIL)
     );
   }
-
   if (req.user.role !== userRoles.PATIENT) {
     return next(
       appError.create(
@@ -976,47 +985,41 @@ const saveFcmToken = asyncWrapper(async (req, res, next) => {
       )
     );
   }
-
   const user = await User.findById(userId);
   if (!user) {
     return next(appError.create("User not found", 404, httpStatusText.FAIL));
-  }
-
-  if (user.fcmToken === fcmToken) {
-    return res.status(200).json({
-      status: httpStatusText.SUCCESS,
-      message: "FCM Token is already up to date",
-    });
-  }
-
-  await User.updateMany({ fcmToken, _id: { $ne: userId } }, { fcmToken: null });
-
-  user.fcmToken = fcmToken;
-  await user.save();
-
-  await sendNotification(
-    userId,
-    null,
-    null,
-    "FCM Token Updated",
-    "Notification settings updated.",
-    "user",
-    "patient"
-  );
-
-  res.status(200).json({
-    status: httpStatusText.SUCCESS,
-    message: "FCM Token saved successfully",
-  });
+}
+if (user.fcmToken === fcmToken) {
+return res.status(200).json({
+status: httpStatusText.SUCCESS,
+message: "FCM Token is already up to date",
+});
+}
+await User.updateMany({ fcmToken, _id: { $ne: userId } }, { fcmToken: null });
+user.fcmToken = fcmToken;
+await user.save();
+await sendNotification(
+userId,
+null,
+null,
+"FCM Token Updated",
+"Notification settings updated.",
+"profile", // تحديث type ليطابق enum
+"patient"
+);
+res.status(200).json({
+status: httpStatusText.SUCCESS,
+message: "FCM Token saved successfully",
+});
 });
 
 module.exports = {
-  getAllUsers,
-  registerUser,
-  loginUser,
-  getUserProfile,
-  updateUserProfile,
-  deleteUserProfile,
-  logoutUser,
-  saveFcmToken,
+getAllUsers,
+registerUser,
+loginUser,
+getUserProfile,
+updateUserProfile,
+deleteUserProfile,
+logoutUser,
+saveFcmToken,
 };

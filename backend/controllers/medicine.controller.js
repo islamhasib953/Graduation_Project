@@ -470,7 +470,7 @@ const { sendNotification } = require("../controllers/notifications.controller");
 // ✅ Create a new medicine for a specific child
 const createMedicine = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
-  const userId = req.user.id;
+  const userId = req.user?.id; // جعل userId اختياريًا (بناءً على التعديلات السابقة)
   const { name, description, days, times } = req.body;
 
   if (!name || !days || !times) {
@@ -505,16 +505,25 @@ const createMedicine = asyncWrapper(async (req, res, next) => {
 
   await newMedicine.save();
 
-  // إرسال إشعار مختصر
-  await sendNotification(
-    userId,
-    childId,
-    null,
-    "Medicine Added",
-    `${child.name}: ${name} added.`,
-    "medicine",
-    "patient" // تغيير من "user" إلى "patient"
-  );
+  // إرسال إشعار مختصر إذا كان userId موجودًا
+  if (userId) {
+    try {
+      await sendNotification(
+        userId,
+        childId,
+        null,
+        "Medicine Added",
+        `${child.name}: ${name} added.`,
+        "medicine",
+        "patient"
+      );
+      console.log(`Notification sent for new medicine: ${name} for child: ${child.name}`);
+    } catch (error) {
+      console.error(`Failed to send notification for new medicine: ${name}`, error);
+    }
+  } else {
+    console.warn("No userId found, skipping notification for new medicine.");
+  }
 
   res.status(201).json({
     status: httpStatusText.SUCCESS,

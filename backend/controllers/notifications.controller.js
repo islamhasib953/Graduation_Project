@@ -22,16 +22,15 @@ const sendNotification = async (
     let role = null;
 
     if (userId && target === "patient") {
-      // تغيير من "user" إلى "patient"
-      const user = await User.findById(userId);
-      if (user) {
+      const user = await User.findById(userId).select("fcmToken");
+      if (user && user.fcmToken) {
         fcmToken = user.fcmToken;
         recipientId = userId;
         role = userRoles.PATIENT;
       }
     } else if (doctorId && target === "doctor") {
-      const doctor = await Doctor.findById(doctorId);
-      if (doctor) {
+      const doctor = await Doctor.findById(doctorId).select("fcmToken");
+      if (doctor && doctor.fcmToken) {
         fcmToken = doctor.fcmToken;
         recipientId = doctorId;
         role = userRoles.DOCTOR;
@@ -43,7 +42,7 @@ const sendNotification = async (
       return;
     }
 
-    // فحص إذا كان الإشعار موجود بالفعل
+    // التحقق من وجود إشعار متكرر في آخر دقيقة
     const existingNotification = await Notification.findOne({
       userId: role === userRoles.PATIENT ? recipientId : null,
       doctorId: role === userRoles.DOCTOR ? recipientId : doctorId || null,
@@ -72,6 +71,7 @@ const sendNotification = async (
     });
 
     await notification.save();
+    console.log(`Notification stored: ${title} - ${body}`);
 
     if (fcmToken) {
       await sendPushNotification(fcmToken, title, body, {
@@ -80,12 +80,14 @@ const sendNotification = async (
         doctorId: doctorId ? doctorId.toString() : null,
         target,
       });
+      console.log(`Push notification sent to ${target}: ${title}`);
     }
   } catch (error) {
     console.error("Error sending notification:", error);
   }
 };
 
+// جلب الإشعارات للمستخدم (الوالد)
 const getUserNotifications = asyncWrapper(async (req, res, next) => {
   const userId = req.user.id;
   const { childId } = req.params;
@@ -103,7 +105,7 @@ const getUserNotifications = asyncWrapper(async (req, res, next) => {
   const notifications = await Notification.find({
     userId,
     childId,
-    target: "patient", // تغيير من "user" إلى "patient"
+    target: "patient",
   })
     .sort({ createdAt: -1 })
     .select("title body type target isRead createdAt");
@@ -114,6 +116,7 @@ const getUserNotifications = asyncWrapper(async (req, res, next) => {
   });
 });
 
+// جلب الإشعارات للدكتور
 const getDoctorNotifications = asyncWrapper(async (req, res, next) => {
   const doctorId = req.user.id;
 
