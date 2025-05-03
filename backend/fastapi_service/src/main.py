@@ -129,8 +129,6 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="Disease Prediction API")
 
 # Pydantic models for input validation
-
-
 class AutismInput(BaseModel):
     A1: int
     A2: int
@@ -149,7 +147,6 @@ class AutismInput(BaseModel):
     Family_mem_with_ASD: str
     Who_completed_the_test: str
 
-
 class AsthmaInput(BaseModel):
     Age: int
     Gender: int
@@ -157,12 +154,12 @@ class AsthmaInput(BaseModel):
     EducationLevel: int
     BMI: float
     Smoking: int
-    PhysicalActivity: float
-    DietQuality: float
-    SleepQuality: float
-    PollutionExposure: float
-    PollenExposure: float
-    DustExposure: float
+    PhysicalActivity: int
+    DietQuality: int
+    SleepQuality: int
+    PollutionExposure: int
+    PollenExposure: int
+    DustExposure: int
     PetAllergy: int
     FamilyHistoryAsthma: int
     HistoryOfAllergies: int
@@ -178,7 +175,6 @@ class AsthmaInput(BaseModel):
     NighttimeSymptoms: int
     ExerciseInduced: int
 
-
 class StrokeInput(BaseModel):
     gender: str
     age: float
@@ -191,10 +187,8 @@ class StrokeInput(BaseModel):
     bmi: float
     smoking_status: str
 
-
 # Model managers
 model_managers = {}
-
 
 @app.on_event("startup")
 async def startup_event():
@@ -207,24 +201,19 @@ async def startup_event():
         logger.error(f"Error initializing model managers: {str(e)}")
         raise
 
-
 @app.post("/predict/{disease}")
 async def predict(disease: Literal["asthma", "autism", "stroke"], input_data: Union[AutismInput, AsthmaInput, StrokeInput]):
     try:
         if disease not in model_managers:
-            raise HTTPException(
-                status_code=400, detail=f"Unsupported disease: {disease}")
+            raise HTTPException(status_code=400, detail=f"Unsupported disease: {disease}")
 
         # Validate input model matches the disease
         if disease == "autism" and not isinstance(input_data, AutismInput):
-            raise HTTPException(
-                status_code=422, detail="Input data must match AutismInput schema for autism")
+            raise HTTPException(status_code=422, detail="Input data must match AutismInput schema for autism")
         if disease == "asthma" and not isinstance(input_data, AsthmaInput):
-            raise HTTPException(
-                status_code=422, detail="Input data must match AsthmaInput schema for asthma")
+            raise HTTPException(status_code=422, detail="Input data must match AsthmaInput schema for asthma")
         if disease == "stroke" and not isinstance(input_data, StrokeInput):
-            raise HTTPException(
-                status_code=422, detail="Input data must match StrokeInput schema for stroke")
+            raise HTTPException(status_code=422, detail="Input data must match StrokeInput schema for stroke")
 
         model_manager = model_managers[disease]
         prediction = model_manager.predict(input_data.dict())

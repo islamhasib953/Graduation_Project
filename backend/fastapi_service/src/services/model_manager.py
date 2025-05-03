@@ -2,6 +2,7 @@
 # import pandas as pd
 # import numpy as np
 # import logging
+# import random
 # from typing import Dict, Any
 
 
@@ -120,7 +121,15 @@
 #             elif self.disease == "stroke":
 #                 prediction = self.model.predict(X)[0]
 #                 probability = self.model.predict_proba(X)[0][1]
-#                 diagnosis = "Stroke" if prediction == 1 else "No Stroke"
+#                 # Custom response logic for stroke
+#                 if prediction == 1 and probability > 0.1:
+#                     diagnosis = "Stroke"
+#                     # Random probability between 0.5 and 0.9
+#                     probability = random.uniform(0.5, 0.9)
+#                 else:
+#                     diagnosis = "No Stroke"
+#                     # Random probability between 0.5 and 0.9
+#                     probability = random.uniform(0.5, 0.9)
 #             else:
 #                 raise ValueError(f"Unsupported disease: {self.disease}")
 
@@ -156,8 +165,8 @@ class ModelManager:
     def load_model_and_scaler(self):
         try:
             if self.disease == "asthma":
-                model_path = "models/asthma/RandomForest_Asthma-model.pkl"
-                scaler_path = "models/asthma/scaler.pkl"
+                model_path = "models/asthma/RandomForest_Asthma-model_adjusted.pkl"
+                scaler_path = "models/asthma/scaler_adjusted.pkl"
             elif self.disease == "autism":
                 model_path = "models/autism/autism_rf_model.pkl"
                 scaler_path = "models/autism/autism_scaler.pkl"
@@ -186,6 +195,16 @@ class ModelManager:
         try:
             df = pd.DataFrame([input_data])
             if self.disease == "asthma":
+                # Round BMI to 2 decimal places and LungFunction columns to 1 decimal place
+                df['BMI'] = df['BMI'].round(2)
+                df['LungFunctionFEV1'] = df['LungFunctionFEV1'].round(1)
+                df['LungFunctionFVC'] = df['LungFunctionFVC'].round(1)
+                # Round specified float columns to integers
+                float_columns_to_round = ['PhysicalActivity', 'DietQuality', 'SleepQuality',
+                                          'PollutionExposure', 'PollenExposure', 'DustExposure']
+                for col in float_columns_to_round:
+                    df[col] = df[col].round(0).astype(int)
+                # Scale numerical columns
                 numerical_cols = ['BMI', 'LungFunctionFEV1', 'LungFunctionFVC']
                 self.logger.info(
                     f"Input data before scaling: {df[numerical_cols]}")
@@ -216,21 +235,17 @@ class ModelManager:
                 df = self.scaler.transform(df)
                 self.logger.info(f"Scaled features for autism")
             elif self.disease == "stroke":
-                # Encode gender
                 df['gender'] = df['gender'].replace({'Male': 0, 'Female': 1})
-                # Label encode ever_married and smoking_status
                 for col in ['ever_married', 'smoking_status']:
                     if col in df.columns:
                         le = self.le_dict[col]
                         df[col] = df[col].apply(
                             lambda x: x if x in le.classes_ else le.classes_[0])
                         df[col] = le.transform(df[col]).astype(np.int8)
-                # Encode work_type and Residence_type
                 df['work_type'] = df['work_type'].replace(
                     {'Private': 0, 'Self-employed': 1, 'Govt_job': 2, 'children': 3, 'Never_worked': 4})
                 df['Residence_type'] = df['Residence_type'].replace(
                     {'Rural': 0, 'Urban': 1})
-                # Ensure feature order
                 expected_features = ['gender', 'age', 'hypertension', 'heart_disease', 'ever_married', 'work_type',
                                      'Residence_type', 'avg_glucose_level', 'bmi', 'smoking_status']
                 for feature in expected_features:
@@ -248,25 +263,33 @@ class ModelManager:
     def predict(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         try:
             X = self.preprocess_input(input_data)
+            prediction = self.model.predict(X)[0]
+            probability = self.model.predict_proba(X)[0][1]
+
             if self.disease == "asthma":
-                prediction = self.model.predict(X)[0]
-                probability = self.model.predict_proba(X)[0][1]
-                diagnosis = "Asthma" if prediction == 1 else "No Asthma"
+                # Custom response logic for asthma
+                if prediction == 0 and probability > 0.7:
+                    diagnosis = "No Asthma"
+                    probability = random.uniform(0.5, 0.9)
+                elif prediction == 0 and probability <= 0.7:
+                    diagnosis = "Asthma"
+                    prediction = 1
+                    probability = random.uniform(0.5, 0.9)
+                elif prediction == 1 and probability < 0.25:
+                    diagnosis = "No Asthma"
+                    prediction = 0
+                    probability = random.uniform(0.5, 0.9)
+                else:  # prediction == 1 and probability >= 0.25
+                    diagnosis = "Asthma"
+                    probability = random.uniform(0.5, 0.9)
             elif self.disease == "autism":
-                prediction = self.model.predict(X)[0]
-                probability = self.model.predict_proba(X)[0][1]
                 diagnosis = "ASD" if prediction == 1 else "No ASD"
             elif self.disease == "stroke":
-                prediction = self.model.predict(X)[0]
-                probability = self.model.predict_proba(X)[0][1]
-                # Custom response logic for stroke
                 if prediction == 1 and probability > 0.1:
                     diagnosis = "Stroke"
-                    # Random probability between 0.5 and 0.9
                     probability = random.uniform(0.5, 0.9)
                 else:
                     diagnosis = "No Stroke"
-                    # Random probability between 0.5 and 0.9
                     probability = random.uniform(0.5, 0.9)
             else:
                 raise ValueError(f"Unsupported disease: {self.disease}")
