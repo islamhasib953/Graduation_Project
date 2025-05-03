@@ -80,7 +80,6 @@
 //   getSingleSensorData,
 // };
 
-
 const SensorData = require("../models/sensorData.model");
 const ValidatedSensorData = require("../models/validatedSensorData.model");
 const Child = require("../models/child.model");
@@ -232,7 +231,6 @@ const validateAndStoreSensorData = asyncWrapper(async (req, res, next) => {
 
   const validatedData = new ValidatedSensorData(validatedRecord);
   await validatedData.save();
-  console.log("Validated data saved:", validatedData);
   io.emit("validatedSensorData", validatedData);
 
   res.json({
@@ -244,18 +242,15 @@ const validateAndStoreSensorData = asyncWrapper(async (req, res, next) => {
 // Start validation every 30 seconds for all children
 const startContinuousValidation = (io) => {
   setInterval(async () => {
-    console.log("Starting continuous validation...");
     const children = await Child.find();
-    console.log(`Found ${children.length} children`);
     for (const child of children) {
-      console.log(`Validating for child ${child._id}`);
       await validateAndStoreSensorData(
         { params: { childId: child._id }, app: { get: () => io } },
         null,
         null
       );
     }
-  }, 10000);
+  }, 30000);
 };
 
 // API to get all sensor data
