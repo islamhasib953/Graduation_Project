@@ -4,7 +4,7 @@ const validatedSensorDataSchema = new mongoose.Schema({
   childId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Child",
-    required: true,
+    required: false,
   },
   temperature: { type: Number, required: false },
   spo2: { type: Number, required: false },

@@ -251,7 +251,7 @@ const startContinuousValidation = (io) => {
         null
       );
     }
-  }, 30000);
+  }, 10000);
 };
 
 // API to get all sensor data
