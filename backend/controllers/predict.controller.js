@@ -13,10 +13,14 @@
 //     winston.format.json()
 //   ),
 //   transports: [
-//     new winston.transports.File({ filename: "logs/predict.log" }),
-//     new winston.transports.Console(),
+//     new winston.transports.Console(), // دايمًا استخدم Console Transport
 //   ],
 // });
+
+// // إضافة File Transport بس لو مش على Vercel
+// // if (!process.env.VERCEL) {
+// //   logger.add(new winston.transports.File({ filename: "logs/predict.log" }));
+// // }
 
 // // Required fields for each model
 // const requiredFields = {
@@ -147,15 +151,8 @@ const logger = winston.createLogger({
     winston.format.timestamp(),
     winston.format.json()
   ),
-  transports: [
-    new winston.transports.Console(), // دايمًا استخدم Console Transport
-  ],
+  transports: [new winston.transports.Console()],
 });
-
-// إضافة File Transport بس لو مش على Vercel
-// if (!process.env.VERCEL) {
-//   logger.add(new winston.transports.File({ filename: "logs/predict.log" }));
-// }
 
 // Required fields for each model
 const requiredFields = {
