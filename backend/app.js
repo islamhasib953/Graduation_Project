@@ -127,6 +127,9 @@ const httpStatusText = require("./utils/httpStatusText");
 const MQTTService = require("./services/mqtt.service");
 const connectDB = require("./config/db.config");
 const scheduleNotifications = require("./utils/scheduleNotifications");
+const {
+  startContinuousValidation,
+} = require("./controllers/sensorData.controller");
 
 // استيراد الـ Routes
 const medicineRoutes = require("./routes/medicine.route");
@@ -187,6 +190,9 @@ mqttService.connect();
 
 // إعداد الإشعارات المجدولة
 scheduleNotifications();
+
+// بدء التحقق الدوري كل 30 ثانية
+startContinuousValidation(io);
 
 // الـ Routes
 app.use("/api/users", usersRoutes);

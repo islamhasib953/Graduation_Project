@@ -6,6 +6,14 @@ const allowedTo = require("../middlewares/allowedTo");
 const userRoles = require("../utils/userRoles");
 
 router
+  .route("/:childId/validate")
+  .post(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    sensorDataController.validateAndStoreSensorData
+  );
+
+router
   .route("/:childId")
   .get(
     verifyToken,

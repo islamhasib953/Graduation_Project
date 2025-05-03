@@ -1,5 +1,6 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,38 +13,45 @@
       padding: 20px;
       background-color: #f0f0f0;
     }
+
     h1 {
       text-align: center;
       color: #333;
     }
+
     .data-container {
       border: 1px solid #ccc;
       padding: 15px;
       margin: 10px 0;
       border-radius: 5px;
       background-color: #fff;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     }
+
     .data-item {
       margin: 5px 0;
       font-size: 16px;
     }
+
     .data-item strong {
       color: #007bff;
     }
+
     .error {
       color: red;
       text-align: center;
       font-weight: bold;
     }
+
     #data {
       min-height: 100px;
     }
   </style>
 </head>
+
 <body>
   <h1>Real-Time Sensor Data</h1>
-  <div id="data">Waiting for sensor data...</div>
+  <div id="data">Waiting for validated sensor data...</div>
 
   <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
   <script>
@@ -51,24 +59,28 @@
 
     socket.on('connect', () => {
       console.log('Connected to WebSocket server');
-      document.getElementById('data').innerHTML = 'Connected! Waiting for sensor data...';
+      document.getElementById('data').innerHTML = 'Connected! Waiting for validated sensor data...';
     });
 
-    socket.on('sensorData', (data) => {
-      console.log('Received sensor data:', data);
+    socket.on('validatedSensorData', (data) => {
+      console.log('Received validated sensor data:', data);
       const dataDiv = document.getElementById('data');
       const dataContainer = document.createElement('div');
       dataContainer.className = 'data-container';
       dataContainer.innerHTML = `
         <div class="data-item"><strong>Child ID:</strong> ${data.childId}</div>
-        <div class="data-item"><strong>Temperature:</strong> ${data.temperature} °C</div>
-        <div class="data-item"><strong>Heart Rate:</strong> ${data.heartRate} bpm</div>
-        <div class="data-item"><strong>SpO2:</strong> ${data.spo2} %</div>
-        <div class="data-item"><strong>Location:</strong> (${data.latitude}, ${data.longitude})</div>
-        <div class="data-item"><strong>Gyroscope:</strong> (X: ${data.gyroX}, Y: ${data.gyroY}, Z: ${data.gyroZ})</div>
+        <div class="data-item"><strong>Temperature:</strong> ${data.temperature || 0} °C</div>
+        <div class="data-item"><strong>Heart Rate:</strong> ${data.bpm || 0} bpm</div>
+        <div class="data-item"><strong>SpO2:</strong> ${data.spo2 || 0} %</div>
+        <div class="data-item"><strong>Respiratory Rate:</strong> ${data.ir || 0} breaths/min</div>
+        <div class="data-item"><strong>Location:</strong> (${data.latitude || 0}, ${data.longitude || 0})</div>
+        <div class="data-item"><strong>Gyroscope:</strong> (X: ${data.gyroX || 0}, Y: ${data.gyroY || 0}, Z: ${data.gyroZ || 0})</div>
         <div class="data-item"><strong>Timestamp:</strong> ${new Date(data.timestamp).toLocaleString()}</div>
+        <div class="data-item"><strong>Status:</strong> ${data.status || 'N/A'}</div>
+        <div class="data-item"><strong>Validation Status:</strong> ${data.validationStatus || 'N/A'}</div>
       `;
-      dataDiv.prepend(dataContainer); // إضافة البيانات الجديدة في الأعلى
+      dataDiv.innerHTML = ''; // Clear previous data
+      dataDiv.appendChild(dataContainer); // Show only the latest validated data
     });
 
     socket.on('connect_error', (error) => {
@@ -77,4 +89,5 @@
     });
   </script>
 </body>
+
 </html>
