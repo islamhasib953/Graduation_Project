@@ -91,6 +91,7 @@ client.on("connect", () => {
         accY: (Math.random() * 0.5 - 0.25).toFixed(2),
         accZ: (Math.random() * 0.5 - 0.25).toFixed(2),
         red: Math.floor(Math.random() * 100), // قيمة عشوائية لـ red
+        status: "active", // إضافة status عشان يطابق الـ schema
         timestamp: Date.now(),
       };
 
