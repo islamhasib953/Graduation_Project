@@ -83,7 +83,13 @@
 
 const SensorData = require("../models/sensorData.model");
 const ValidatedSensorData = require("../models/validatedSensorData.model");
+const BabyActivity = require("../models/babyActivity.model");
+const SleepQuality = require("../models/sleepQuality.model");
 const Child = require("../models/child.model");
+const {
+  calculateActivity,
+  calculateSleepQuality,
+} = require("../utils/activityLogic");
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
@@ -232,8 +238,19 @@ const validateAndStoreSensorData = asyncWrapper(async (req, res, next) => {
 
   const validatedData = new ValidatedSensorData(validatedRecord);
   await validatedData.save();
-  console.log("Validated data saved:", validatedData);
   io.emit("validatedSensorData", validatedData);
+
+  // حساب Baby Activity
+  const activityData = calculateActivity(validatedData, age);
+  const newActivity = new BabyActivity({ childId, ...activityData });
+  await newActivity.save();
+  io.emit("babyActivityUpdate", newActivity);
+
+  // حساب Sleep Quality
+  const sleepData = calculateSleepQuality(validatedData, age);
+  const newSleep = new SleepQuality({ childId, ...sleepData });
+  await newSleep.save();
+  io.emit("sleepQualityUpdate", newSleep);
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -244,18 +261,19 @@ const validateAndStoreSensorData = asyncWrapper(async (req, res, next) => {
 // Start validation every 30 seconds for all children
 const startContinuousValidation = (io) => {
   setInterval(async () => {
-    console.log("Starting continuous validation...");
     const children = await Child.find();
-    console.log(`Found ${children.length} children`);
     for (const child of children) {
-      console.log(`Validating for child ${child._id}`);
       await validateAndStoreSensorData(
-        { params: { childId: child._id }, app: { get: () => io } },
+        {
+          params: { childId: child._id },
+          user: { id: child.parentId },
+          app: { get: () => io },
+        },
         null,
         null
       );
     }
-  }, 10000);
+  }, 30000);
 };
 
 // API to get all sensor data
@@ -331,9 +349,67 @@ const getSingleSensorData = asyncWrapper(async (req, res, next) => {
   });
 });
 
+// API to get Baby Activity records for the last 24 hours
+const getActivitiesForLastDay = asyncWrapper(async (req, res, next) => {
+  const { childId } = req.params;
+  const userId = req.user.id;
+
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or you are not authorized",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const activities = await BabyActivity.find({
+    childId,
+    createdAt: { $gte: oneDayAgo },
+  }).sort({ createdAt: -1 });
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: activities,
+  });
+});
+
+// API to get Sleep Quality records for the last 24 hours
+const getSleepQualitiesForLastDay = asyncWrapper(async (req, res, next) => {
+  const { childId } = req.params;
+  const userId = req.user.id;
+
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or you are not authorized",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const sleepQualities = await SleepQuality.find({
+    childId,
+    createdAt: { $gte: oneDayAgo },
+  }).sort({ createdAt: -1 });
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: sleepQualities,
+  });
+});
+
 module.exports = {
   validateAndStoreSensorData,
   getAllSensorData,
   getSingleSensorData,
   startContinuousValidation,
+  getActivitiesForLastDay,
+  getSleepQualitiesForLastDay,
 };

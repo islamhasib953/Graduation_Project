@@ -29,4 +29,20 @@ router
     sensorDataController.getSingleSensorData
   );
 
+router
+  .route("/:childId/activities")
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    sensorDataController.getActivitiesForLastDay
+  );
+
+router
+  .route("/:childId/sleep-qualities")
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    sensorDataController.getSleepQualitiesForLastDay
+  );
+
 module.exports = router;

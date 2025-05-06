@@ -94,9 +94,7 @@ class MQTTService {
 
         const child = await Child.findById(data.childId);
         if (!child) {
-          console.error(
-            `Child with ID ${data.childId} not found, skipping save`
-          );
+          console.error(`Child with ID ${data.childId} not found`);
           return;
         }
 

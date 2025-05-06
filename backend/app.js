@@ -178,7 +178,16 @@ app.use(morgan("combined"));
 
 app.use(async (req, res, next) => {
   res.locals.messages = require("express-messages")(req, res);
+  req.app.set("io", io); // إضافة io لكل الطلبات
   next();
+});
+
+// WebSocket connection
+io.on("connection", (socket) => {
+  console.log("A client connected");
+  socket.on("disconnect", () => {
+    console.log("A client disconnected");
+  });
 });
 
 // إعداد MongoDB
@@ -224,3 +233,4 @@ app.use((error, req, res, next) => {
 });
 
 module.exports = { app, server };
+

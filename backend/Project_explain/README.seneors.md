@@ -243,7 +243,7 @@ The system is intended for parents and doctors to monitor children's health metr
 ### Running the Frontend
 1. **Start Live Server**:
    ```bash
-   cd public
+   cd public  
    live-server
    ```
    - Opens a browser at `http://localhost:8080`.
