@@ -1,3 +1,4 @@
+
 const mongoose = require("mongoose");
 
 const sensorDataSchema = new mongoose.Schema({
@@ -5,7 +6,7 @@ const sensorDataSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "Child",
     required: false,
-  }, // ربط بالطفل
+  },
   temperature: { type: Number, required: false },
   spo2: { type: Number, required: false },
   latitude: { type: Number, required: false },
@@ -13,7 +14,6 @@ const sensorDataSchema = new mongoose.Schema({
   gyroX: { type: Number, required: false },
   gyroY: { type: Number, required: false },
   gyroZ: { type: Number, required: false },
-  // الحقول الجديدة:
   bpm: { type: Number, required: false },
   ir: { type: Number, required: false },
   red: { type: Number, required: false },
@@ -21,7 +21,6 @@ const sensorDataSchema = new mongoose.Schema({
   accY: { type: Number, required: false },
   accZ: { type: Number, required: false },
   status: { type: String, required: false },
-
   timestamp: { type: Number, required: false },
   createdAt: { type: Date, default: Date.now },
 });
