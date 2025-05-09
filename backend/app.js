@@ -161,6 +161,10 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(cookieParser());
 
+// ⛔️ لازم قبل express-rate-limit
+app.set('trust proxy', false); // أو 1 لو على سيرفر خارجي مثل Render
+
+
 // Middlewares
 app.use(cors());
 app.use(mongoSanitize());
