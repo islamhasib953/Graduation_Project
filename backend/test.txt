@@ -1,215 +1,189 @@
-no asthma >63,0,1,0,15.848744398517509,0,0.8944483090233335,5.488695584993768,8.701002733591553,7.388480566727442,2.8555777852179687,0.9743393830919789,1,1,0,0,0,0,1.3690511997873338,4.9412056608744575,0,0,1,0,0,1
-****************************
-there is asthma :9,1,3,1,34.96946962586112,0,8.293475319059786,1.3172863614250807,6.960847232709893,1.6742376846785867,9.624349757689508,9.94985613405871,0,1,0,0,1,1,2.289334213132939,2.9836863482330322,1,0,1,1,0,1
-****************************************
-اكتب ريوستات علشان اختبر الموديل بس يحتورى على الحاجات دى
-واكتب ازاى ارن fastapi
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Real-Time Sensor Data</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f0f0f0;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+
+    .controls {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .controls button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .controls button:hover {
+      background-color: #0056b3;
+    }
+
+    .data-container {
+      border: 1px solid #ccc;
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 5px;
+      background-color: #fff;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .data-item {
+      margin: 5px 0;
+      font-size: 16px;
+    }
+
+    .data-item strong {
+      color: #007bff;
+    }
+
+    .error {
+      color: red;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    #data {
+      min-height: 100px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Real-Time Sensor Data</h1>
+  <div class="controls">
+    <button onclick="clearData()">Clear Data</button>
+  </div>
+  <div id="data">Waiting for validated sensor data...</div>
+
+  <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+  <script>
+    const socket = io('https://sigma-3hkg.onrender.com');
+    const maxRecords = 10;
+
+    socket.on('connect', () => {
+      console.log('Connected to WebSocket server');
+      document.getElementById('data').innerHTML = 'Connected! Waiting for validated sensor data...';
+    });
+
+    socket.on('validatedSensorData', (data) => {
+      console.log('Received validated sensor data:', data);
+      const dataDiv = document.getElementById('data');
+
+      const dataContainer = document.createElement('div');
+      dataContainer.className = 'data-container';
+      dataContainer.innerHTML = `
+        <div class="data-item"><strong>Received At:</strong> ${new Date().toLocaleString()}</div>
+        <div class="data-item"><strong>Child ID:</strong> ${data.childId || 'N/A'}</div>
+        <div class="data-item"><strong>Temperature:</strong> ${data.temperature ? data.temperature.toFixed(2) + ' °C' : 'N/A'}</div>
+        <div class="data-item"><strong>Heart Rate:</strong> ${data.bpm ? data.bpm.toFixed(0) + ' bpm' : 'N/A'}</div>
+        <div class="data-item"><strong>SpO2:</strong> ${data.spo2 ? data.spo2.toFixed(0) + ' %' : 'N/A'}</div>
+        <div class="data-item"><strong>Respiratory Rate:</strong> ${data.ir ? data.ir.toFixed(0) + ' breaths/min' : 'N/A'}</div>
+        <div class="data-item"><strong>Location:</strong> (${data.latitude ? data.latitude.toFixed(6) : 'N/A'}, ${data.longitude ? data.longitude.toFixed(6) : 'N/A'})</div>
+        <div class="data-item"><strong>Gyroscope:</strong> (X: ${data.gyroX ? data.gyroX.toFixed(2) : 'N/A'}, Y: ${data.gyroY ? data.gyroY.toFixed(2) : 'N/A'}, Z: ${data.gyroZ ? data.gyroZ.toFixed(2) : 'N/A'})</div>
+        <div class="data-item"><strong>Accelerometer:</strong> (X: ${data.accX ? data.accX.toFixed(2) : 'N/A'}, Y: ${data.accY ? data.accY.toFixed(2) : 'N/A'}, Z: ${data.accZ ? data.accZ.toFixed(2) : 'N/A'})</div>
+        <div class="data-item"><strong>Red:</strong> ${data.red ? data.red.toFixed(0) : 'N/A'}</div>
+        <div class="data-item"><strong>Status:</strong> ${data.status || 'N/A'}</div>
+        <div class="data-item"><strong>Validation Status:</strong> ${data.validationStatus || 'N/A'}</div>
+        <div class="data-item"><strong>Created At:</strong> ${data.createdAt ? new Date(data.createdAt).toLocaleString() : 'N/A'}</div>
+      `;
+
+      if (dataDiv.firstChild) {
+        dataDiv.insertBefore(dataContainer, dataDiv.firstChild);
+      } else {
+        dataDiv.innerHTML = '';
+        dataDiv.appendChild(dataContainer);
+      }
+
+      const containers = dataDiv.getElementsByClassName('data-container');
+      while (containers.length > maxRecords) {
+        dataDiv.removeChild(containers[containers.length - 1]);
+      }
+    });
+
+    socket.on('babyActivityUpdate', (data) => {
+      console.log('Received BabyActivity:', data);
+      const dataDiv = document.getElementById('data');
+      const dataContainer = document.createElement('div');
+      dataContainer.className = 'data-container';
+      dataContainer.innerHTML = `
+        <div class="data-item"><strong>Activity Update:</strong> ${data.activityStage}</div>
+        <div class="data-item"><strong>Child ID:</strong> ${data.childId}</div>
+        <div class="data-item"><strong>BPM:</strong> ${data.bpm ? data.bpm.toFixed(0) : 'N/A'}</div>
+        <div class="data-item"><strong>Avg Gyro:</strong> ${data.avgGyro ? data.avgGyro.toFixed(2) : 'N/A'}</div>
+        <div class="data-item"><strong>Avg Acc:</strong> ${data.avgAcc ? data.avgAcc.toFixed(2) : 'N/A'}</div>
+        <div class="data-item"><strong>Created At:</strong> ${new Date(data.createdAt).toLocaleString()}</div>
+      `;
+      if (dataDiv.firstChild) {
+        dataDiv.insertBefore(dataContainer, dataDiv.firstChild);
+      } else {
+        dataDiv.innerHTML = '';
+        dataDiv.appendChild(dataContainer);
+      }
+
+      const containers = dataDiv.getElementsByClassName('data-container');
+      while (containers.length > maxRecords) {
+        dataDiv.removeChild(containers[containers.length - 1]);
+      }
+    });
+
+    socket.on('sleepQualityUpdate', (data) => {
+      console.log('Received SleepQuality:', data);
+      const dataDiv = document.getElementById('data');
+      const dataContainer = document.createElement('div');
+      dataContainer.className = 'data-container';
+      dataContainer.innerHTML = `
+        <div class="data-item"><strong>Sleep Quality Update:</strong> ${data.sleepStage}</div>
+        <div class="data-item"><strong>Child ID:</strong> ${data.childId}</div>
+        <div class="data-item"><strong>BPM:</strong> ${data.bpm ? data.bpm.toFixed(0) : 'N/A'}</div>
+        <div class="data-item"><strong>Avg Gyro:</strong> ${data.avgGyro ? data.avgGyro.toFixed(2) : 'N/A'}</div>
+        <div class="data-item"><strong>Avg Acc:</strong> ${data.avgAcc ? data.avgAcc.toFixed(2) : 'N/A'}</div>
+        <div class="data-item"><strong>Created At:</strong> ${new Date(data.createdAt).toLocaleString()}</div>
+      `;
+      if (dataDiv.firstChild) {
+        dataDiv.insertBefore(dataContainer, dataDiv.firstChild);
+      } else {
+        dataDiv.innerHTML = '';
+        dataDiv.appendChild(dataContainer);
+      }
+
+      const containers = dataDiv.getElementsByClassName('data-container');
+      while (containers.length > maxRecords) {
+        dataDiv.removeChild(containers[containers.length - 1]);
+      }
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('WebSocket connection error:', error);
+      document.getElementById('data').innerHTML = `<p class="error">Connection error: ${error.message}</p>`;
+    });
+
+    function clearData() {
+      document.getElementById('data').innerHTML = 'Waiting for validated sensor data...';
+    }
+  </script>
+</body>
+
+</html>
 
 
-
-دلوقتى  انا عندى داتا بتاعت السينوسرات بتتخرن فى الداتابيز عايز اضيف عليها لوجيك قبل ما اعرضها فى الفرونت 
-عايز اضيف اللوجيك انه مثلا ياخد اخر 10 قراءات من الداتابيز ويدخلها على اللوجيك انه يتاكد منها انها صحيحة ومش بايظة او فيها اى مشاكل فاهمنى يعنى ياخد مثلا ال 10 قراءات ويحاول يجيب ادق او اصح قراءة فيهم او متوسط مثلا القراءة الصح او ياخد اصح داتا لكل سينسور مثلا لوحده من 10 قراءت وفى الاخر يجمع ريكورد كامل من ال 10 قراءات باصح داتا لكل سيسنور ثم يخزنها فى الموديل الجديد فاهمنى 
-وكمان خد بالك ان الداتا بتيجى من ساعة بيلبسها طفل عمره من 6 اشهر الى 7 سنين اوك
-ف خد بالك ان اللوجيك يعتمد على عمرة الطفل لان القراءات الصحيحة بتختلف من سن طفل لسن اخر 
-وده الموديل بتاع السينوسرات اللى بيتخزن فيه كل الداتا من الساعة
-
-const mongoose = require("mongoose");
-
-const sensorDataSchema = new mongoose.Schema({
-  childId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Child",
-    required: false,
-  }, // ربط بالطفل
-  temperature: { type: Number, required: false },
-  spo2: { type: Number, required: false },
-  latitude: { type: Number, required: false },
-  longitude: { type: Number, required: false },
-  gyroX: { type: Number, required: false },
-  gyroY: { type: Number, required: false },
-  gyroZ: { type: Number, required: false },
-  // الحقول الجديدة:
-  bpm: { type: Number, required: false },
-  ir: { type: Number, required: false },
-  red: { type: Number, required: false },
-  accX: { type: Number, required: false },
-  accY: { type: Number, required: false },
-  accZ: { type: Number, required: false },
-  status: { type: String, required: false },
-
-  timestamp: { type: Number, required: false },
-  createdAt: { type: Date, default: Date.now },
-});
-
-module.exports = mongoose.model("SensorData", sensorDataSchema);
-*****************************
-وده موديل الطفل
-const mongoose = require("mongoose");
-
-const ChildSchema = new mongoose.Schema(
-  {
-    name: { type: String, required: [true, "Name is required"], trim: true },
-    gender: {
-      type: String,
-      enum: ["Boy", "Girl"],
-      required: [true, "Gender is required"],
-    },
-    birthDate: { type: Date, required: [true, "Birth date is required"] },
-    heightAtBirth: { type: Number, min: [0, "Height must be positive"] },
-    weightAtBirth: { type: Number, min: [0, "Weight must be positive"] },
-    headCircumferenceAtBirth: {
-      type: Number,
-      min: [0, "Head circumference must be positive"],
-    },
-    bloodType: {
-      type: String,
-      match: [/^(A|B|AB|O)[+-]$/, "Invalid blood type"],
-    },
-    parentId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    deviceId: { type: String, required: false, unique: true }, // حقل جديد لتحديد الساعة
-    photo: {
-      type: String,
-      default: "Uploads/vaccination.jpg",
-      validate: {
-        validator: function (value) {
-          return /\.(jpg|jpeg|png|gif)$/i.test(value);
-        },
-        message: "Image must be a valid image file",
-      },
-    },
-    favorite: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Doctor",
-        required: false,
-      },
-    ], // حقل جديد لتخزين الدكاترة المفضلة لكل طفل
-  },
-  { timestamps: true }
-);
-
-module.exports = mongoose.model("Child", ChildSchema);
-
-********************************
-ممكن تستخدم تاريخ الميلاد ناقص الوقت الحالى علشان تجيب عمر الطفل
-وعايزك مثلا بعد ما يتاكد ان الداتا سليمة يخزنها مثلا فى موديل تانى منفصل يكون بيحتورى على كل الداتا السليمة
-يعننى من الاخر اللوجيك اللى هيجيب الداتا علشان يشوفها صحيحية يجيبها من الموديل اللى بيتخزن فيه الداتا من الساعة لكن  ال apis اللى هتستخدم فى عرض الداتا بتكون بتجيب الداتا من الموديل اللى فيه الداتا صحيحة
-
-*************************************
-const SensorData = require("../models/sensorData.model");
-const Child = require("../models/child.model");
-const asyncWrapper = require("../middlewares/asyncWrapper");
-const httpStatusText = require("../utils/httpStatusText");
-const appError = require("../utils/appError");
-
-// ✅ Get all sensor data for a specific child
-const getAllSensorData = asyncWrapper(async (req, res, next) => {
-  const { childId } = req.params;
-  const userId = req.user.id; // جلب الـ userId من الـ JWT
-
-  // التحقق إن الـ childId ينتمي لليوزر اللي سجل دخول
-  const child = await Child.findOne({ _id: childId, parentId: userId });
-  if (!child) {
-    return next(
-      appError.create(
-        "Child not found or you are not authorized",
-        404,
-        httpStatusText.FAIL
-      )
-    );
-  }
-
-  const sensorData = await SensorData.find({ childId })
-    .sort({ createdAt: -1 })
-    .limit(50);
-
-  if (!sensorData.length) {
-    return next(
-      appError.create(
-        "No sensor data found for this child",
-        404,
-        httpStatusText.FAIL
-      )
-    );
-  }
-
-  res.json({
-    status: httpStatusText.SUCCESS,
-    data: sensorData,
-  });
-});
-
-// ✅ Get a single sensor data record for a specific child
-const getSingleSensorData = asyncWrapper(async (req, res, next) => {
-  const { childId, sensorDataId } = req.params;
-  const userId = req.user.id; // جلب الـ userId من الـ JWT
-
-  // التحقق إن الـ childId ينتمي لليوزر اللي سجل دخول
-  const child = await Child.findOne({ _id: childId, parentId: userId });
-  if (!child) {
-    return next(
-      appError.create(
-        "Child not found or you are not authorized",
-        404,
-        httpStatusText.FAIL
-      )
-    );
-  }
-
-  const sensorData = await SensorData.findOne({
-    _id: sensorDataId,
-    childId,
-  });
-
-  if (!sensorData) {
-    return next(
-      appError.create("Sensor data not found", 404, httpStatusText.FAIL)
-    );
-  }
-
-  res.json({
-    status: httpStatusText.SUCCESS,
-    data: sensorData,
-  });
-});
-
-module.exports = {
-  getAllSensorData,
-  getSingleSensorData,
-};
-**************************
-const express = require("express");
-const router = express.Router();
-const sensorDataController = require("../controllers/sensorData.controller");
-const verifyToken = require("../middlewares/virifyToken");
-const allowedTo = require("../middlewares/allowedTo");
-const userRoles = require("../utils/userRoles");
-
-router
-  .route("/:childId")
-  .get(
-    verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    sensorDataController.getAllSensorData
-  );
-
-router
-  .route("/:childId/:sensorDataId")
-  .get(
-    verifyToken,
-    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
-    sensorDataController.getSingleSensorData
-  );
-
-module.exports = router;
-**********************
-شوف بقى محتاج تضيف اى وتعدل اى وعرفنى 
-
-
-
-
-اخير اكتب السايكل اللى بتشتغل بتشتغل ازاى وكمان واشرح اللوجيك وازاى الداتا بتتبعت من الباك والفرونت بستلمنها ازا
+http://localhost:8000
