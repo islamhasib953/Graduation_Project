@@ -1,86 +1,3 @@
-// const SensorData = require("../models/sensorData.model");
-// const Child = require("../models/child.model");
-// const asyncWrapper = require("../middlewares/asyncWrapper");
-// const httpStatusText = require("../utils/httpStatusText");
-// const appError = require("../utils/appError");
-
-// // ✅ Get all sensor data for a specific child
-// const getAllSensorData = asyncWrapper(async (req, res, next) => {
-//   const { childId } = req.params;
-//   const userId = req.user.id; // جلب الـ userId من الـ JWT
-
-//   // التحقق إن الـ childId ينتمي لليوزر اللي سجل دخول
-//   const child = await Child.findOne({ _id: childId, parentId: userId });
-//   if (!child) {
-//     return next(
-//       appError.create(
-//         "Child not found or you are not authorized",
-//         404,
-//         httpStatusText.FAIL
-//       )
-//     );
-//   }
-
-//   const sensorData = await SensorData.find({ childId })
-//     .sort({ createdAt: -1 })
-//     .limit(50);
-
-//   if (!sensorData.length) {
-//     return next(
-//       appError.create(
-//         "No sensor data found for this child",
-//         404,
-//         httpStatusText.FAIL
-//       )
-//     );
-//   }
-
-//   res.json({
-//     status: httpStatusText.SUCCESS,
-//     data: sensorData,
-//   });
-// });
-
-// // ✅ Get a single sensor data record for a specific child
-// const getSingleSensorData = asyncWrapper(async (req, res, next) => {
-//   const { childId, sensorDataId } = req.params;
-//   const userId = req.user.id; // جلب الـ userId من الـ JWT
-
-//   // التحقق إن الـ childId ينتمي لليوزر اللي سجل دخول
-//   const child = await Child.findOne({ _id: childId, parentId: userId });
-//   if (!child) {
-//     return next(
-//       appError.create(
-//         "Child not found or you are not authorized",
-//         404,
-//         httpStatusText.FAIL
-//       )
-//     );
-//   }
-
-//   const sensorData = await SensorData.findOne({
-//     _id: sensorDataId,
-//     childId,
-//   });
-
-//   if (!sensorData) {
-//     return next(
-//       appError.create("Sensor data not found", 404, httpStatusText.FAIL)
-//     );
-//   }
-
-//   res.json({
-//     status: httpStatusText.SUCCESS,
-//     data: sensorData,
-//   });
-// });
-
-// module.exports = {
-//   getAllSensorData,
-//   getSingleSensorData,
-// };
-
-
 const SensorData = require("../models/sensorData.model");
 const ValidatedSensorData = require("../models/validatedSensorData.model");
 const BabyActivity = require("../models/babyActivity.model");
@@ -93,6 +10,16 @@ const {
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
+const winston = require("winston");
+
+const logger = winston.createLogger({
+  level: "info",
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [new winston.transports.Console()],
+});
 
 // Helper function to calculate age in years
 const calculateAge = (birthDate) => {
@@ -105,30 +32,32 @@ const calculateAge = (birthDate) => {
 
 // Helper function to validate sensor readings based on age
 const validateReading = (reading, type, age) => {
-  if (reading === null || reading === undefined) return false;
+  if (reading === null || reading === undefined || reading < 0) return false;
   if (type === "bpm") {
-    if (age >= 0.5 && age < 1) return reading >= 90 && reading <= 120;
-    if (age >= 1 && age < 3) return reading >= 70 && reading <= 110;
-    if (age >= 3 && age < 5) return reading >= 65 && reading <= 100;
-    if (age >= 5 && age <= 7) return reading >= 60 && reading <= 95;
+    if (age >= 0.5 && age < 1) return reading >= 80 && reading <= 170;
+    if (age >= 1 && age < 3) return reading >= 80 && reading <= 150;
+    if (age >= 3 && age < 5) return reading >= 70 && reading <= 130;
+    if (age >= 5 && age <= 7) return reading >= 65 && reading <= 120;
     return false;
   }
   if (type === "spo2") return reading >= 90 && reading <= 100;
   if (type === "ir") {
-    if (age >= 0.5 && age < 1) return reading >= 30 && reading <= 45;
+    if (age >= 0.5 && age < 1) return reading >= 30 && reading <= 55;
     if (age >= 1 && age < 3) return reading >= 20 && reading <= 30;
     if (age >= 3 && age < 5) return reading >= 20 && reading <= 25;
     if (age >= 5 && age <= 7) return reading >= 14 && reading <= 22;
     return false;
   }
-  if (type === "temperature") return reading >= 36.1 && reading <= 37.2;
+  if (type === "temperature") return reading >= 36.1 && reading <= 37.9;
   return true;
 };
 
 // Helper function to calculate average of valid readings
 const calculateAverage = (readings) => {
-  const validReadings = readings.filter((r) => r !== null && r !== undefined);
-  if (validReadings.length === 0) return 0;
+  const validReadings = readings.filter(
+    (r) => r !== null && r !== undefined && r >= 0
+  );
+  if (validReadings.length === 0) return null;
   return validReadings.reduce((sum, r) => sum + r, 0) / validReadings.length;
 };
 
@@ -178,6 +107,7 @@ const validateAndStoreSensorData = asyncWrapper(async (req, res, next) => {
   let hasInvalidReadings = false;
   let allInvalid = true;
 
+  // التحقق من BPM
   const bpmReadings = sensorData.map((data) => data.bpm);
   const validBpmReadings = bpmReadings.filter((bpm) =>
     validateReading(bpm, "bpm", age)
@@ -186,6 +116,7 @@ const validateAndStoreSensorData = asyncWrapper(async (req, res, next) => {
   if (validBpmReadings.length === 0) hasInvalidReadings = true;
   if (validBpmReadings.length > 0) allInvalid = false;
 
+  // التحقق من SpO2
   const spo2Readings = sensorData.map((data) => data.spo2);
   const validSpo2Readings = spo2Readings.filter((spo2) =>
     validateReading(spo2, "spo2", age)
@@ -194,6 +125,7 @@ const validateAndStoreSensorData = asyncWrapper(async (req, res, next) => {
   if (validSpo2Readings.length === 0) hasInvalidReadings = true;
   if (validSpo2Readings.length > 0) allInvalid = false;
 
+  // التحقق من IR
   const irReadings = sensorData.map((data) => data.ir);
   const validIrReadings = irReadings.filter((ir) =>
     validateReading(ir, "ir", age)
@@ -202,35 +134,48 @@ const validateAndStoreSensorData = asyncWrapper(async (req, res, next) => {
   if (validIrReadings.length === 0) hasInvalidReadings = true;
   if (validIrReadings.length > 0) allInvalid = false;
 
+  // التحقق من Red
+  const redReadings = sensorData.map((data) => data.red);
+  const validRedReadings = redReadings.filter((red) =>
+    validateReading(red, "red", age)
+  );
+  validatedRecord.red = calculateAverage(validRedReadings);
+  if (validRedReadings.length === 0) hasInvalidReadings = true;
+  if (validRedings.length > 0) allInvalid = false;
+
+  // التحقق من Temperature
   const tempReadings = sensorData.map((data) => data.temperature);
   const validTempReadings = tempReadings.filter((temp) =>
     validateReading(temp, "temperature", age)
   );
   validatedRecord.temperature = calculateAverage(validTempReadings);
-  if (validTempReadings.length === 0) hasInvalidReadings = true;
+  if (validTempReadings.length === 0 && tempReadings.some((t) => t != null))
+    hasInvalidReadings = true;
   if (validTempReadings.length > 0) allInvalid = false;
 
+  // الحقول بدون تحقق
   const noValidationFields = [
     "accX",
     "accY",
     "accZ",
-    "status",
     "gyroX",
     "gyroY",
     "gyroZ",
     "latitude",
     "longitude",
-    "red",
   ];
   noValidationFields.forEach((field) => {
-    const readings = sensorData.map((data) => data[field]);
-    validatedRecord[field] = calculateAverage(readings);
+    const readings = sensorData
+      .map((data) => data[field])
+      .filter((r) => r !== null && r !== undefined && !isNaN(r));
+    validatedRecord[field] =
+      readings.length > 0 ? calculateAverage(readings) : null;
   });
 
-  validatedRecord.red = sensorData[0].red;
-  validatedRecord.timestamp = sensorData[0].timestamp;
-  validatedRecord.status = sensorData[0].status;
+  // أحدث قيمة لـ status
+  validatedRecord.status = sensorData[0].status || "Unknown";
 
+  // تحديد حالة التحقق
   if (allInvalid) validatedRecord.validationStatus = "Invalid";
   else if (hasInvalidReadings)
     validatedRecord.validationStatus = "PartiallyValidated";
@@ -238,19 +183,59 @@ const validateAndStoreSensorData = asyncWrapper(async (req, res, next) => {
 
   const validatedData = new ValidatedSensorData(validatedRecord);
   await validatedData.save();
-  io.emit("validatedSensorData", validatedData);
+
+  // التحقق من وجود عملاء متصلين
+  if (io.engine.clientsCount > 0) {
+    io.emit("validatedSensorData", validatedData);
+  }
 
   // حساب Baby Activity
-  const activityData = calculateActivity(validatedData, age);
-  const newActivity = new BabyActivity({ childId, ...activityData });
-  await newActivity.save();
-  io.emit("babyActivityUpdate", newActivity);
+  try {
+    const activityData = calculateActivity(validatedData, age);
+    if (activityData.activityStage === "Insufficient Data") {
+      logger.warn(`Insufficient data for BabyActivity for child: ${childId}`);
+    } else {
+      const newActivity = new BabyActivity({ childId, ...activityData });
+      await newActivity.save();
+      if (io.engine.clientsCount > 0) {
+        io.emit("babyActivityUpdate", newActivity);
+      }
+      logger.info(`BabyActivity saved for child: ${childId}`, {
+        activityStage: activityData.activityStage,
+      });
+    }
+  } catch (error) {
+    logger.error(
+      `Error saving BabyActivity for child ${childId}:`,
+      error.message
+    );
+  }
 
   // حساب Sleep Quality
-  const sleepData = calculateSleepQuality(validatedData, age);
-  const newSleep = new SleepQuality({ childId, ...sleepData });
-  await newSleep.save();
-  io.emit("sleepQualityUpdate", newSleep);
+  try {
+    const sleepData = calculateSleepQuality(validatedData, age);
+    if (sleepData.sleepStage === "Insufficient Data") {
+      logger.warn(`Insufficient data for SleepQuality for child: ${childId}`);
+    } else {
+      const newSleep = new SleepQuality({ childId, ...sleepData });
+      await newSleep.save();
+      if (io.engine.clientsCount > 0) {
+        io.emit("sleepQualityUpdate", newSleep);
+      }
+      logger.info(`SleepQuality saved for child: ${childId}`, {
+        sleepStage: sleepData.sleepStage,
+      });
+    }
+  } catch (error) {
+    logger.error(
+      `Error saving SleepQuality for child ${childId}:`,
+      error.message
+    );
+  }
+
+  logger.info(`Validated sensor data saved for child: ${childId}`, {
+    validationStatus: validatedData.validationStatus,
+  });
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -258,22 +243,199 @@ const validateAndStoreSensorData = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// Start validation every 30 seconds for all children
+// Start validation every 30 seconds for active children
 const startContinuousValidation = (io) => {
   setInterval(async () => {
-    const children = await Child.find();
-    for (const child of children) {
-      await validateAndStoreSensorData(
-        {
-          params: { childId: child._id },
-          user: { id: child.parentId },
-          app: { get: () => io },
-        },
-        null,
-        null
-      );
+    try {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      const recentSensorData = await SensorData.find({
+        createdAt: { $gte: oneHourAgo },
+      }).distinct("childId");
+      const children = await Child.find({ _id: { $in: recentSensorData } });
+
+      for (const child of children) {
+        try {
+          const childId = child._id;
+          const userId = child.parentId;
+
+          const childData = await Child.findOne({
+            _id: childId,
+            parentId: userId,
+          });
+          if (!childData) {
+            logger.error(`Child not found or unauthorized: ${childId}`);
+            continue;
+          }
+
+          const age = calculateAge(childData.birthDate);
+          if (age < 0.5 || age > 7) {
+            logger.error(`Child's age out of range: ${childId}, Age: ${age}`);
+            continue;
+          }
+
+          const sensorData = await SensorData.find({ childId })
+            .sort({ createdAt: -1 })
+            .limit(10);
+
+          if (!sensorData.length) {
+            logger.error(`No sensor data found for child: ${childId}`);
+            continue;
+          }
+
+          let validatedRecord = { childId };
+          let hasInvalidReadings = false;
+          let allInvalid = true;
+
+          // التحقق من BPM
+          const bpmReadings = sensorData.map((data) => data.bpm);
+          const validBpmReadings = bpmReadings.filter((bpm) =>
+            validateReading(bpm, "bpm", age)
+          );
+          validatedRecord.bpm = calculateAverage(validBpmReadings);
+          if (validBpmReadings.length === 0) hasInvalidReadings = true;
+          if (validBpmReadings.length > 0) allInvalid = false;
+
+          // التحقق من SpO2
+          const spo2Readings = sensorData.map((data) => data.spo2);
+          const validSpo2Readings = spo2Readings.filter((spo2) =>
+            validateReading(spo2, "spo2", age)
+          );
+          validatedRecord.spo2 = calculateAverage(validSpo2Readings);
+          if (validSpo2Readings.length === 0) hasInvalidReadings = true;
+          if (validSpo2Readings.length > 0) allInvalid = false;
+
+          // التحقق من IR
+          const irReadings = sensorData.map((data) => data.ir);
+          const validIrReadings = irReadings.filter((ir) =>
+            validateReading(ir, "ir", age)
+          );
+          validatedRecord.ir = calculateAverage(validIrReadings);
+          if (validIrReadings.length === 0) hasInvalidReadings = true;
+          if (validIrReadings.length > 0) allInvalid = false;
+
+          // التحقق من Red
+          const redReadings = sensorData.map((data) => data.red);
+          const validRedReadings = redReadings.filter((red) =>
+            validateReading(red, "red", age)
+          );
+          validatedRecord.red = calculateAverage(validRedReadings);
+          if (validRedReadings.length === 0) hasInvalidReadings = true;
+          if (validRedReadings.length > 0) allInvalid = false;
+
+          // التحقق من Temperature
+          const tempReadings = sensorData.map((data) => data.temperature);
+          const validTempReadings = tempReadings.filter((temp) =>
+            validateReading(temp, "temperature", age)
+          );
+          validatedRecord.temperature = calculateAverage(validTempReadings);
+          if (
+            validTempReadings.length === 0 &&
+            tempReadings.some((t) => t != null)
+          )
+            hasInvalidReadings = true;
+          if (validTempReadings.length > 0) allInvalid = false;
+
+          // الحقول بدون تحقق
+          const noValidationFields = [
+            "accX",
+            "accY",
+            "accZ",
+            "gyroX",
+            "gyroY",
+            "gyroZ",
+            "latitude",
+            "longitude",
+          ];
+          noValidationFields.forEach((field) => {
+            const readings = sensorData
+              .map((data) => data[field])
+              .filter((r) => r !== null && r !== undefined && !isNaN(r));
+            validatedRecord[field] =
+              readings.length > 0 ? calculateAverage(readings) : null;
+          });
+
+          // أحدث قيمة لـ status
+          validatedRecord.status = sensorData[0].status || "Unknown";
+
+          // تحديد حالة التحقق
+          if (allInvalid) validatedRecord.validationStatus = "Invalid";
+          else if (hasInvalidReadings)
+            validatedRecord.validationStatus = "PartiallyValidated";
+          else validatedRecord.validationStatus = "Validated";
+
+          const validatedData = new ValidatedSensorData(validatedRecord);
+          await validatedData.save();
+
+          // التحقق من وجود عملاء متصلين
+          if (io.engine.clientsCount > 0) {
+            io.emit("validatedSensorData", validatedData);
+          }
+
+          // حساب Baby Activity
+          try {
+            const activityData = calculateActivity(validatedData, age);
+            if (activityData.activityStage === "Insufficient Data") {
+              logger.warn(
+                `Insufficient data for BabyActivity for child: ${childId}`
+              );
+            } else {
+              const newActivity = new BabyActivity({
+                childId,
+                ...activityData,
+              });
+              await newActivity.save();
+              if (io.engine.clientsCount > 0) {
+                io.emit("babyActivityUpdate", newActivity);
+              }
+              logger.info(`BabyActivity saved for child: ${childId}`, {
+                activityStage: activityData.activityStage,
+              });
+            }
+          } catch (error) {
+            logger.error(
+              `Error saving BabyActivity for child ${childId}:`,
+              error.message
+            );
+          }
+
+          // حساب Sleep Quality
+          try {
+            const sleepData = calculateSleepQuality(validatedData, age);
+            if (sleepData.sleepStage === "Insufficient Data") {
+              logger.warn(
+                `Insufficient data for SleepQuality for child: ${childId}`
+              );
+            } else {
+              const newSleep = new SleepQuality({ childId, ...sleepData });
+              await newSleep.save();
+              if (io.engine.clientsCount > 0) {
+                io.emit("sleepQualityUpdate", newSleep);
+              }
+              logger.info(`SleepQuality saved for child: ${childId}`, {
+                sleepStage: sleepData.sleepStage,
+              });
+            }
+          } catch (error) {
+            logger.error(
+              `Error saving SleepQuality for child ${childId}:`,
+              error.message
+            );
+          }
+
+          logger.info(`Validated data saved for child: ${childId}`, {
+            validationStatus: validatedData.validationStatus,
+          });
+        } catch (error) {
+          logger.error(
+            `Error validating data for child ${child._id}:`,
+            error.message
+          );
+        }
+      }
+    } catch (error) {
+      logger.error("Error in continuous validation:", error.message);
     }
-  }, 30000);
+  }, 11000);
 };
 
 // API to get all sensor data

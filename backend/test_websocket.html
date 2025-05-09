@@ -8,7 +8,7 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      max-width: 800px;
+      max-width: 1000px;
       margin: 0 auto;
       padding: 20px;
       background-color: #f0f0f0;
@@ -17,6 +17,25 @@
     h1 {
       text-align: center;
       color: #333;
+    }
+
+    .controls {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .controls button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .controls button:hover {
+      background-color: #0056b3;
     }
 
     .data-container {
@@ -51,11 +70,15 @@
 
 <body>
   <h1>Real-Time Sensor Data</h1>
+  <div class="controls">
+    <button onclick="clearData()">Clear Data</button>
+  </div>
   <div id="data">Waiting for validated sensor data...</div>
 
   <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
   <script>
     const socket = io('http://localhost:8000');
+    const maxRecords = 10;
 
     socket.on('connect', () => {
       console.log('Connected to WebSocket server');
@@ -65,28 +88,98 @@
     socket.on('validatedSensorData', (data) => {
       console.log('Received validated sensor data:', data);
       const dataDiv = document.getElementById('data');
+
       const dataContainer = document.createElement('div');
       dataContainer.className = 'data-container';
       dataContainer.innerHTML = `
-        <div class="data-item"><strong>Child ID:</strong> ${data.childId}</div>
-        <div class="data-item"><strong>Temperature:</strong> ${data.temperature || 0} °C</div>
-        <div class="data-item"><strong>Heart Rate:</strong> ${data.bpm || 0} bpm</div>
-        <div class="data-item"><strong>SpO2:</strong> ${data.spo2 || 0} %</div>
-        <div class="data-item"><strong>Respiratory Rate:</strong> ${data.ir || 0} breaths/min</div>
-        <div class="data-item"><strong>Location:</strong> (${data.latitude || 0}, ${data.longitude || 0})</div>
-        <div class="data-item"><strong>Gyroscope:</strong> (X: ${data.gyroX || 0}, Y: ${data.gyroY || 0}, Z: ${data.gyroZ || 0})</div>
-        <div class="data-item"><strong>Timestamp:</strong> ${new Date(data.timestamp).toLocaleString()}</div>
+        <div class="data-item"><strong>Received At:</strong> ${new Date().toLocaleString()}</div>
+        <div class="data-item"><strong>Child ID:</strong> ${data.childId || 'N/A'}</div>
+        <div class="data-item"><strong>Temperature:</strong> ${data.temperature ? data.temperature.toFixed(2) + ' °C' : 'N/A'}</div>
+        <div class="data-item"><strong>Heart Rate:</strong> ${data.bpm ? data.bpm.toFixed(0) + ' bpm' : 'N/A'}</div>
+        <div class="data-item"><strong>SpO2:</strong> ${data.spo2 ? data.spo2.toFixed(0) + ' %' : 'N/A'}</div>
+        <div class="data-item"><strong>Respiratory Rate:</strong> ${data.ir ? data.ir.toFixed(0) + ' breaths/min' : 'N/A'}</div>
+        <div class="data-item"><strong>Location:</strong> (${data.latitude ? data.latitude.toFixed(6) : 'N/A'}, ${data.longitude ? data.longitude.toFixed(6) : 'N/A'})</div>
+        <div class="data-item"><strong>Gyroscope:</strong> (X: ${data.gyroX ? data.gyroX.toFixed(2) : 'N/A'}, Y: ${data.gyroY ? data.gyroY.toFixed(2) : 'N/A'}, Z: ${data.gyroZ ? data.gyroZ.toFixed(2) : 'N/A'})</div>
+        <div class="data-item"><strong>Accelerometer:</strong> (X: ${data.accX ? data.accX.toFixed(2) : 'N/A'}, Y: ${data.accY ? data.accY.toFixed(2) : 'N/A'}, Z: ${data.accZ ? data.accZ.toFixed(2) : 'N/A'})</div>
+        <div class="data-item"><strong>Red:</strong> ${data.red ? data.red.toFixed(0) : 'N/A'}</div>
         <div class="data-item"><strong>Status:</strong> ${data.status || 'N/A'}</div>
         <div class="data-item"><strong>Validation Status:</strong> ${data.validationStatus || 'N/A'}</div>
+        <div class="data-item"><strong>Created At:</strong> ${data.createdAt ? new Date(data.createdAt).toLocaleString() : 'N/A'}</div>
       `;
-      dataDiv.innerHTML = ''; // Clear previous data
-      dataDiv.appendChild(dataContainer); // Show only the latest validated data
+
+      if (dataDiv.firstChild) {
+        dataDiv.insertBefore(dataContainer, dataDiv.firstChild);
+      } else {
+        dataDiv.innerHTML = '';
+        dataDiv.appendChild(dataContainer);
+      }
+
+      const containers = dataDiv.getElementsByClassName('data-container');
+      while (containers.length > maxRecords) {
+        dataDiv.removeChild(containers[containers.length - 1]);
+      }
+    });
+
+    socket.on('babyActivityUpdate', (data) => {
+      console.log('Received BabyActivity:', data);
+      const dataDiv = document.getElementById('data');
+      const dataContainer = document.createElement('div');
+      dataContainer.className = 'data-container';
+      dataContainer.innerHTML = `
+        <div class="data-item"><strong>Activity Update:</strong> ${data.activityStage}</div>
+        <div class="data-item"><strong>Child ID:</strong> ${data.childId}</div>
+        <div class="data-item"><strong>BPM:</strong> ${data.bpm ? data.bpm.toFixed(0) : 'N/A'}</div>
+        <div class="data-item"><strong>Avg Gyro:</strong> ${data.avgGyro ? data.avgGyro.toFixed(2) : 'N/A'}</div>
+        <div class="data-item"><strong>Avg Acc:</strong> ${data.avgAcc ? data.avgAcc.toFixed(2) : 'N/A'}</div>
+        <div class="data-item"><strong>Created At:</strong> ${new Date(data.createdAt).toLocaleString()}</div>
+      `;
+      if (dataDiv.firstChild) {
+        dataDiv.insertBefore(dataContainer, dataDiv.firstChild);
+      } else {
+        dataDiv.innerHTML = '';
+        dataDiv.appendChild(dataContainer);
+      }
+
+      const containers = dataDiv.getElementsByClassName('data-container');
+      while (containers.length > maxRecords) {
+        dataDiv.removeChild(containers[containers.length - 1]);
+      }
+    });
+
+    socket.on('sleepQualityUpdate', (data) => {
+      console.log('Received SleepQuality:', data);
+      const dataDiv = document.getElementById('data');
+      const dataContainer = document.createElement('div');
+      dataContainer.className = 'data-container';
+      dataContainer.innerHTML = `
+        <div class="data-item"><strong>Sleep Quality Update:</strong> ${data.sleepStage}</div>
+        <div class="data-item"><strong>Child ID:</strong> ${data.childId}</div>
+        <div class="data-item"><strong>BPM:</strong> ${data.bpm ? data.bpm.toFixed(0) : 'N/A'}</div>
+        <div class="data-item"><strong>Avg Gyro:</strong> ${data.avgGyro ? data.avgGyro.toFixed(2) : 'N/A'}</div>
+        <div class="data-item"><strong>Avg Acc:</strong> ${data.avgAcc ? data.avgAcc.toFixed(2) : 'N/A'}</div>
+        <div class="data-item"><strong>Created At:</strong> ${new Date(data.createdAt).toLocaleString()}</div>
+      `;
+      if (dataDiv.firstChild) {
+        dataDiv.insertBefore(dataContainer, dataDiv.firstChild);
+      } else {
+        dataDiv.innerHTML = '';
+        dataDiv.appendChild(dataContainer);
+      }
+
+      const containers = dataDiv.getElementsByClassName('data-container');
+      while (containers.length > maxRecords) {
+        dataDiv.removeChild(containers[containers.length - 1]);
+      }
     });
 
     socket.on('connect_error', (error) => {
       console.error('WebSocket connection error:', error);
       document.getElementById('data').innerHTML = `<p class="error">Connection error: ${error.message}</p>`;
     });
+
+    function clearData() {
+      document.getElementById('data').innerHTML = 'Waiting for validated sensor data...';
+    }
   </script>
 </body>
 

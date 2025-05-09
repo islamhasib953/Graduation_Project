@@ -14,6 +14,7 @@ const babyActivitySchema = new mongoose.Schema({
       "Moderate Activity",
       "Intense Activity",
       "Distress/Stress",
+      "Insufficient Data",
     ],
     required: true,
   },
@@ -30,7 +31,6 @@ const babyActivitySchema = new mongoose.Schema({
     enum: ["Validated", "PartiallyValidated", "Invalid"],
     default: "Validated",
   },
-  timestamp: { type: Number, required: true },
   createdAt: { type: Date, default: Date.now },
 });
 

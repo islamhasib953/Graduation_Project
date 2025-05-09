@@ -24,7 +24,7 @@ const validatedSensorDataSchema = new mongoose.Schema({
     type: String,
     enum: ["Validated", "PartiallyValidated", "Invalid"],
     default: "Validated",
-  }, // حالة التحقق
+  },
   timestamp: { type: Number, required: false },
   createdAt: { type: Date, default: Date.now },
 });
