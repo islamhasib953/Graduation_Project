@@ -140,7 +140,7 @@ const memoryRoutes = require("./routes/memory.route");
 const vaccinationRoutes = require("./routes/vaccination.route");
 const growthRoutes = require("./routes/growth.route");
 const doctorRoutes = require("./routes/doctor.route");
-const sensorDataRoutes = require("./routes/sensorData.route");
+// const sensorDataRoutes = require("./routes/sensorData.route");
 const predictionRoutes = require("./routes/predict.route");
 const notificationsRoutes = require("./routes/notifications.routes");
 
@@ -216,7 +216,7 @@ app.use("/api/memory", memoryRoutes);
 app.use("/api/vaccinations", vaccinationRoutes);
 app.use("/api/growth", growthRoutes);
 app.use("/api/doctors", doctorRoutes);
-app.use("/api/sensor-data", sensorDataRoutes);
+// app.use("/api/sensor-data", sensorDataRoutes);
 app.use("/api/predictions", predictionRoutes);
 app.use("/api/notifications", notificationsRoutes);
 

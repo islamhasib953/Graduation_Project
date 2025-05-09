@@ -439,139 +439,139 @@ const startContinuousValidation = (io) => {
 };
 
 // API to get all sensor data
-const getAllSensorData = asyncWrapper(async (req, res, next) => {
-  const { childId } = req.params;
-  const userId = req.user.id;
+// const getAllSensorData = asyncWrapper(async (req, res, next) => {
+//   const { childId } = req.params;
+//   const userId = req.user.id;
 
-  const child = await Child.findOne({ _id: childId, parentId: userId });
-  if (!child) {
-    return next(
-      appError.create(
-        "Child not found or you are not authorized",
-        404,
-        httpStatusText.FAIL
-      )
-    );
-  }
+//   const child = await Child.findOne({ _id: childId, parentId: userId });
+//   if (!child) {
+//     return next(
+//       appError.create(
+//         "Child not found or you are not authorized",
+//         404,
+//         httpStatusText.FAIL
+//       )
+//     );
+//   }
 
-  const sensorData = await ValidatedSensorData.find({ childId })
-    .sort({ createdAt: -1 })
-    .limit(50);
+//   const sensorData = await ValidatedSensorData.find({ childId })
+//     .sort({ createdAt: -1 })
+//     .limit(50);
 
-  if (!sensorData.length) {
-    return next(
-      appError.create(
-        "No validated sensor data found for this child",
-        404,
-        httpStatusText.FAIL
-      )
-    );
-  }
+//   if (!sensorData.length) {
+//     return next(
+//       appError.create(
+//         "No validated sensor data found for this child",
+//         404,
+//         httpStatusText.FAIL
+//       )
+//     );
+//   }
 
-  res.json({
-    status: httpStatusText.SUCCESS,
-    data: sensorData,
-  });
-});
+//   res.json({
+//     status: httpStatusText.SUCCESS,
+//     data: sensorData,
+//   });
+// });
 
-// API to get a single sensor data record
-const getSingleSensorData = asyncWrapper(async (req, res, next) => {
-  const { childId, sensorDataId } = req.params;
-  const userId = req.user.id;
+// // API to get a single sensor data record
+// const getSingleSensorData = asyncWrapper(async (req, res, next) => {
+//   const { childId, sensorDataId } = req.params;
+//   const userId = req.user.id;
 
-  const child = await Child.findOne({ _id: childId, parentId: userId });
-  if (!child) {
-    return next(
-      appError.create(
-        "Child not found or you are not authorized",
-        404,
-        httpStatusText.FAIL
-      )
-    );
-  }
+//   const child = await Child.findOne({ _id: childId, parentId: userId });
+//   if (!child) {
+//     return next(
+//       appError.create(
+//         "Child not found or you are not authorized",
+//         404,
+//         httpStatusText.FAIL
+//       )
+//     );
+//   }
 
-  const sensorData = await ValidatedSensorData.findOne({
-    _id: sensorDataId,
-    childId,
-  });
+//   const sensorData = await ValidatedSensorData.findOne({
+//     _id: sensorDataId,
+//     childId,
+//   });
 
-  if (!sensorData) {
-    return next(
-      appError.create(
-        "Validated sensor data not found",
-        404,
-        httpStatusText.FAIL
-      )
-    );
-  }
+//   if (!sensorData) {
+//     return next(
+//       appError.create(
+//         "Validated sensor data not found",
+//         404,
+//         httpStatusText.FAIL
+//       )
+//     );
+//   }
 
-  res.json({
-    status: httpStatusText.SUCCESS,
-    data: sensorData,
-  });
-});
+//   res.json({
+//     status: httpStatusText.SUCCESS,
+//     data: sensorData,
+//   });
+// });
 
-// API to get Baby Activity records for the last 24 hours
-const getActivitiesForLastDay = asyncWrapper(async (req, res, next) => {
-  const { childId } = req.params;
-  const userId = req.user.id;
+// // API to get Baby Activity records for the last 24 hours
+// const getActivitiesForLastDay = asyncWrapper(async (req, res, next) => {
+//   const { childId } = req.params;
+//   const userId = req.user.id;
 
-  const child = await Child.findOne({ _id: childId, parentId: userId });
-  if (!child) {
-    return next(
-      appError.create(
-        "Child not found or you are not authorized",
-        404,
-        httpStatusText.FAIL
-      )
-    );
-  }
+//   const child = await Child.findOne({ _id: childId, parentId: userId });
+//   if (!child) {
+//     return next(
+//       appError.create(
+//         "Child not found or you are not authorized",
+//         404,
+//         httpStatusText.FAIL
+//       )
+//     );
+//   }
 
-  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const activities = await BabyActivity.find({
-    childId,
-    createdAt: { $gte: oneDayAgo },
-  }).sort({ createdAt: -1 });
+//   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+//   const activities = await BabyActivity.find({
+//     childId,
+//     createdAt: { $gte: oneDayAgo },
+//   }).sort({ createdAt: -1 });
 
-  res.json({
-    status: httpStatusText.SUCCESS,
-    data: activities,
-  });
-});
+//   res.json({
+//     status: httpStatusText.SUCCESS,
+//     data: activities,
+//   });
+// });
 
-// API to get Sleep Quality records for the last 24 hours
-const getSleepQualitiesForLastDay = asyncWrapper(async (req, res, next) => {
-  const { childId } = req.params;
-  const userId = req.user.id;
+// // API to get Sleep Quality records for the last 24 hours
+// const getSleepQualitiesForLastDay = asyncWrapper(async (req, res, next) => {
+//   const { childId } = req.params;
+//   const userId = req.user.id;
 
-  const child = await Child.findOne({ _id: childId, parentId: userId });
-  if (!child) {
-    return next(
-      appError.create(
-        "Child not found or you are not authorized",
-        404,
-        httpStatusText.FAIL
-      )
-    );
-  }
+//   const child = await Child.findOne({ _id: childId, parentId: userId });
+//   if (!child) {
+//     return next(
+//       appError.create(
+//         "Child not found or you are not authorized",
+//         404,
+//         httpStatusText.FAIL
+//       )
+//     );
+//   }
 
-  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const sleepQualities = await SleepQuality.find({
-    childId,
-    createdAt: { $gte: oneDayAgo },
-  }).sort({ createdAt: -1 });
+//   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+//   const sleepQualities = await SleepQuality.find({
+//     childId,
+//     createdAt: { $gte: oneDayAgo },
+//   }).sort({ createdAt: -1 });
 
-  res.json({
-    status: httpStatusText.SUCCESS,
-    data: sleepQualities,
-  });
-});
+//   res.json({
+//     status: httpStatusText.SUCCESS,
+//     data: sleepQualities,
+//   });
+// });
 
 module.exports = {
   // validateAndStoreSensorData,
-  getAllSensorData,
-  getSingleSensorData,
-  startContinuousValidation,
-  getActivitiesForLastDay,
-  getSleepQualitiesForLastDay,
+  // getAllSensorData,
+  // getSingleSensorData,
+  startContinuousValidation
+  // getActivitiesForLastDay,
+  // getSleepQualitiesForLastDay,
 };
