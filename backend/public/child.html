@@ -41,22 +41,25 @@
   <input type="text" id="messageInput" placeholder="Type a message...">
   <button id="sendButton">Send</button>
 
-  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>
-    // استبدل هذه القيم بمعرفات حقيقية من قاعدة البيانات
-    const childId = 'child123'; // معرف الطفل
-    const doctorId = 'doctor456'; // معرف الدكتور
+    const childId = '6814bd00d157322d7cad7661';
+    const doctorId = '67feab9a9d5743ac32a1e851';
+    const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImJhYmFAZXhhbXBsZS5jb20iLCJpZCI6IjY4MTRiY2VmZDE1NzMyMmQ3Y2FkNzY1OCIsInJvbGUiOiJwYXRpZW50IiwiaWF0IjoxNzQ2OTg2MDMwLCJleHAiOjE3NDc1OTA4MzB9.-Xl4X9h1ouKdwDDNQtMf4e5523Mp8Ak1RgmJBZCx2XM'
+    const socket = io('https://sigma-3hkg.onrender.com');
 
-    const socket = io('http://localhost:3000'); // استبدل بالرابط الفعلي للسيرفر
+    socket.on('connect', () => {
+      console.log('Connected to server:', socket.id);
+    });
 
-    // انضمام إلى غرفة الشات
+    socket.on('connect_error', (error) => {
+      console.error('Connection error:', error.message);
+    });
+
     socket.emit('joinChat', { childId, doctorId });
 
-    // جلب سجل الدردشة عند التحميل
-    fetch(`/api/chats/${childId}/${doctorId}/history`, {
-      headers: {
-        'Authorization': 'Bearer <patient-token>' // استبدل بـ token الخاص بولي الأمر
-      }
+    fetch(`https://sigma-3hkg.onrender.com/api/chats/${childId}/${doctorId}/history`, {
+      headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => res.json())
       .then(data => {
@@ -69,12 +72,15 @@
       })
       .catch(err => console.error('Error fetching chat history:', err));
 
-    // عرض الرسائل
     socket.on('receiveMessage', (message) => {
       displayMessage(message);
     });
 
-    // دالة لعرض الرسالة في واجهة المستخدم
+    socket.on('error', (error) => {
+      console.error('Socket error:', error.message);
+      alert(error.message);
+    });
+
     function displayMessage(message) {
       const chatBox = document.getElementById('chatBox');
       const messageDiv = document.createElement('div');
@@ -84,7 +90,6 @@
       chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    // إرسال رسالة
     document.getElementById('sendButton').addEventListener('click', () => {
       const messageInput = document.getElementById('messageInput');
       const content = messageInput.value.trim();
@@ -95,7 +100,6 @@
       }
     });
 
-    // إرسال عند الضغط على Enter
     document.getElementById('messageInput').addEventListener('keypress', (e) => {
       if (e.key === 'Enter') document.getElementById('sendButton').click();
     });

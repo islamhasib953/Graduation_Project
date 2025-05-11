@@ -17,6 +17,7 @@ const chatSchema = new mongoose.Schema(
         sender: {
           type: String,
           required: true,
+          enum: ["child", "doctor"], // التأكد من أن المرسل إما طفل أو دكتور
         },
         content: {
           type: String,
@@ -47,5 +48,8 @@ const chatSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// إضافة فهارس لتحسين أداء الاستعلامات
+chatSchema.index({ childId: 1, doctorId: 1 }, { unique: true });
 
 module.exports = mongoose.model("Chat", chatSchema);
