@@ -24,15 +24,15 @@ const ChildSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    deviceId: { type: String, required: false, unique: true }, // حقل جديد لتحديد الساعة
+    deviceId: { type: String, required: false, unique: true },
     photo: {
       type: String,
-      default: "Uploads/vaccination.jpg",
+      default: "uploads/child-default.jpg",
       validate: {
         validator: function (value) {
-          return /\.(jpg|jpeg|png|gif)$/i.test(value);
+          return !value || /\.(jpg|jpeg|png|gif)$/i.test(value);
         },
-        message: "Image must be a valid image file",
+        message: "Photo must be a valid image file",
       },
     },
     favorite: [
@@ -41,7 +41,7 @@ const ChildSchema = new mongoose.Schema(
         ref: "Doctor",
         required: false,
       },
-    ], // حقل جديد لتخزين الدكاترة المفضلة لكل طفل
+    ],
   },
   { timestamps: true }
 );

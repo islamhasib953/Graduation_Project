@@ -5,8 +5,8 @@
 // const appError = require("../utils/appError");
 // const VaccineInfo = require("../models/vaccineInfo.model");
 // const UserVaccination = require("../models/UserVaccination.model");
+// const { sendNotification } = require("../controllers/notifications.controller");
 
-// // ✅ Create new child and assign all existing vaccinations
 // const createChild = asyncWrapper(async (req, res, next) => {
 //   const {
 //     name,
@@ -19,7 +19,7 @@
 //     headCircumferenceAtBirth,
 //   } = req.body;
 
-//   const parentId = req.user.id; // Get parentId from logged-in user
+//   const parentId = req.user.id;
 
 //   if (
 //     !name ||
@@ -44,7 +44,6 @@
 
 //   const childPhoto = photo || "Uploads/child.jpg";
 
-//   // إنشاء الطفل الجديد
 //   const newChild = new Child({
 //     name,
 //     gender,
@@ -59,10 +58,8 @@
 
 //   await newChild.save();
 
-//   // ✅ جلب جميع التطعيمات من قاعدة البيانات
 //   const allVaccines = await VaccineInfo.find();
 
-//   // ✅ إذا كان هناك تطعيمات، أضفها للطفل الجديد
 //   if (allVaccines.length > 0) {
 //     const vaccinationsToCreate = allVaccines.map((vaccine) => {
 //       const dueDate = new Date(birthDate);
@@ -78,6 +75,17 @@
 //     await UserVaccination.insertMany(vaccinationsToCreate);
 //   }
 
+//   // إرسال إشعار مختصر
+//   await sendNotification(
+//     parentId,
+//     newChild._id,
+//     null,
+//     "Child Added",
+//     `${newChild.name} added.`,
+//     "child",
+//     "patient" // تغيير من "user" إلى "patient"
+//   );
+
 //   res.status(201).json({
 //     status: httpStatusText.SUCCESS,
 //     message: "Child created successfully and assigned vaccinations.",
@@ -88,7 +96,6 @@
 //   });
 // });
 
-// // ✅ Get all children for admin
 // const getAllChildren = asyncWrapper(async (req, res) => {
 //   const children = await Child.find({}, "_id name birthDate photo");
 //   res.json({
@@ -102,7 +109,6 @@
 //   });
 // });
 
-// // ✅ Get all children for a specific user (logged-in user)
 // const getChildrenForUser = asyncWrapper(async (req, res, next) => {
 //   const userId = req.user.id;
 //   const children = await Child.find({ parentId: userId })
@@ -139,7 +145,6 @@
 //   });
 // });
 
-// // ✅ Get single child with all details
 // const getSingleChild = asyncWrapper(async (req, res, next) => {
 //   const { childId } = req.params;
 
@@ -170,7 +175,6 @@
 //   });
 // });
 
-// // ✅ Update a child
 // const updateChild = asyncWrapper(async (req, res, next) => {
 //   const { childId } = req.params;
 //   const {
@@ -184,38 +188,100 @@
 //     photo,
 //   } = req.body;
 
-//   const updatedChild = await Child.findByIdAndUpdate(
-//     childId,
-//     {
-//       name,
-//       gender,
-//       birthDate,
-//       bloodType,
-//       heightAtBirth,
-//       weightAtBirth,
-//       headCircumferenceAtBirth,
-//       photo,
-//     },
-//     { new: true }
-//   );
-
-//   if (!updatedChild) {
+//   const child = await Child.findById(childId);
+//   if (!child) {
 //     return next(appError.create("Child not found", 404, httpStatusText.FAIL));
+//   }
+
+//   const changes = [];
+//   if (name && name !== child.name) {
+//     changes.push(`name to ${name}`);
+//     child.name = name;
+//   }
+//   if (gender && gender !== child.gender) {
+//     changes.push(`gender to ${gender}`);
+//     child.gender = gender;
+//   }
+//   if (birthDate && birthDate !== child.birthDate.toISOString()) {
+//     changes.push(`birth date to ${birthDate}`);
+//     child.birthDate = birthDate;
+//   }
+//   if (bloodType && bloodType !== child.bloodType) {
+//     changes.push(`blood type to ${bloodType}`);
+//     child.bloodType = bloodType;
+//   }
+//   if (heightAtBirth && heightAtBirth !== child.heightAtBirth) {
+//     changes.push(`birth height to ${heightAtBirth}`);
+//     child.heightAtBirth = heightAtBirth;
+//   }
+//   if (weightAtBirth && weightAtBirth !== child.weightAtBirth) {
+//     changes.push(`birth weight to ${weightAtBirth}`);
+//     child.weightAtBirth = weightAtBirth;
+//   }
+//   if (
+//     headCircumferenceAtBirth &&
+//     headCircumferenceAtBirth !== child.headCircumferenceAtBirth
+//   ) {
+//     changes.push(`birth head circumference to ${headCircumferenceAtBirth}`);
+//     child.headCircumferenceAtBirth = headCircumferenceAtBirth;
+//   }
+//   if (photo && photo !== child.photo) {
+//     changes.push(`photo updated`);
+//     child.photo = photo;
+//   }
+
+//   await child.save();
+
+//   // إرسال إشعار مختصر مع التغييرات فقط
+//   if (changes.length > 0) {
+//     await sendNotification(
+//       child.parentId,
+//       childId,
+//       null,
+//       "Child Updated",
+//       `${child.name} updated: ${changes.join(", ")}`,
+//       "child",
+//       "patient" // تغيير من "user" إلى "patient"
+//     );
 //   }
 
 //   res.json({
 //     status: httpStatusText.SUCCESS,
-//     data: { child: updatedChild },
+//     data: { child },
 //   });
 // });
 
-// // ✅ Delete a child
 // const deleteChild = asyncWrapper(async (req, res, next) => {
-//   const deletedChild = await Child.findByIdAndDelete(req.params.childId);
+//   const { childId } = req.params;
+//   const userId = req.user.id;
 
-//   if (!deletedChild) {
+//   const child = await Child.findById(childId);
+//   if (!child) {
 //     return next(appError.create("Child not found", 404, httpStatusText.FAIL));
 //   }
+
+//   if (child.parentId.toString() !== userId.toString()) {
+//     return next(
+//       appError.create(
+//         "Unauthorized: You cannot delete this child",
+//         403,
+//         httpStatusText.FAIL
+//       )
+//     );
+//   }
+
+//   // إرسال إشعار مختصر
+//   await sendNotification(
+//     userId,
+//     childId,
+//     null,
+//     "Child Removed",
+//     `${child.name} removed.`,
+//     "child",
+//     "patient" // تغيير من "user" إلى "patient"
+//   );
+
+//   await Child.findByIdAndDelete(childId);
 
 //   res.json({
 //     status: httpStatusText.SUCCESS,
@@ -232,7 +298,6 @@
 //   deleteChild,
 // };
 
-
 const Child = require("../models/child.model");
 const User = require("../models/user.model");
 const asyncWrapper = require("../middlewares/asyncWrapper");
@@ -246,7 +311,6 @@ const createChild = asyncWrapper(async (req, res, next) => {
   const {
     name,
     gender,
-    photo,
     birthDate,
     bloodType,
     heightAtBirth,
@@ -277,7 +341,9 @@ const createChild = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  const childPhoto = photo || "Uploads/child.jpg";
+  const childPhoto = req.file
+    ? `/uploads/${req.file.filename}`
+    : "Uploads/child.jpg";
 
   const newChild = new Child({
     name,
@@ -310,7 +376,6 @@ const createChild = asyncWrapper(async (req, res, next) => {
     await UserVaccination.insertMany(vaccinationsToCreate);
   }
 
-  // إرسال إشعار مختصر
   await sendNotification(
     parentId,
     newChild._id,
@@ -318,7 +383,7 @@ const createChild = asyncWrapper(async (req, res, next) => {
     "Child Added",
     `${newChild.name} added.`,
     "child",
-    "patient" // تغيير من "user" إلى "patient"
+    "patient"
   );
 
   res.status(201).json({
@@ -420,7 +485,6 @@ const updateChild = asyncWrapper(async (req, res, next) => {
     heightAtBirth,
     weightAtBirth,
     headCircumferenceAtBirth,
-    photo,
   } = req.body;
 
   const child = await Child.findById(childId);
@@ -460,14 +524,13 @@ const updateChild = asyncWrapper(async (req, res, next) => {
     changes.push(`birth head circumference to ${headCircumferenceAtBirth}`);
     child.headCircumferenceAtBirth = headCircumferenceAtBirth;
   }
-  if (photo && photo !== child.photo) {
+  if (req.file) {
     changes.push(`photo updated`);
-    child.photo = photo;
+    child.photo = `/uploads/${req.file.filename}`;
   }
 
   await child.save();
 
-  // إرسال إشعار مختصر مع التغييرات فقط
   if (changes.length > 0) {
     await sendNotification(
       child.parentId,
@@ -476,7 +539,7 @@ const updateChild = asyncWrapper(async (req, res, next) => {
       "Child Updated",
       `${child.name} updated: ${changes.join(", ")}`,
       "child",
-      "patient" // تغيير من "user" إلى "patient"
+      "patient"
     );
   }
 
@@ -505,7 +568,6 @@ const deleteChild = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // إرسال إشعار مختصر
   await sendNotification(
     userId,
     childId,
@@ -513,7 +575,7 @@ const deleteChild = asyncWrapper(async (req, res, next) => {
     "Child Removed",
     `${child.name} removed.`,
     "child",
-    "patient" // تغيير من "user" إلى "patient"
+    "patient"
   );
 
   await Child.findByIdAndDelete(childId);

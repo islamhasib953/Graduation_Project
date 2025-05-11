@@ -1,11 +1,14 @@
 // const History = require("../models/history.model");
+// const Child = require("../models/child.model");
 // const asyncWrapper = require("../middlewares/asyncWrapper");
 // const httpStatusText = require("../utils/httpStatusText");
 // const appError = require("../utils/appError");
+// const { sendNotification } = require("../controllers/notifications.controller");
 
 // // ✅ Create a new history record
 // const createHistory = asyncWrapper(async (req, res, next) => {
-//   const { childId } = req.params; // Extract childId from URL params
+//   const { childId } = req.params;
+//   const userId = req.user?.id; // جعل userId اختياريًا
 //   const {
 //     diagnosis,
 //     disease,
@@ -15,7 +18,7 @@
 //     time,
 //     notesImage,
 //     doctorName,
-//   } = req.body; // أضفنا doctorName هنا
+//   } = req.body;
 
 //   if (!diagnosis || !disease || !treatment || !date || !time) {
 //     return next(
@@ -27,6 +30,12 @@
 //     );
 //   }
 
+//   // التحقق من وجود الطفل فقط (بدون التحقق من parentId)
+//   const child = await Child.findById(childId);
+//   if (!child) {
+//     return next(appError.create("Child not found", 404, httpStatusText.FAIL));
+//   }
+
 //   const newHistory = new History({
 //     childId,
 //     diagnosis,
@@ -35,13 +44,25 @@
 //     notes,
 //     date,
 //     time,
-//     doctorName: doctorName || undefined, // لو ما بعتيش doctorName، هياخد القيمة الافتراضية من الـ Schema
+//     doctorName: doctorName || undefined,
 //     notesImage: notesImage || null,
 //   });
 
 //   await newHistory.save();
 
-//   // مكان التعديل: أضفنا doctorName في الـ Response
+//   // إرسال الإشعار فقط إذا كان userId موجودًا
+//   if (userId) {
+//     await sendNotification(
+//       userId,
+//       childId,
+//       null,
+//       "History Added",
+//       `${child.name}: ${disease} added.`,
+//       "history",
+//       "patient"
+//     );
+//   }
+
 //   res.json({
 //     status: httpStatusText.SUCCESS,
 //     data: {
@@ -53,7 +74,7 @@
 //       notesImage: newHistory.notesImage,
 //       date: newHistory.date,
 //       time: newHistory.time,
-//       doctorName: newHistory.doctorName, // أضفنا doctorName هنا
+//       doctorName: newHistory.doctorName,
 //     },
 //   });
 // });
@@ -62,9 +83,14 @@
 // const getAllHistory = asyncWrapper(async (req, res, next) => {
 //   const { childId } = req.params;
 
-//   // مكان التعديل: أضفنا doctorName في الـ select
+//   // التحقق من وجود الطفل فقط (بدون التحقق من parentId)
+//   const child = await Child.findById(childId);
+//   if (!child) {
+//     return next(appError.create("Child not found", 404, httpStatusText.FAIL));
+//   }
+
 //   const history = await History.find({ childId }).select(
-//     "diagnosis disease treatment date childId notes notesImage time doctorName" // أضفنا doctorName هنا
+//     "diagnosis disease treatment date childId notes notesImage time doctorName"
 //   );
 
 //   if (!history.length) {
@@ -77,7 +103,6 @@
 //     );
 //   }
 
-//   // مكان التعديل: أضفنا doctorName في الـ Response
 //   res.json({
 //     status: httpStatusText.SUCCESS,
 //     data: history.map((record) => ({
@@ -88,8 +113,8 @@
 //       notes: record.notes,
 //       date: record.date,
 //       time: record.time,
-//       notesImage: record.notesImage, // عدلنا notesImage بدل notes
-//       doctorName: record.doctorName, // أضفنا doctorName هنا
+//       notesImage: record.notesImage,
+//       doctorName: record.doctorName,
 //     })),
 //   });
 // });
@@ -98,9 +123,14 @@
 // const getSingleHistory = asyncWrapper(async (req, res, next) => {
 //   const { childId, historyId } = req.params;
 
-//   // مكان التعديل: أضفنا doctorName في الـ select
+//   // التحقق من وجود الطفل فقط (بدون التحقق من parentId)
+//   const child = await Child.findById(childId);
+//   if (!child) {
+//     return next(appError.create("Child not found", 404, httpStatusText.FAIL));
+//   }
+
 //   const history = await History.findOne({ _id: historyId, childId }).select(
-//     "_id diagnosis disease treatment notes notesImage date time doctorName" // أضفنا doctorName هنا
+//     "_id diagnosis disease treatment notes notesImage date time doctorName"
 //   );
 
 //   if (!history) {
@@ -109,7 +139,6 @@
 //     );
 //   }
 
-//   // مكان التعديل: أضفنا doctorName في الـ Response
 //   res.json({
 //     status: httpStatusText.SUCCESS,
 //     data: {
@@ -121,7 +150,7 @@
 //       notesImage: history.notesImage,
 //       date: history.date,
 //       time: history.time,
-//       doctorName: history.doctorName, // أضفنا doctorName هنا
+//       doctorName: history.doctorName,
 //     },
 //   });
 // });
@@ -129,6 +158,7 @@
 // // ✅ Update a history record
 // const updateHistory = asyncWrapper(async (req, res, next) => {
 //   const { childId, historyId } = req.params;
+//   const userId = req.user?.id; // جعل userId اختياريًا
 //   const {
 //     diagnosis,
 //     disease,
@@ -138,9 +168,14 @@
 //     time,
 //     notesImage,
 //     doctorName,
-//   } = req.body; // أضفنا doctorName هنا
+//   } = req.body;
 
-//   // مكان التعديل: أضفنا doctorName في الـ Update
+//   // التحقق من وجود الطفل فقط (بدون التحقق من parentId)
+//   const child = await Child.findById(childId);
+//   if (!child) {
+//     return next(appError.create("Child not found", 404, httpStatusText.FAIL));
+//   }
+
 //   const updatedHistory = await History.findOneAndUpdate(
 //     { _id: historyId, childId },
 //     {
@@ -152,7 +187,7 @@
 //       time,
 //       notesImage,
 //       doctorName,
-//     }, // أضفنا doctorName هنا
+//     },
 //     { new: true, runValidators: true }
 //   );
 
@@ -162,7 +197,19 @@
 //     );
 //   }
 
-//   // مكان التعديل: أضفنا doctorName في الـ Response
+//   // إرسال الإشعار فقط إذا كان userId موجودًا
+//   if (userId) {
+//     await sendNotification(
+//       userId,
+//       childId,
+//       null,
+//       "History Updated",
+//       `${child.name}: ${updatedHistory.disease} updated.`,
+//       "history",
+//       "patient"
+//     );
+//   }
+
 //   res.json({
 //     status: httpStatusText.SUCCESS,
 //     data: {
@@ -175,7 +222,7 @@
 //         notesImage: updatedHistory.notesImage,
 //         date: updatedHistory.date,
 //         time: updatedHistory.time,
-//         doctorName: updatedHistory.doctorName, // أضفنا doctorName هنا
+//         doctorName: updatedHistory.doctorName,
 //       },
 //     },
 //   });
@@ -184,6 +231,13 @@
 // // ✅ Delete a history record
 // const deleteHistory = asyncWrapper(async (req, res, next) => {
 //   const { childId, historyId } = req.params;
+//   const userId = req.user?.id; // جعل userId اختياريًا
+
+//   // التحقق من وجود الطفل فقط (بدون التحقق من parentId)
+//   const child = await Child.findById(childId);
+//   if (!child) {
+//     return next(appError.create("Child not found", 404, httpStatusText.FAIL));
+//   }
 
 //   const deletedHistory = await History.findOneAndDelete({
 //     _id: historyId,
@@ -196,6 +250,19 @@
 //     );
 //   }
 
+//   // إرسال الإشعار فقط إذا كان userId موجودًا
+//   if (userId) {
+//     await sendNotification(
+//       userId,
+//       childId,
+//       null,
+//       "History Removed",
+//       `${child.name}: Record removed.`,
+//       "history",
+//       "patient"
+//     );
+//   }
+
 //   res.json({
 //     status: httpStatusText.SUCCESS,
 //     message: "History record deleted successfully",
@@ -205,6 +272,13 @@
 // // ✅ Filter history records using query parameters
 // const filterHistory = asyncWrapper(async (req, res, next) => {
 //   const { childId } = req.params;
+
+//   // التحقق من وجود الطفل فقط (بدون التحقق من parentId)
+//   const child = await Child.findById(childId);
+//   if (!child) {
+//     return next(appError.create("Child not found", 404, httpStatusText.FAIL));
+//   }
+
 //   const { diagnosis, disease, treatment, fromDate, toDate, sortBy } = req.query;
 
 //   let query = { childId };
@@ -230,10 +304,9 @@
 //     sortOption = { date: 1 };
 //   }
 
-//   // مكان التعديل: أضفنا doctorName في الـ select
 //   const history = await History.find(query)
 //     .sort(sortOption)
-//     .select("_id diagnosis disease treatment date doctorName"); // أضفنا doctorName هنا
+//     .select("_id diagnosis disease treatment date doctorName");
 
 //   if (!history.length) {
 //     return next(
@@ -241,7 +314,6 @@
 //     );
 //   }
 
-//   // مكان التعديل: أضفنا doctorName في الـ Response
 //   res.json({
 //     status: httpStatusText.SUCCESS,
 //     data: history.map((record) => ({
@@ -250,7 +322,7 @@
 //       disease: record.disease,
 //       treatment: record.treatment,
 //       date: record.date,
-//       doctorName: record.doctorName, // أضفنا doctorName هنا
+//       doctorName: record.doctorName,
 //     })),
 //   });
 // });
@@ -263,6 +335,7 @@
 //   deleteHistory,
 //   filterHistory,
 // };
+
 
 const History = require("../models/history.model");
 const Child = require("../models/child.model");
@@ -282,7 +355,6 @@ const createHistory = asyncWrapper(async (req, res, next) => {
     notes,
     date,
     time,
-    notesImage,
     doctorName,
   } = req.body;
 
@@ -302,6 +374,9 @@ const createHistory = asyncWrapper(async (req, res, next) => {
     return next(appError.create("Child not found", 404, httpStatusText.FAIL));
   }
 
+  // دعم multer: إذا كان هناك ملف مرفوع، استخدم مساره
+  const notesImage = req.file ? `/uploads/${req.file.filename}` : null;
+
   const newHistory = new History({
     childId,
     diagnosis,
@@ -311,7 +386,7 @@ const createHistory = asyncWrapper(async (req, res, next) => {
     date,
     time,
     doctorName: doctorName || undefined,
-    notesImage: notesImage || null,
+    notesImage,
   });
 
   await newHistory.save();
@@ -432,7 +507,6 @@ const updateHistory = asyncWrapper(async (req, res, next) => {
     notes,
     date,
     time,
-    notesImage,
     doctorName,
   } = req.body;
 
@@ -441,6 +515,9 @@ const updateHistory = asyncWrapper(async (req, res, next) => {
   if (!child) {
     return next(appError.create("Child not found", 404, httpStatusText.FAIL));
   }
+
+  // دعم multer: إذا كان هناك ملف مرفوع، استخدم مساره، وإلا احتفظ بالقيمة القديمة
+  const notesImage = req.file ? `/uploads/${req.file.filename}` : undefined;
 
   const updatedHistory = await History.findOneAndUpdate(
     { _id: historyId, childId },
@@ -451,7 +528,7 @@ const updateHistory = asyncWrapper(async (req, res, next) => {
       notes,
       date,
       time,
-      notesImage,
+      ...(notesImage && { notesImage }), // تحديث notesImage فقط إذا كان هناك ملف مرفوع
       doctorName,
     },
     { new: true, runValidators: true }

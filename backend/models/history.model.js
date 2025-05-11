@@ -44,27 +44,12 @@ const HistorySchema = new mongoose.Schema(
       type: String,
       required: [true, "Time is required"],
     },
-    // doctor: {
-    //   type: String,
-    //   required: [true, "Doctor is required"],
-    //   trim: true,
-    // },
     doctorName: {
       type: String,
-      required: [true, "Doctor name is required"], // الحقل إجباري
+      required: [true, "Doctor name is required"],
       trim: true,
-      default: "Dr. Islam Hasib", // القيمة الافتراضية لو ما اتحطش قيمة
+      default: "Dr. Islam Hasib",
     },
-    // doctorImage: {
-    //   type: String,
-    //   default: "uploads/default-doctor.jpg",
-    //   validate: {
-    //     validator: function (value) {
-    //       return /\.(jpg|jpeg|png|gif)$/i.test(value);
-    //     },
-    //     message: "Doctor image must be a valid image file",
-    //   },
-    // },
     notesImage: {
       type: String,
       default: null,

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Child Chat</title>
+  <style>
+    #chatBox {
+      height: 300px;
+      overflow-y: scroll;
+      border: 1px solid #ccc;
+      padding: 10px;
+    }
+
+    #messageInput {
+      width: 70%;
+      padding: 5px;
+    }
+
+    #sendButton {
+      padding: 5px 10px;
+    }
+
+    .message {
+      margin: 5px 0;
+    }
+
+    .message.child {
+      color: blue;
+    }
+
+    .message.doctor {
+      color: green;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>Child Chat</h2>
+  <div id="chatBox"></div>
+  <input type="text" id="messageInput" placeholder="Type a message...">
+  <button id="sendButton">Send</button>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // استبدل هذه القيم بمعرفات حقيقية من قاعدة البيانات
+    const childId = 'child123'; // معرف الطفل
+    const doctorId = 'doctor456'; // معرف الدكتور
+
+    const socket = io('http://localhost:3000'); // استبدل بالرابط الفعلي للسيرفر
+
+    // انضمام إلى غرفة الشات
+    socket.emit('joinChat', { childId, doctorId });
+
+    // جلب سجل الدردشة عند التحميل
+    fetch(`/api/chats/${childId}/${doctorId}/history`, {
+      headers: {
+        'Authorization': 'Bearer <patient-token>' // استبدل بـ token الخاص بولي الأمر
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'SUCCESS') {
+          const messages = data.data.messages;
+          messages.forEach(msg => displayMessage(msg));
+        } else {
+          console.error('Failed to load chat history:', data.message);
+        }
+      })
+      .catch(err => console.error('Error fetching chat history:', err));
+
+    // عرض الرسائل
+    socket.on('receiveMessage', (message) => {
+      displayMessage(message);
+    });
+
+    // دالة لعرض الرسالة في واجهة المستخدم
+    function displayMessage(message) {
+      const chatBox = document.getElementById('chatBox');
+      const messageDiv = document.createElement('div');
+      messageDiv.classList.add('message', message.sender);
+      messageDiv.textContent = `${message.sender}: ${message.content || ''} ${message.media ? '(Media: ' + message.media + ')' : ''} (${new Date(message.timestamp).toLocaleString()})`;
+      chatBox.appendChild(messageDiv);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    // إرسال رسالة
+    document.getElementById('sendButton').addEventListener('click', () => {
+      const messageInput = document.getElementById('messageInput');
+      const content = messageInput.value.trim();
+      if (content) {
+        const message = { childId, doctorId, sender: 'child', content, media: null };
+        socket.emit('sendMessage', message);
+        messageInput.value = '';
+      }
+    });
+
+    // إرسال عند الضغط على Enter
+    document.getElementById('messageInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') document.getElementById('sendButton').click();
+    });
+  </script>
+</body>
+
+</html>

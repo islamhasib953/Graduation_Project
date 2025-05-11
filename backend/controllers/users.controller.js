@@ -15,16 +15,14 @@
 //   res.json({ status: httpStatusText.SUCCESS, data: { users } });
 // });
 
-// // ✅ جلب بيانات اليوزر (Profile)
+// // جلب بيانات اليوزر (Profile)
 // const getUserProfile = asyncWrapper(async (req, res, next) => {
 //   const userId = req.user.id;
-
 //   if (!userId) {
 //     return next(
 //       appError.create("User ID not found in token", 401, httpStatusText.FAIL)
 //     );
 //   }
-
 //   if (req.user.role !== userRoles.PATIENT) {
 //     return next(
 //       appError.create(
@@ -34,13 +32,10 @@
 //       )
 //     );
 //   }
-
 //   const user = await User.findById(userId).select("-password -token");
-
 //   if (!user) {
 //     return next(appError.create("User not found", 404, httpStatusText.FAIL));
 //   }
-
 //   res.json({
 //     status: httpStatusText.SUCCESS,
 //     data: {
@@ -58,7 +53,7 @@
 //   });
 // });
 
-// // ✅ تعديل بيانات اليوزر (Profile)
+// // تعديل بيانات اليوزر (Profile)
 // const updateUserProfile = asyncWrapper(async (req, res, next) => {
 //   const userId = req.user.id;
 //   const { firstName, lastName, email, phone, address } = req.body;
@@ -74,7 +69,6 @@
 //   }
 
 //   const user = await User.findById(userId);
-
 //   if (!user) {
 //     return next(appError.create("User not found", 404, httpStatusText.FAIL));
 //   }
@@ -109,17 +103,21 @@
 
 //   await user.save();
 
-//   // إرسال إشعار مختصر مع التغييرات فقط
 //   if (changes.length > 0) {
-//     await sendNotification(
-//       userId,
-//       null,
-//       null,
-//       "Profile Updated",
-//       `Updated: ${changes.join(", ")}`,
-//       "user",
-//       "patient"
-//     );
+//     try {
+//       await sendNotification(
+//         userId,
+//         null,
+//         null,
+//         "Profile Updated",
+//         `Updated: ${changes.join(", ")}`,
+//         "profile",
+//         "patient"
+//       );
+//       console.log(`Notification sent for profile update: ${changes.join(", ")}`);
+//     } catch (error) {
+//       console.error(`Failed to send profile update notification: ${error.message}`);
+//     }
 //   }
 
 //   res.json({
@@ -140,23 +138,20 @@
 //   });
 // });
 
-// // ✅ حذف الأكونت بتاع اليوزر (مع مسح الـ Token)
+// // حذف الأكونت بتاع اليوزر
 // const deleteUserProfile = asyncWrapper(async (req, res, next) => {
 //   const userId = req.user.id;
 //   const userEmail = req.user.email;
-
 //   if (!userId) {
 //     return next(
 //       appError.create("User ID not found in token", 401, httpStatusText.FAIL)
 //     );
 //   }
-
 //   if (!mongoose.Types.ObjectId.isValid(userId)) {
 //     return next(
 //       appError.create("Invalid User ID in token", 400, httpStatusText.FAIL)
 //     );
 //   }
-
 //   if (req.user.role !== userRoles.PATIENT) {
 //     return next(
 //       appError.create(
@@ -166,51 +161,39 @@
 //       )
 //     );
 //   }
-
 //   const user = await User.findById(userId);
 //   if (!user) {
 //     return next(appError.create("User not found", 404, httpStatusText.FAIL));
 //   }
-
 //   if (user.email !== userEmail) {
 //     return next(
 //       appError.create("Unauthorized: Email mismatch", 403, httpStatusText.FAIL)
 //     );
 //   }
-
-//   // استخدام Transaction للتأكد من إن كل العمليات بتتم مع بعض
 //   const session = await mongoose.startSession();
 //   session.startTransaction();
-
 //   try {
 //     user.token = null;
 //     await user.save({ session });
-
 //     const deleteResult = await User.deleteOne({ _id: userId }, { session });
 //     if (deleteResult.deletedCount === 0) {
 //       throw new Error("Failed to delete user account");
 //     }
-
-//     // إرسال إشعار مختصر
 //     await sendNotification(
 //       userId,
 //       null,
 //       null,
 //       "Account Deleted",
 //       "Your account has been deleted.",
-//       "user",
+//       "profile", // تحديث type ليطابق enum
 //       "patient"
 //     );
-
-//     // Commit الـ Transaction
 //     await session.commitTransaction();
-
 //     res.json({
 //       status: httpStatusText.SUCCESS,
 //       message: "User account deleted successfully",
 //     });
 //   } catch (error) {
-//     // Rollback الـ Transaction لو حصل أي خطأ
 //     await session.abortTransaction();
 //     return next(
 //       appError.create(
@@ -224,10 +207,9 @@
 //   }
 // });
 
-// // ✅ تسجيل الخروج لليوزر
+// // تسجيل الخروج لليوزر
 // const logoutUser = asyncWrapper(async (req, res, next) => {
 //   const userId = req.user.id;
-
 //   if (req.user.role !== userRoles.PATIENT) {
 //     return next(
 //       appError.create(
@@ -237,33 +219,28 @@
 //       )
 //     );
 //   }
-
 //   const user = await User.findById(userId);
 //   if (!user) {
 //     return next(appError.create("User not found", 404, httpStatusText.FAIL));
 //   }
-
 //   user.token = null;
 //   await user.save();
-
-//   // إرسال إشعار مختصر
 //   await sendNotification(
 //     userId,
 //     null,
 //     null,
 //     "Logged Out",
 //     "You have logged out.",
-//     "logout",
+//     "general", // تحديث type ليطابق enum
 //     "patient"
 //   );
-
 //   res.json({
 //     status: httpStatusText.SUCCESS,
 //     message: "Logged out successfully",
 //   });
 // });
 
-// // ✅ Register New User or Doctor
+// // Register New User or Doctor
 // const registerUser = asyncWrapper(async (req, res, next) => {
 //   const {
 //     firstName,
@@ -280,20 +257,14 @@
 //     availableDays,
 //     availableTimes,
 //   } = req.body;
-
 //   const oldUser = await User.findOne({ email });
 //   const oldDoctor = await Doctor.findOne({ email });
 //   if (oldUser || oldDoctor) {
-//     const error = appError.create(
-//       "Email already exists",
-//       400,
-//       httpStatusText.FAIL
+//     return next(
+//       appError.create("Email already exists", 400, httpStatusText.FAIL)
 //     );
-//     return next(error);
 //   }
-
 //   const hashedPassword = await bcrypt.hash(password, 12);
-
 //   if (role === userRoles.DOCTOR) {
 //     const newDoctor = new Doctor({
 //       firstName,
@@ -311,19 +282,12 @@
 //       availableTimes,
 //       avatar: req.file ? req.file.filename : "uploads/doctor.jpg",
 //     });
-
 //     const token = await genrateJWT(
-//       {
-//         email: newDoctor.email,
-//         id: newDoctor._id,
-//         role: newDoctor.role,
-//       },
+//       { email: newDoctor.email, id: newDoctor._id, role: newDoctor.role },
 //       "7d"
 //     );
 //     newDoctor.token = token;
-
 //     await newDoctor.save();
-
 //     const doctorData = {
 //       _id: newDoctor._id,
 //       firstName: newDoctor.firstName,
@@ -342,18 +306,15 @@
 //       created_at: newDoctor.created_at,
 //       token: newDoctor.token,
 //     };
-
-//     // إرسال إشعار للدكتور
 //     await sendNotification(
 //       newDoctor._id,
 //       null,
 //       null,
 //       "Account Created",
 //       "Welcome! Your account has been created.",
-//       "user",
+//       "profile", // تحديث type ليطابق enum
 //       "doctor"
 //     );
-
 //     res.status(201).json({
 //       status: httpStatusText.SUCCESS,
 //       message: "Doctor registered successfully",
@@ -371,19 +332,12 @@
 //       role: userRoles.PATIENT,
 //       avatar: req.file ? req.file.filename : "uploads/profile.jpg",
 //     });
-
 //     const token = await genrateJWT(
-//       {
-//         email: newUser.email,
-//         id: newUser._id,
-//         role: newUser.role,
-//       },
+//       { email: newUser.email, id: newUser._id, role: newUser.role },
 //       "7d"
 //     );
 //     newUser.token = token;
-
 //     await newUser.save();
-
 //     const userData = {
 //       _id: newUser._id,
 //       firstName: newUser.firstName,
@@ -398,18 +352,15 @@
 //       created_at: newUser.created_at,
 //       token: newUser.token,
 //     };
-
-//     // إرسال إشعار للمستخدم
 //     await sendNotification(
 //       newUser._id,
 //       null,
 //       null,
 //       "Account Created",
 //       "Welcome! Your account has been created.",
-//       "user",
+//       "profile", // تحديث type ليطابق enum
 //       "patient"
 //     );
-
 //     res.status(201).json({
 //       status: httpStatusText.SUCCESS,
 //       message: "User registered successfully",
@@ -418,21 +369,16 @@
 //   }
 // });
 
-// // ✅ Login User or Doctor
+// // Login User or Doctor
 // const loginUser = asyncWrapper(async (req, res, next) => {
 //   const { email, password } = req.body;
 //   if (!email || !password) {
-//     const error = appError.create(
-//       "Email and Password are required",
-//       400,
-//       httpStatusText.FAIL
+//     return next(
+//       appError.create("Email and Password are required", 400, httpStatusText.FAIL)
 //     );
-//     return next(error);
 //   }
-
 //   let user = await User.findOne({ email });
 //   let role;
-
 //   if (user) {
 //     role = user.role;
 //   } else {
@@ -441,37 +387,26 @@
 //       role = user.role;
 //     }
 //   }
-
 //   if (!user) {
-//     const error = appError.create("User not found", 400, httpStatusText.FAIL);
-//     return next(error);
+//     return next(appError.create("User not found", 400, httpStatusText.FAIL));
 //   }
-
 //   const isPasswordCorrect = await bcrypt.compare(password, user.password);
 //   if (isPasswordCorrect && user) {
 //     const token = await genrateJWT(
-//       {
-//         email: user.email,
-//         id: user._id,
-//         role: role,
-//       },
+//       { email: user.email, id: user._id, role: role },
 //       "7d"
 //     );
-
 //     user.token = token;
 //     await user.save();
-
-//     // إرسال إشعار بناءً على دور المستخدم
 //     await sendNotification(
 //       user._id,
 //       null,
 //       null,
 //       "Logged In",
 //       "You have logged in successfully.",
-//       "login",
+//       "general", // تحديث type ليطابق enum
 //       role === userRoles.DOCTOR ? "doctor" : "patient"
 //     );
-
 //     res.status(200).json({
 //       status: httpStatusText.SUCCESS,
 //       data: {
@@ -480,26 +415,21 @@
 //       },
 //     });
 //   } else {
-//     const error = appError.create(
-//       "Email or Password are incorrect",
-//       500,
-//       httpStatusText.ERROR
+//     return next(
+//       appError.create("Email or Password are incorrect", 500, httpStatusText.ERROR)
 //     );
-//     return next(error);
 //   }
 // });
 
-// // ✅ Save FCM Token for user
+// // Save FCM Token for user
 // const saveFcmToken = asyncWrapper(async (req, res, next) => {
 //   const { fcmToken } = req.body;
 //   const userId = req.user.id;
-
 //   if (!fcmToken) {
 //     return next(
 //       appError.create("FCM Token is required", 400, httpStatusText.FAIL)
 //     );
 //   }
-
 //   if (req.user.role !== userRoles.PATIENT) {
 //     return next(
 //       appError.create(
@@ -509,51 +439,44 @@
 //       )
 //     );
 //   }
-
 //   const user = await User.findById(userId);
 //   if (!user) {
 //     return next(appError.create("User not found", 404, httpStatusText.FAIL));
-//   }
-
-//   if (user.fcmToken === fcmToken) {
-//     return res.status(200).json({
-//       status: httpStatusText.SUCCESS,
-//       message: "FCM Token is already up to date",
-//     });
-//   }
-
-//   await User.updateMany({ fcmToken, _id: { $ne: userId } }, { fcmToken: null });
-
-//   user.fcmToken = fcmToken;
-//   await user.save();
-
-//   await sendNotification(
-//     userId,
-//     null,
-//     null,
-//     "FCM Token Updated",
-//     "Notification settings updated.",
-//     "user",
-//     "patient"
-//   );
-
-//   res.status(200).json({
-//     status: httpStatusText.SUCCESS,
-//     message: "FCM Token saved successfully",
-//   });
+// }
+// if (user.fcmToken === fcmToken) {
+// return res.status(200).json({
+// status: httpStatusText.SUCCESS,
+// message: "FCM Token is already up to date",
+// });
+// }
+// await User.updateMany({ fcmToken, _id: { $ne: userId } }, { fcmToken: null });
+// user.fcmToken = fcmToken;
+// await user.save();
+// await sendNotification(
+// userId,
+// null,
+// null,
+// "FCM Token Updated",
+// "Notification settings updated.",
+// "profile", // تحديث type ليطابق enum
+// "patient"
+// );
+// res.status(200).json({
+// status: httpStatusText.SUCCESS,
+// message: "FCM Token saved successfully",
+// });
 // });
 
 // module.exports = {
-//   getAllUsers,
-//   registerUser,
-//   loginUser,
-//   getUserProfile,
-//   updateUserProfile,
-//   deleteUserProfile,
-//   logoutUser,
-//   saveFcmToken,
+// getAllUsers,
+// registerUser,
+// loginUser,
+// getUserProfile,
+// updateUserProfile,
+// deleteUserProfile,
+// logoutUser,
+// saveFcmToken,
 // };
-
 
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const User = require("../models/user.model");
@@ -630,6 +553,9 @@ const updateUserProfile = asyncWrapper(async (req, res, next) => {
     return next(appError.create("User not found", 404, httpStatusText.FAIL));
   }
 
+  // دعم multer: إذا كان هناك ملف مرفوع، استخدم مساره لتحديث avatar
+  const avatar = req.file ? `/uploads/${req.file.filename}` : undefined;
+
   const changes = [];
   if (firstName && firstName !== user.firstName) {
     changes.push(`name to ${firstName}`);
@@ -657,6 +583,10 @@ const updateUserProfile = asyncWrapper(async (req, res, next) => {
     changes.push(`address to ${address}`);
     user.address = address;
   }
+  if (avatar) {
+    changes.push(`avatar updated`);
+    user.avatar = avatar;
+  }
 
   await user.save();
 
@@ -671,9 +601,13 @@ const updateUserProfile = asyncWrapper(async (req, res, next) => {
         "profile",
         "patient"
       );
-      console.log(`Notification sent for profile update: ${changes.join(", ")}`);
+      console.log(
+        `Notification sent for profile update: ${changes.join(", ")}`
+      );
     } catch (error) {
-      console.error(`Failed to send profile update notification: ${error.message}`);
+      console.error(
+        `Failed to send profile update notification: ${error.message}`
+      );
     }
   }
 
@@ -742,7 +676,7 @@ const deleteUserProfile = asyncWrapper(async (req, res, next) => {
       null,
       "Account Deleted",
       "Your account has been deleted.",
-      "profile", // تحديث type ليطابق enum
+      "profile",
       "patient"
     );
     await session.commitTransaction();
@@ -788,7 +722,7 @@ const logoutUser = asyncWrapper(async (req, res, next) => {
     null,
     "Logged Out",
     "You have logged out.",
-    "general", // تحديث type ليطابق enum
+    "general",
     "patient"
   );
   res.json({
@@ -823,6 +757,9 @@ const registerUser = asyncWrapper(async (req, res, next) => {
   }
   const hashedPassword = await bcrypt.hash(password, 12);
   if (role === userRoles.DOCTOR) {
+    const avatar = req.file
+      ? `/uploads/${req.file.filename}`
+      : "uploads/doctor.jpg";
     const newDoctor = new Doctor({
       firstName,
       lastName,
@@ -837,7 +774,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       rate,
       availableDays,
       availableTimes,
-      avatar: req.file ? req.file.filename : "uploads/doctor.jpg",
+      avatar,
     });
     const token = await genrateJWT(
       { email: newDoctor.email, id: newDoctor._id, role: newDoctor.role },
@@ -869,7 +806,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       null,
       "Account Created",
       "Welcome! Your account has been created.",
-      "profile", // تحديث type ليطابق enum
+      "profile",
       "doctor"
     );
     res.status(201).json({
@@ -878,6 +815,9 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       data: { user: doctorData },
     });
   } else {
+    const avatar = req.file
+      ? `/uploads/${req.file.filename}`
+      : "uploads/profile.jpg";
     const newUser = new User({
       firstName,
       lastName,
@@ -887,7 +827,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       email,
       password: hashedPassword,
       role: userRoles.PATIENT,
-      avatar: req.file ? req.file.filename : "uploads/profile.jpg",
+      avatar,
     });
     const token = await genrateJWT(
       { email: newUser.email, id: newUser._id, role: newUser.role },
@@ -915,7 +855,7 @@ const registerUser = asyncWrapper(async (req, res, next) => {
       null,
       "Account Created",
       "Welcome! Your account has been created.",
-      "profile", // تحديث type ليطابق enum
+      "profile",
       "patient"
     );
     res.status(201).json({
@@ -931,7 +871,11 @@ const loginUser = asyncWrapper(async (req, res, next) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return next(
-      appError.create("Email and Password are required", 400, httpStatusText.FAIL)
+      appError.create(
+        "Email and Password are required",
+        400,
+        httpStatusText.FAIL
+      )
     );
   }
   let user = await User.findOne({ email });
@@ -961,7 +905,7 @@ const loginUser = asyncWrapper(async (req, res, next) => {
       null,
       "Logged In",
       "You have logged in successfully.",
-      "general", // تحديث type ليطابق enum
+      "general",
       role === userRoles.DOCTOR ? "doctor" : "patient"
     );
     res.status(200).json({
@@ -973,7 +917,11 @@ const loginUser = asyncWrapper(async (req, res, next) => {
     });
   } else {
     return next(
-      appError.create("Email or Password are incorrect", 500, httpStatusText.ERROR)
+      appError.create(
+        "Email or Password are incorrect",
+        500,
+        httpStatusText.ERROR
+      )
     );
   }
 });
@@ -999,38 +947,38 @@ const saveFcmToken = asyncWrapper(async (req, res, next) => {
   const user = await User.findById(userId);
   if (!user) {
     return next(appError.create("User not found", 404, httpStatusText.FAIL));
-}
-if (user.fcmToken === fcmToken) {
-return res.status(200).json({
-status: httpStatusText.SUCCESS,
-message: "FCM Token is already up to date",
-});
-}
-await User.updateMany({ fcmToken, _id: { $ne: userId } }, { fcmToken: null });
-user.fcmToken = fcmToken;
-await user.save();
-await sendNotification(
-userId,
-null,
-null,
-"FCM Token Updated",
-"Notification settings updated.",
-"profile", // تحديث type ليطابق enum
-"patient"
-);
-res.status(200).json({
-status: httpStatusText.SUCCESS,
-message: "FCM Token saved successfully",
-});
+  }
+  if (user.fcmToken === fcmToken) {
+    return res.status(200).json({
+      status: httpStatusText.SUCCESS,
+      message: "FCM Token is already up to date",
+    });
+  }
+  await User.updateMany({ fcmToken, _id: { $ne: userId } }, { fcmToken: null });
+  user.fcmToken = fcmToken;
+  await user.save();
+  await sendNotification(
+    userId,
+    null,
+    null,
+    "FCM Token Updated",
+    "Notification settings updated.",
+    "profile",
+    "patient"
+  );
+  res.status(200).json({
+    status: httpStatusText.SUCCESS,
+    message: "FCM Token saved successfully",
+  });
 });
 
 module.exports = {
-getAllUsers,
-registerUser,
-loginUser,
-getUserProfile,
-updateUserProfile,
-deleteUserProfile,
-logoutUser,
-saveFcmToken,
+  getAllUsers,
+  registerUser,
+  loginUser,
+  getUserProfile,
+  updateUserProfile,
+  deleteUserProfile,
+  logoutUser,
+  saveFcmToken,
 };

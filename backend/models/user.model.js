@@ -62,15 +62,17 @@ const userSchema = new mongoose.Schema(
       default: userRoles.PATIENT,
       required: true,
     },
-    fcmToken: { type: String, default: null }, // حقل جديد
+    fcmToken: { type: String, default: null },
     avatar: {
       type: String,
-      default: "uploads/profile.jpg",
+      default: "uploads/user-default.jpg",
+      validate: {
+        validator: function (value) {
+          return !value || /\.(jpg|jpeg|png|gif)$/i.test(value);
+        },
+        message: "Avatar must be a valid image file",
+      },
     },
-    // created_at: {
-    //   type: Date,
-    //   default: Date.now,
-    // },
   },
   { timestamps: true }
 );

@@ -9,10 +9,10 @@ const memorySchema = new mongoose.Schema(
     },
     image: {
       type: String,
-      default: "uploads/vaccination.jpg",
+      default: "uploads/memory-default.jpg",
       validate: {
         validator: function (value) {
-          return /\.(jpg|jpeg|png|gif)$/i.test(value);
+          return !value || /\.(jpg|jpeg|png|gif)$/i.test(value);
         },
         message: "Image must be a valid image file",
       },
