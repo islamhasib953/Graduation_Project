@@ -118,7 +118,6 @@
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import Literal, Union
 from src.services.model_manager import ModelManager
 import logging
 
@@ -129,6 +128,8 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="Disease Prediction API")
 
 # Pydantic models for input validation
+
+
 class AutismInput(BaseModel):
     A1: int
     A2: int
@@ -147,6 +148,7 @@ class AutismInput(BaseModel):
     Family_mem_with_ASD: str
     Who_completed_the_test: str
 
+
 class AsthmaInput(BaseModel):
     Age: int
     Gender: int
@@ -154,12 +156,12 @@ class AsthmaInput(BaseModel):
     EducationLevel: int
     BMI: float
     Smoking: int
-    PhysicalActivity: int
-    DietQuality: int
-    SleepQuality: int
-    PollutionExposure: int
-    PollenExposure: int
-    DustExposure: int
+    PhysicalActivity: float  # Changed to float
+    DietQuality: float      # Changed to float
+    SleepQuality: float     # Changed to float
+    PollutionExposure: float  # Changed to float
+    PollenExposure: float   # Changed to float
+    DustExposure: float     # Changed to float
     PetAllergy: int
     FamilyHistoryAsthma: int
     HistoryOfAllergies: int
@@ -175,6 +177,7 @@ class AsthmaInput(BaseModel):
     NighttimeSymptoms: int
     ExerciseInduced: int
 
+
 class StrokeInput(BaseModel):
     gender: str
     age: float
@@ -187,8 +190,10 @@ class StrokeInput(BaseModel):
     bmi: float
     smoking_status: str
 
+
 # Model managers
 model_managers = {}
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -201,23 +206,41 @@ async def startup_event():
         logger.error(f"Error initializing model managers: {str(e)}")
         raise
 
-@app.post("/predict/{disease}")
-async def predict(disease: Literal["asthma", "autism", "stroke"], input_data: Union[AutismInput, AsthmaInput, StrokeInput]):
+# Endpoint for asthma prediction
+
+
+@app.post("/predict/asthma")
+async def predict_asthma(input_data: AsthmaInput):
     try:
-        if disease not in model_managers:
-            raise HTTPException(status_code=400, detail=f"Unsupported disease: {disease}")
-
-        # Validate input model matches the disease
-        if disease == "autism" and not isinstance(input_data, AutismInput):
-            raise HTTPException(status_code=422, detail="Input data must match AutismInput schema for autism")
-        if disease == "asthma" and not isinstance(input_data, AsthmaInput):
-            raise HTTPException(status_code=422, detail="Input data must match AsthmaInput schema for asthma")
-        if disease == "stroke" and not isinstance(input_data, StrokeInput):
-            raise HTTPException(status_code=422, detail="Input data must match StrokeInput schema for stroke")
-
-        model_manager = model_managers[disease]
+        model_manager = model_managers["asthma"]
         prediction = model_manager.predict(input_data.dict())
         return prediction
     except Exception as e:
-        logger.error(f"Error during prediction for {disease}: {str(e)}")
+        logger.error(f"Error during prediction for asthma: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Endpoint for autism prediction
+
+
+@app.post("/predict/autism")
+async def predict_autism(input_data: AutismInput):
+    try:
+        model_manager = model_managers["autism"]
+        prediction = model_manager.predict(input_data.dict())
+        return prediction
+    except Exception as e:
+        logger.error(f"Error during prediction for autism: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Endpoint for stroke prediction
+
+
+@app.post("/predict/stroke")
+async def predict_stroke(input_data: StrokeInput):
+    try:
+        model_manager = model_managers["stroke"]
+        prediction = model_manager.predict(input_data.dict())
+        return prediction
+    except Exception as e:
+        logger.error(f"Error during prediction for stroke: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -275,12 +275,12 @@ class ModelManager:
                     diagnosis = "Asthma"
                     prediction = 1
                     probability = random.uniform(0.5, 0.9)
-                elif prediction == 1 and probability < 0.25:
-                    diagnosis = "No Asthma"
+                elif prediction == 1 and probability > 0.25:
+                    diagnosis = "Asthma"
                     prediction = 0
                     probability = random.uniform(0.5, 0.9)
-                else:  # prediction == 1 and probability >= 0.25
-                    diagnosis = "Asthma"
+                elif prediction == 1 and probability < 0.25:
+                    diagnosis = "No Asthma"
                     probability = random.uniform(0.5, 0.9)
             elif self.disease == "autism":
                 diagnosis = "ASD" if prediction == 1 else "No ASD"
