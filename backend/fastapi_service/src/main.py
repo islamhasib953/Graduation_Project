@@ -11,8 +11,6 @@
 # app = FastAPI(title="Disease Prediction API")
 
 # # Pydantic models for input validation
-
-
 # class AutismInput(BaseModel):
 #     A1: int
 #     A2: int
@@ -31,7 +29,6 @@
 #     Family_mem_with_ASD: str
 #     Who_completed_the_test: str
 
-
 # class AsthmaInput(BaseModel):
 #     Age: int
 #     Gender: int
@@ -39,12 +36,12 @@
 #     EducationLevel: int
 #     BMI: float
 #     Smoking: int
-#     PhysicalActivity: float
-#     DietQuality: float
-#     SleepQuality: float
-#     PollutionExposure: float
-#     PollenExposure: float
-#     DustExposure: float
+#     PhysicalActivity: int
+#     DietQuality: int
+#     SleepQuality: int
+#     PollutionExposure: int
+#     PollenExposure: int
+#     DustExposure: int
 #     PetAllergy: int
 #     FamilyHistoryAsthma: int
 #     HistoryOfAllergies: int
@@ -60,7 +57,6 @@
 #     NighttimeSymptoms: int
 #     ExerciseInduced: int
 
-
 # class StrokeInput(BaseModel):
 #     gender: str
 #     age: float
@@ -73,10 +69,8 @@
 #     bmi: float
 #     smoking_status: str
 
-
 # # Model managers
 # model_managers = {}
-
 
 # @app.on_event("startup")
 # async def startup_event():
@@ -89,24 +83,19 @@
 #         logger.error(f"Error initializing model managers: {str(e)}")
 #         raise
 
-
 # @app.post("/predict/{disease}")
 # async def predict(disease: Literal["asthma", "autism", "stroke"], input_data: Union[AutismInput, AsthmaInput, StrokeInput]):
 #     try:
 #         if disease not in model_managers:
-#             raise HTTPException(
-#                 status_code=400, detail=f"Unsupported disease: {disease}")
+#             raise HTTPException(status_code=400, detail=f"Unsupported disease: {disease}")
 
 #         # Validate input model matches the disease
 #         if disease == "autism" and not isinstance(input_data, AutismInput):
-#             raise HTTPException(
-#                 status_code=422, detail="Input data must match AutismInput schema for autism")
+#             raise HTTPException(status_code=422, detail="Input data must match AutismInput schema for autism")
 #         if disease == "asthma" and not isinstance(input_data, AsthmaInput):
-#             raise HTTPException(
-#                 status_code=422, detail="Input data must match AsthmaInput schema for asthma")
+#             raise HTTPException(status_code=422, detail="Input data must match AsthmaInput schema for asthma")
 #         if disease == "stroke" and not isinstance(input_data, StrokeInput):
-#             raise HTTPException(
-#                 status_code=422, detail="Input data must match StrokeInput schema for stroke")
+#             raise HTTPException(status_code=422, detail="Input data must match StrokeInput schema for stroke")
 
 #         model_manager = model_managers[disease]
 #         prediction = model_manager.predict(input_data.dict())
@@ -116,19 +105,41 @@
 #         raise HTTPException(status_code=500, detail=str(e))
 
 
-from fastapi import FastAPI, HTTPException
+import random
+import json
+import pickle
+import numpy as np
+from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Literal, Union
+import speech_recognition as sr
+from gtts import gTTS
+import nltk
+from nltk.stem import WordNetLemmatizer
+import tensorflow as tf
+import base64
+import io
 from src.services.model_manager import ModelManager
 import logging
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+nltk.download('wordnet')
+nltk.download('punkt')
 
 app = FastAPI(title="Disease Prediction API")
 
+origins = ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Pydantic models for input validation
+
+
 class AutismInput(BaseModel):
     A1: int
     A2: int
@@ -147,6 +158,7 @@ class AutismInput(BaseModel):
     Family_mem_with_ASD: str
     Who_completed_the_test: str
 
+
 class AsthmaInput(BaseModel):
     Age: int
     Gender: int
@@ -154,12 +166,12 @@ class AsthmaInput(BaseModel):
     EducationLevel: int
     BMI: float
     Smoking: int
-    PhysicalActivity: int
-    DietQuality: int
-    SleepQuality: int
-    PollutionExposure: int
-    PollenExposure: int
-    DustExposure: int
+    PhysicalActivity: float
+    DietQuality: float
+    SleepQuality: float
+    PollutionExposure: float
+    PollenExposure: float
+    DustExposure: float
     PetAllergy: int
     FamilyHistoryAsthma: int
     HistoryOfAllergies: int
@@ -175,6 +187,7 @@ class AsthmaInput(BaseModel):
     NighttimeSymptoms: int
     ExerciseInduced: int
 
+
 class StrokeInput(BaseModel):
     gender: str
     age: float
@@ -187,8 +200,25 @@ class StrokeInput(BaseModel):
     bmi: float
     smoking_status: str
 
+
+class ChatbotInput(BaseModel):
+    msg: str
+
+
+# Error messages dictionary
+error_messages = {
+    "no_message": "No message provided. Please enter a message.",
+    "speech_recognition_error": "Unable to recognize speech. Please try again.",
+    "speech_recognition_service_error": "Speech recognition service error. Please check your internet connection.",
+    "general_error": "Sorry, I didn't understand that, please try again in appropriate sentence or questions :).",
+    "file_format_error": "File must be in WAV format."
+}
+
 # Model managers
 model_managers = {}
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -196,28 +226,88 @@ async def startup_event():
         model_managers["asthma"] = ModelManager("asthma")
         model_managers["autism"] = ModelManager("autism")
         model_managers["stroke"] = ModelManager("stroke")
+        model_managers["chatbot"] = ModelManager("chatbot")
         logger.info("Model managers initialized successfully")
     except Exception as e:
         logger.error(f"Error initializing model managers: {str(e)}")
         raise
 
-@app.post("/predict/{disease}")
-async def predict(disease: Literal["asthma", "autism", "stroke"], input_data: Union[AutismInput, AsthmaInput, StrokeInput]):
+# Existing endpoints
+
+
+@app.post("/predict/asthma")
+async def predict_asthma(input_data: AsthmaInput):
     try:
-        if disease not in model_managers:
-            raise HTTPException(status_code=400, detail=f"Unsupported disease: {disease}")
-
-        # Validate input model matches the disease
-        if disease == "autism" and not isinstance(input_data, AutismInput):
-            raise HTTPException(status_code=422, detail="Input data must match AutismInput schema for autism")
-        if disease == "asthma" and not isinstance(input_data, AsthmaInput):
-            raise HTTPException(status_code=422, detail="Input data must match AsthmaInput schema for asthma")
-        if disease == "stroke" and not isinstance(input_data, StrokeInput):
-            raise HTTPException(status_code=422, detail="Input data must match StrokeInput schema for stroke")
-
-        model_manager = model_managers[disease]
+        model_manager = model_managers["asthma"]
         prediction = model_manager.predict(input_data.dict())
         return prediction
     except Exception as e:
-        logger.error(f"Error during prediction for {disease}: {str(e)}")
+        logger.error(f"Error during prediction for asthma: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/predict/autism")
+async def predict_autism(input_data: AutismInput):
+    try:
+        model_manager = model_managers["autism"]
+        prediction = model_manager.predict(input_data.dict())
+        return prediction
+    except Exception as e:
+        logger.error(f"Error during prediction for autism: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/predict/stroke")
+async def predict_stroke(input_data: StrokeInput):
+    try:
+        model_manager = model_managers["stroke"]
+        prediction = model_manager.predict(input_data.dict())
+        return prediction
+    except Exception as e:
+        logger.error(f"Error during prediction for stroke: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Chatbot endpoints
+
+
+@app.post("/medi_text")
+async def process_medi_message(user_message: ChatbotInput):
+    try:
+        text_message = user_message.msg.lower()
+        if not text_message:
+            return JSONResponse(content={"text_response": error_messages["no_message"]}, status_code=400)
+        model_manager = model_managers["chatbot"]
+        prediction = model_manager.predict({"msg": text_message})
+        return prediction
+    except Exception as e:
+        logger.error(f"Error during text prediction: {str(e)}")
+        return JSONResponse(content={"text_response": error_messages["general_error"]}, status_code=500)
+
+
+@app.post("/medi_voice")
+async def process_medi_message(file: UploadFile = File(...)):
+    try:
+        if file.filename.endswith('.wav'):
+            audio_data = await file.read()
+            recognizer = sr.Recognizer()
+            with io.BytesIO(audio_data) as f:
+                audio = sr.AudioFile(f)
+                with audio as source:
+                    audio_data = recognizer.record(source)
+            text_message = recognizer.recognize_google(
+                audio_data, language='en').lower()
+            if not text_message:
+                return JSONResponse(content={"text_response": error_messages["no_message"]}, status_code=400)
+            input_data = {"msg": text_message}
+            model_manager = model_managers["chatbot"]
+            prediction = model_manager.predict(input_data)
+            return prediction
+        else:
+            return JSONResponse(content={"text_response": error_messages["file_format_error"]}, status_code=400)
+    except sr.UnknownValueError:
+        return JSONResponse(content={"text_response": error_messages["speech_recognition_error"]}, status_code=400)
+    except sr.RequestError:
+        return JSONResponse(content={"text_response": error_messages["speech_recognition_service_error"]}, status_code=400)
+    except Exception as e:
+        logger.error(f"Error during voice prediction: {str(e)}")
+        return JSONResponse(content={"text_response": error_messages["general_error"]}, status_code=500)
