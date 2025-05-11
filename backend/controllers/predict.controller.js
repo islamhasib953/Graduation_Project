@@ -136,6 +136,7 @@
 
 // module.exports = { predictDisease };
 
+
 const axios = require("axios");
 const FormData = require("form-data"); // Added for file upload
 const fs = require("fs");
@@ -249,7 +250,7 @@ const predictDisease = async (req, res, next) => {
         formData.append("file", fs.createReadStream(req.file.path), {
           filename: req.file.originalname,
         });
-        endpoint = `${FASTAPI_URL}/medi_voice`;
+        endpoint = `${FASTAPI_URL}/medi_voice`; // Voice endpoint
         const response = await axios.post(endpoint, formData, {
           headers: formData.getHeaders(),
         });
@@ -262,7 +263,7 @@ const predictDisease = async (req, res, next) => {
         });
       } else if (req.body.msg) {
         // Handle text input
-        endpoint = `${FASTAPI_URL}/medi_text`;
+        endpoint = `${FASTAPI_URL}/medi_text`; // Text endpoint
         const response = await axios.post(endpoint, req.body);
         logger.info(`Prediction successful for ${disease} (text)`, {
           response: response.data,
