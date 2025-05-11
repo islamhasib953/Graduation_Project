@@ -116,16 +116,37 @@
 #         raise HTTPException(status_code=500, detail=str(e))
 
 
-from fastapi import FastAPI, HTTPException
+import random
+import json
+import pickle
+import numpy as np
+from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import speech_recognition as sr
+from gtts import gTTS
+import nltk
+from nltk.stem import WordNetLemmatizer
+import tensorflow as tf
+import base64
+import io
 from src.services.model_manager import ModelManager
 import logging
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+nltk.download('wordnet')
+nltk.download('punkt')
 
 app = FastAPI(title="Disease Prediction API")
+
+origins = ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Pydantic models for input validation
 
@@ -156,12 +177,12 @@ class AsthmaInput(BaseModel):
     EducationLevel: int
     BMI: float
     Smoking: int
-    PhysicalActivity: float  # Changed to float
-    DietQuality: float      # Changed to float
-    SleepQuality: float     # Changed to float
-    PollutionExposure: float  # Changed to float
-    PollenExposure: float   # Changed to float
-    DustExposure: float     # Changed to float
+    PhysicalActivity: float
+    DietQuality: float
+    SleepQuality: float
+    PollutionExposure: float
+    PollenExposure: float
+    DustExposure: float
     PetAllergy: int
     FamilyHistoryAsthma: int
     HistoryOfAllergies: int
@@ -191,8 +212,23 @@ class StrokeInput(BaseModel):
     smoking_status: str
 
 
+class ChatbotInput(BaseModel):
+    msg: str
+
+
+# Error messages dictionary
+error_messages = {
+    "no_message": "No message provided. Please enter a message.",
+    "speech_recognition_error": "Unable to recognize speech. Please try again.",
+    "speech_recognition_service_error": "Speech recognition service error. Please check your internet connection.",
+    "general_error": "Sorry, I didn't understand that, please try again in appropriate sentence or questions :).",
+    "file_format_error": "File must be in WAV format."
+}
+
 # Model managers
 model_managers = {}
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 
 @app.on_event("startup")
@@ -201,12 +237,13 @@ async def startup_event():
         model_managers["asthma"] = ModelManager("asthma")
         model_managers["autism"] = ModelManager("autism")
         model_managers["stroke"] = ModelManager("stroke")
+        model_managers["chatbot"] = ModelManager("chatbot")
         logger.info("Model managers initialized successfully")
     except Exception as e:
         logger.error(f"Error initializing model managers: {str(e)}")
         raise
 
-# Endpoint for asthma prediction
+# Existing endpoints
 
 
 @app.post("/predict/asthma")
@@ -219,8 +256,6 @@ async def predict_asthma(input_data: AsthmaInput):
         logger.error(f"Error during prediction for asthma: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Endpoint for autism prediction
-
 
 @app.post("/predict/autism")
 async def predict_autism(input_data: AutismInput):
@@ -232,8 +267,6 @@ async def predict_autism(input_data: AutismInput):
         logger.error(f"Error during prediction for autism: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Endpoint for stroke prediction
-
 
 @app.post("/predict/stroke")
 async def predict_stroke(input_data: StrokeInput):
@@ -244,3 +277,48 @@ async def predict_stroke(input_data: StrokeInput):
     except Exception as e:
         logger.error(f"Error during prediction for stroke: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# Chatbot endpoints
+
+
+@app.post("/medi_text")
+async def process_medi_message(user_message: ChatbotInput):
+    try:
+        text_message = user_message.msg.lower()
+        if not text_message:
+            return JSONResponse(content={"text_response": error_messages["no_message"]}, status_code=400)
+        model_manager = model_managers["chatbot"]
+        prediction = model_manager.predict({"msg": text_message})
+        return prediction
+    except Exception as e:
+        logger.error(f"Error during text prediction: {str(e)}")
+        return JSONResponse(content={"text_response": error_messages["general_error"]}, status_code=500)
+
+
+@app.post("/medi_voice")
+async def process_medi_message(file: UploadFile = File(...)):
+    try:
+        if file.filename.endswith('.wav'):
+            audio_data = await file.read()
+            recognizer = sr.Recognizer()
+            with io.BytesIO(audio_data) as f:
+                audio = sr.AudioFile(f)
+                with audio as source:
+                    audio_data = recognizer.record(source)
+            text_message = recognizer.recognize_google(
+                audio_data, language='en').lower()
+            if not text_message:
+                return JSONResponse(content={"text_response": error_messages["no_message"]}, status_code=400)
+            input_data = {"msg": text_message}
+            model_manager = model_managers["chatbot"]
+            prediction = model_manager.predict(input_data)
+            return prediction
+        else:
+            return JSONResponse(content={"text_response": error_messages["file_format_error"]}, status_code=400)
+    except sr.UnknownValueError:
+        return JSONResponse(content={"text_response": error_messages["speech_recognition_error"]}, status_code=400)
+    except sr.RequestError:
+        return JSONResponse(content={"text_response": error_messages["speech_recognition_service_error"]}, status_code=400)
+    except Exception as e:
+        logger.error(f"Error during voice prediction: {str(e)}")
+        return JSONResponse(content={"text_response": error_messages["general_error"]}, status_code=500)
