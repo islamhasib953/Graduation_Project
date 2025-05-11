@@ -5,6 +5,7 @@ const allowedTo = require("../middlewares/allowedTo");
 const userRoles = require("../utils/userRoles");
 const chatController = require("../controllers/chat.controller");
 const upload = require("../utils/multer.config");
+const mongoose = require("mongoose"); // استيراد mongoose
 
 // التحقق من صحة المعرفات
 const validateIds = (req, res, next) => {

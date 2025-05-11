@@ -40,12 +40,16 @@
   <div id="chatBox"></div>
   <input type="text" id="messageInput" placeholder="Type a message...">
   <button id="sendButton">Send</button>
+  <br>
+  <input type="file" id="mediaInput" accept="image/*,application/pdf,.doc,.docx">
+  <button id="uploadButton">Upload Media</button>
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>
     const childId = '6814bd00d157322d7cad7661';
     const doctorId = '67feab9a9d5743ac32a1e851';
-    const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImJhYmFAZXhhbXBsZS5jb20iLCJpZCI6IjY4MTRiY2VmZDE1NzMyMmQ3Y2FkNzY1OCIsInJvbGUiOiJwYXRpZW50IiwiaWF0IjoxNzQ2OTg2MDMwLCJleHAiOjE3NDc1OTA4MzB9.-Xl4X9h1ouKdwDDNQtMf4e5523Mp8Ak1RgmJBZCx2XM'
+    const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImJhYmFAZXhhbXBsZS5jb20iLCJpZCI6IjY4MTRiY2VmZDE1NzMyMmQ3Y2FkNzY1OCIsInJvbGUiOiJwYXRpZW50IiwiaWF0IjoxNzQ2OTg0OTc0LCJleHAiOjE3NDc1ODk3NzR9.AIWcXDh0KGzeLq7MyfVtftW4zGNJmAsY5zAEiu5H_4w';
+
     const socket = io('https://sigma-3hkg.onrender.com');
 
     socket.on('connect', () => {
@@ -102,6 +106,41 @@
 
     document.getElementById('messageInput').addEventListener('keypress', (e) => {
       if (e.key === 'Enter') document.getElementById('sendButton').click();
+    });
+
+    // معالجة رفع الملفات
+    document.getElementById('uploadButton').addEventListener('click', () => {
+      const mediaInput = document.getElementById('mediaInput');
+      const file = mediaInput.files[0];
+      if (file) {
+        const formData = new FormData();
+        formData.append('media', file);
+
+        fetch(`https://sigma-3hkg.onrender.com/api/chats/${childId}/${doctorId}/upload`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: formData
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.status === 'SUCCESS') {
+              console.log('Media uploaded:', data.data.mediaUrl);
+              const message = {
+                sender: 'child',
+                media: data.data.mediaUrl,
+                timestamp: new Date()
+              };
+              displayMessage(message); // عرض الملف المرفوع في الشات
+              socket.emit('sendMessage', { childId, doctorId, sender: 'child', media: data.data.mediaUrl, content: null });
+            } else {
+              console.error('Failed to upload media:', data.message);
+              alert(data.message);
+            }
+          })
+          .catch(err => console.error('Error uploading media:', err));
+      } else {
+        alert('Please select a file to upload');
+      }
     });
   </script>
 </body>
