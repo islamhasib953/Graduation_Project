@@ -5,23 +5,23 @@ const notificationSchema = new mongoose.Schema(
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: false,
+      default: null,
     },
     childId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Child",
-      required: false,
+      default: null,
     },
     doctorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Doctor",
-      required: false,
+      default: null,
     },
     title: {
       type: String,
       required: true,
     },
-    message: {
+    body: {
       type: String,
       required: true,
     },
@@ -32,24 +32,31 @@ const notificationSchema = new mongoose.Schema(
         "vaccination",
         "growth",
         "growth_alert",
-        "appointment",
         "appointment_reminder",
-        "favorite",
         "general",
         "profile",
         "logout",
-        "doctor",
+        "bracelet",
       ],
       required: true,
     },
-    recipientId: {
-      type: mongoose.Schema.Types.ObjectId,
-      required: false, // اختياري للتوافق مع الإشعارات القديمة
-    },
-    recipientType: {
+    target: {
       type: String,
       enum: ["patient", "doctor"],
-      required: false, // اختياري للتوافق مع الإشعارات القديمة
+      required: true,
+    },
+    isRead: {
+      type: Boolean,
+      default: false,
+    },
+    status: {
+      type: String,
+      enum: ["pending", "sent", "failed"],
+      default: "pending",
+    },
+    sentAt: {
+      type: Date,
+      default: null,
     },
   },
   { timestamps: true }
