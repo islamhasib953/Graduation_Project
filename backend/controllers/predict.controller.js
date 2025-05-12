@@ -242,7 +242,7 @@ const predictDisease = async (req, res, next) => {
     logger.info(`Prediction request for ${disease}`, { input: req.body });
 
     // Send request to FastAPI
-    let endpoint = `${FASTAPI_URL}/predict/${disease}`;
+    let endpoint = `${FASTAPI_URL}/predict/${disease}`; // Default for asthma, autism, stroke
     if (disease === "chatbot") {
       if (req.file && req.file.fieldname === "audio") {
         // Handle voice input (WAV file)
