@@ -447,16 +447,37 @@ const scheduleNotifications = () => {
       const currentMoment = moment(now.format("h:mm A"), "h:mm A");
 
       for (const medicine of medicines) {
+        // التحقق من وجود userId و childId
+        if (!medicine.userId) {
+          console.error(`Medicine with ID ${medicine._id} has missing userId`);
+          continue;
+        }
+        if (!medicine.childId) {
+          console.error(
+            `Medicine with ID ${medicine._id} has invalid or missing childId: ${medicine.childId}`
+          );
+          continue;
+        }
+
         const userId = medicine.userId;
         const childId = medicine.childId._id;
         const childName = medicine.childId.name;
 
         for (const time of medicine.times) {
+          // التحقق من صلاحية تنسيق الوقت
+          const medicineTime = moment(time, "h:mm A", true);
+          if (!medicineTime.isValid()) {
+            console.error(
+              `Invalid time format for medicine ${medicine._id}: ${time}`
+            );
+            continue;
+          }
+
           const notificationKey = `${currentDate.toISOString()}-${currentDay}-${
             medicine._id
           }-${time}-medicine`;
 
-          // التحقق من وجود إشعار تم إرساله لهذا المفتاح في قاعدة البيانات
+          // التحقق من وجود إشعار تم إرساله
           const existingNotification = await Notification.findOne({
             userId,
             childId,
@@ -470,7 +491,6 @@ const scheduleNotifications = () => {
             continue;
           }
 
-          const medicineTime = moment(time, "h:mm A");
           const timeDiffMinutes = Math.abs(
             currentMoment.diff(medicineTime, "minutes")
           );
@@ -502,7 +522,7 @@ const scheduleNotifications = () => {
       console.error("Error in medicine notification cron job:", error);
     }
   });
-
+  
   // إشعارات التطعيمات: التحقق كل دقيقة بناءً على الوقت (8:00 AM ±5 دقائق)
   cron.schedule("* * * * *", async () => {
     try {
