@@ -157,7 +157,6 @@
 #         except Exception as e:
 #             self.logger.error(f"Error during prediction: {str(e)}")
 #             raise
-
 import joblib
 import pandas as pd
 import numpy as np
@@ -250,7 +249,12 @@ class ModelManager:
 
     def predict_class(self, sentence):
         bow = self.bag_of_words(sentence)
-        res = self.model.predict(np.array([bow]))[0]
+        # Ensure the input is a 2D array with shape (1, len(words))
+        bow = np.array([bow])  # Shape becomes (1, len(words))
+        if bow.shape[1] != len(self.words):
+            raise ValueError(
+                f"Expected input size {len(self.words)}, got {bow.shape[1]}")
+        res = self.model.predict(bow)[0]  # Predict with proper shape
         ERROR_THRESHOLD = 0.25
         results = [[i, r] for i, r in enumerate(res) if r > ERROR_THRESHOLD]
         results.sort(key=lambda x: x[1], reverse=True)
@@ -277,8 +281,8 @@ class ModelManager:
 
     def preprocess_input(self, input_data: Dict[str, Any]) -> np.ndarray:
         try:
-            df = pd.DataFrame([input_data])
             if self.disease == "asthma":
+                df = pd.DataFrame([input_data])
                 df['BMI'] = df['BMI'].round(2)
                 df['LungFunctionFEV1'] = df['LungFunctionFEV1'].round(1)
                 df['LungFunctionFVC'] = df['LungFunctionFVC'].round(1)
@@ -291,7 +295,9 @@ class ModelManager:
                     f"Input data before scaling: {df[numerical_cols]}")
                 df[numerical_cols] = self.scaler.transform(df[numerical_cols])
                 self.logger.info(f"Scaled numerical columns: {numerical_cols}")
+                return df
             elif self.disease == "autism":
+                df = pd.DataFrame([input_data])
                 if 'Who completed the test' in df.columns:
                     df['Who completed the test'] = df['Who completed the test'].replace(
                         'Parent', 'family member')
@@ -315,7 +321,9 @@ class ModelManager:
                 self.logger.info(f"Input data before scaling: {df}")
                 df = self.scaler.transform(df)
                 self.logger.info(f"Scaled features for autism")
+                return df
             elif self.disease == "stroke":
+                df = pd.DataFrame([input_data])
                 df['gender'] = df['gender'].replace({'Male': 0, 'Female': 1})
                 for col in ['ever_married', 'smoking_status']:
                     if col in df.columns:
@@ -336,75 +344,65 @@ class ModelManager:
                 self.logger.info(f"Input data before scaling: {df}")
                 df = self.scaler.transform(df)
                 self.logger.info(f"Scaled features for stroke")
+                return df
             elif self.disease == "chatbot":
                 sentence = input_data.get('msg', '')
                 if not sentence:
                     raise ValueError("No message provided")
+                # Return bag of words directly
                 return self.bag_of_words(sentence.lower())
-            return df
         except Exception as e:
             self.logger.error(f"Error preprocessing input data: {str(e)}")
             raise
 
     def predict(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            X = self.preprocess_input(input_data)
             if self.disease in ["asthma", "autism", "stroke"]:
+                X = self.preprocess_input(input_data)
                 prediction = self.model.predict(X)[0]
                 probability = self.model.predict_proba(X)[0][1] if hasattr(
                     self.model, 'predict_proba') else random.uniform(0.5, 0.9)
+                if self.disease == "asthma":
+                    if prediction == 0 and probability > 0.7:
+                        diagnosis = "No Asthma"
+                    elif prediction == 0 and probability <= 0.7:
+                        diagnosis = "Asthma"
+                        prediction = 1
+                    elif prediction == 1 and probability > 0.25:
+                        diagnosis = "Asthma"
+                    elif prediction == 1 and probability < 0.25:
+                        diagnosis = "No Asthma"
+                elif self.disease == "autism":
+                    diagnosis = "ASD" if prediction == 1 else "No ASD"
+                elif self.disease == "stroke":
+                    diagnosis = "Stroke" if prediction == 1 and probability > 0.1 else "No Stroke"
+                return {
+                    "prediction": int(prediction),
+                    "probability": float(probability),
+                    "diagnosis": diagnosis,
+                    "class_predicted": diagnosis,
+                    "probability_note": f"Probability represents the likelihood of {self.disease.capitalize()}"
+                }
             elif self.disease == "chatbot":
-                res = self.model.predict(X)[0]
-                ERROR_THRESHOLD = 0.25
-                results = [[i, r]
-                           for i, r in enumerate(res) if r > ERROR_THRESHOLD]
-                results.sort(key=lambda x: x[1], reverse=True)
-                return_list = []
-                if results:
-                    for r in results:
-                        return_list.append(
-                            {'intent': self.classes[r[0]], 'probability': str(r[1])})
-                if not return_list:
+                sentence = input_data.get('msg', '')
+                if not sentence:
                     return {
-                        "user_message": input_data.get('msg', ''),
+                        "user_message": "",
+                        "text_response": "No message provided"
+                    }
+                predict = self.predict_class(sentence.lower())
+                if not predict:
+                    return {
+                        "user_message": sentence,
                         "text_response": "Sorry, I didn't understand that."
                     }
-                tag = return_list[0]['intent']
-                for i in self.intents['intents']:
-                    if i['tag'] == tag:
-                        response = random.choice(i['responses'])
-                        break
-                else:
-                    response = "Sorry, I didn't understand that."
+                response = self.get_response(predict)
                 return {
-                    "user_message": input_data.get('msg', ''),
+                    "user_message": sentence,
                     "text_response": response
                 }
             else:
                 raise ValueError(f"Unsupported disease: {self.disease}")
-
-            if self.disease == "asthma":
-                if prediction == 0 and probability > 0.7:
-                    diagnosis = "No Asthma"
-                elif prediction == 0 and probability <= 0.7:
-                    diagnosis = "Asthma"
-                    prediction = 1
-                elif prediction == 1 and probability > 0.25:
-                    diagnosis = "Asthma"
-                elif prediction == 1 and probability < 0.25:
-                    diagnosis = "No Asthma"
-            elif self.disease == "autism":
-                diagnosis = "ASD" if prediction == 1 else "No ASD"
-            elif self.disease == "stroke":
-                diagnosis = "Stroke" if prediction == 1 and probability > 0.1 else "No Stroke"
-
-            return {
-                "prediction": int(prediction),
-                "probability": float(probability),
-                "diagnosis": diagnosis,
-                "class_predicted": diagnosis,
-                "probability_note": f"Probability represents the likelihood of {self.disease.capitalize()}"
-            }
         except Exception as e:
             self.logger.error(f"Error during prediction: {str(e)}")
             raise
