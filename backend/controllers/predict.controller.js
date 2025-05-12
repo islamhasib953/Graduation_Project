@@ -144,7 +144,7 @@ const winston = require("winston");
 const httpStatusText = require("../utils/httpStatusText");
 const AppError = require("../utils/appError");
 
-const FASTAPI_URL = process.env.FASTAPI_URL; // || "http://localhost:8001";
+const FASTAPI_URL = process.env.FASTAPI_URL || "http://localhost:8001";
 
 // Configure logging
 const logger = winston.createLogger({
