@@ -138,8 +138,6 @@
 
 
 const axios = require("axios");
-const FormData = require("form-data"); // Added for file upload
-const fs = require("fs");
 const winston = require("winston");
 const httpStatusText = require("../utils/httpStatusText");
 const AppError = require("../utils/appError");
@@ -232,7 +230,7 @@ const predictDisease = async (req, res, next) => {
     // Validate input fields
     const fields = requiredFields[disease];
     for (const field of fields) {
-      if (!(field in req.body) && disease !== "chatbot") {
+      if (!(field in req.body)) {
         logger.error(`Missing required field: ${field} for ${disease}`);
         return next(new AppError(`Missing required field: ${field}`, 400));
       }
@@ -244,38 +242,15 @@ const predictDisease = async (req, res, next) => {
     // Send request to FastAPI
     let endpoint = `${FASTAPI_URL}/predict/${disease}`; // Default for asthma, autism, stroke
     if (disease === "chatbot") {
-      if (req.file && req.file.fieldname === "audio") {
-        // Handle voice input (WAV file)
-        const formData = new FormData();
-        formData.append("file", fs.createReadStream(req.file.path), {
-          filename: req.file.originalname,
-        });
-        endpoint = `${FASTAPI_URL}/medi_voice`; // Voice endpoint
-        const response = await axios.post(endpoint, formData, {
-          headers: formData.getHeaders(),
-        });
-        logger.info(`Prediction successful for ${disease} (voice)`, {
-          response: response.data,
-        });
-        return res.status(200).json({
-          status: httpStatusText.SUCCESS,
-          data: response.data,
-        });
-      } else if (req.body.msg) {
-        // Handle text input
-        endpoint = `${FASTAPI_URL}/medi_text`; // Text endpoint
-        const response = await axios.post(endpoint, req.body);
-        logger.info(`Prediction successful for ${disease} (text)`, {
-          response: response.data,
-        });
-        return res.status(200).json({
-          status: httpStatusText.SUCCESS,
-          data: response.data,
-        });
-      } else {
-        logger.error(`No msg or audio file provided for chatbot`);
-        return next(new AppError(`No message or audio file provided`, 400));
-      }
+      endpoint = `${FASTAPI_URL}/medi_text`; // Text endpoint
+      const response = await axios.post(endpoint, req.body);
+      logger.info(`Prediction successful for ${disease} (text)`, {
+        response: response.data,
+      });
+      return res.status(200).json({
+        status: httpStatusText.SUCCESS,
+        data: response.data,
+      });
     } else {
       const response = await axios.post(endpoint, req.body);
       logger.info(`Prediction successful for ${disease}`, {
