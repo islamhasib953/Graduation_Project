@@ -1,0 +1,1723 @@
+يناء على التعديلات السابقى هبعتلك فايلات الروتس وشوفها لو محتاجة اى تعديل
+
+const express = require("express");
+const { validationResult } = require("express-validator");
+const router = express.Router();
+const verifyToken = require("../middlewares/virifyToken");
+const checkOwnership = require("../middlewares/Ownership");
+const childController = require("../controllers/child.controller");
+const validationschema = require("../middlewares/validationschema");
+const upload = require("../utils/multer.config"); // استيراد Multer المركزي
+
+router
+  .route("/")
+  .post(
+    verifyToken,
+    checkOwnership,
+    (req, res, next) => {
+      req.modelName = "child"; // إضافة اسم الموديل
+      next();
+    },
+    upload.single("photo"), // إضافة Multer لرفع الصورة
+    validationschema.validateChild,
+    childController.createChild
+  )
+  .get(
+    verifyToken,
+    checkOwnership,
+    validationschema.validateChild,
+    childController.getChildrenForUser
+  );
+
+router
+  .route("/:childId")
+  .get(verifyToken, checkOwnership, childController.getSingleChild)
+  .patch(
+    verifyToken,
+    checkOwnership,
+    (req, res, next) => {
+      req.modelName = "child"; // إضافة اسم الموديل
+      next();
+    },
+    upload.single("photo"), // إضافة Multer لرفع الصورة عند التحديث
+    validationschema.validateChild,
+    childController.updateChild
+  )
+  .delete(verifyToken, checkOwnership, childController.deleteChild);
+
+module.exports = router;
+***********************
+  
+const express = require("express");
+const router = express.Router();
+const verifyToken = require("../middlewares/virifyToken");
+const allowedTo = require("../middlewares/allowedTo");
+const userRoles = require("../utils/userRoles");
+const doctorController = require("../controllers/doctor.controller");
+const upload = require("../utils/multer.config"); // استيراد Multer المركزي
+
+router
+  .route("/profile")
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+    doctorController.getDoctorProfile
+  )
+  .patch(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+    (req, res, next) => {
+      req.modelName = "doctor"; // إضافة اسم الموديل
+      next();
+    },
+    upload.single("avatar"), // إضافة Multer لرفع الصورة عند التحديث
+    doctorController.updateDoctorProfile
+  )
+  .delete(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+    doctorController.deleteDoctorProfile
+  );
+
+router.post(
+  "/logout",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+  doctorController.logoutDoctor
+);
+
+router.patch(
+  "/availability",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+  doctorController.updateAvailability
+);
+
+router.get(
+  "/appointments/upcoming",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+  doctorController.getUpcomingAppointments
+);
+
+router.post(
+  "/child/records",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+  doctorController.getChildRecords
+);
+
+router.patch(
+  "/appointments/:appointmentId/status",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
+  doctorController.updateAppointmentStatus
+);
+
+router.get(
+  "/appointments/user/:childId",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+  doctorController.getUserAppointments
+);
+
+router.get(
+  "/favorites/:childId",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+  doctorController.getFavoriteDoctors
+);
+
+router.get(
+  "/:childId",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+  doctorController.getAllDoctors
+);
+
+router
+  .route("/:childId/:doctorId")
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    doctorController.getSingleDoctor
+  );
+
+router.post(
+  "/:childId/:doctorId/book",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+  doctorController.bookAppointment
+);
+
+router.patch(
+  "/:childId/:doctorId/favorite",
+  verifyToken,
+  allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+  doctorController.toggleFavoriteDoctor
+);
+
+router
+  .route("/appointments/:childId/:appointmentId")
+  .patch(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+    doctorController.rescheduleAppointment
+  )
+  .delete(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+    doctorController.cancelAppointment
+  );
+
+router.post(
+  "/save-fcm-token",
+  verifyToken,
+  allowedTo(userRoles.DOCTOR),
+  doctorController.saveFcmToken
+);
+
+module.exports = router;
+************************************
+
+const express = require("express");
+const router = express.Router();
+const verifyToken = require("../middlewares/virifyToken");
+const allowedTo = require("../middlewares/allowedTo");
+const userRoles = require("../utils/userRoles");
+// const validationschema = require("../middleware/validationschema");
+const growthController = require("../controllers/growth.controller");
+const { sendNotification } = require("../controllers/notifications.controller");
+const Appointment = require("../models/appointment.model");
+
+router
+  .route("/:childId")
+  .post(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    // validationschema.validateGrowth,
+    async (req, res, next) => {
+      try {
+        const { childId } = req.params;
+        const userId = req.user.id;
+
+        // استدعاء دالة createGrowth
+        const result = await growthController.createGrowth(req, res, next);
+
+        // التأكد إن العملية نجحت وإن الـ response تم إرساله
+        if (res.headersSent) {
+          const growth = result.data; // افتراض إن createGrowth بترجع data
+          if (growth) {
+            console.log(
+              `Sending notification for new growth record: Height ${growth.height}, Weight ${growth.weight}`
+            );
+            await sendNotification(
+              userId,
+              childId,
+              null,
+              "New Growth Record Added",
+              `A new growth record (Height: ${growth.height}, Weight: ${growth.weight}) has been added for your child.`,
+              "growth",
+              "patient"
+            );
+
+            // التحقق من انحراف الطول
+            const standardHeight = growth.ageInMonths * 2 + 50;
+            const heightDeviation = Math.abs(growth.height - standardHeight);
+            if (heightDeviation > 10) {
+              console.log(
+                `Sending growth alert for child ${childId}: Height deviation ${heightDeviation}`
+              );
+              await sendNotification(
+                userId,
+                childId,
+                null,
+                "Growth Alert",
+                `The height of your child (${growth.height} cm) deviates significantly from the expected value (${standardHeight} cm).`,
+                "growth_alert",
+                "patient"
+              );
+
+              // إشعار للدكتور (مش مفعل افتراضيًا)
+              /*
+              const latestAppointment = await Appointment.findOne({ childId, status: "Accepted" })
+                .sort({ date: -1 })
+                .select("doctorId");
+              if (latestAppointment && latestAppointment.doctorId) {
+                await sendNotification(
+                  null,
+                  childId,
+                  latestAppointment.doctorId,
+                  "Growth Alert for Patient",
+                  `A growth record for a patient shows significant height deviation (Height: ${growth.height} cm, Expected: ${standardHeight} cm).`,
+                  "growth_alert",
+                  "doctor"
+                );
+              }
+              */
+            }
+          }
+        }
+      } catch (error) {
+        console.error(
+          `Error creating growth record for child ${childId}:`,
+          error
+        );
+        return next(
+          appError.create("Failed to create growth record", 500, "error")
+        );
+      }
+    }
+  )
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    growthController.getAllGrowth
+  );
+
+router
+  .route("/:childId/last")
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    growthController.getLastGrowthRecord
+  );
+
+router
+  .route("/:childId/last-change")
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    growthController.getLastGrowthChange
+  );
+
+router
+  .route("/:childId/:growthId")
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    growthController.getSingleGrowth
+  )
+  .patch(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    // validationschema.validateGrowth,
+    async (req, res, next) => {
+      try {
+        const { childId, growthId } = req.params;
+        const userId = req.user.id;
+
+        // استدعاء دالة updateGrowth
+        const result = await growthController.updateGrowth(req, res, next);
+
+        // التأكد إن العملية نجحت وإن الـ response تم إرساله
+        if (res.headersSent) {
+          const growth = result.data; // افتراض إن updateGrowth بترجع data
+          if (growth) {
+            console.log(
+              `Sending notification for updated growth record: Height ${growth.height}, Weight ${growth.weight}`
+            );
+            await sendNotification(
+              userId,
+              childId,
+              null,
+              "Growth Record Updated",
+              `The growth record (Height: ${growth.height}, Weight: ${growth.weight}) has been updated for your child.`,
+              "growth",
+              "patient"
+            );
+
+            // التحقق من انحراف الطول
+            const standardHeight = growth.ageInMonths * 2 + 50;
+            const heightDeviation = Math.abs(growth.height - standardHeight);
+            if (heightDeviation > 10) {
+              console.log(
+                `Sending growth alert for child ${childId}: Height deviation ${heightDeviation}`
+              );
+              await sendNotification(
+                userId,
+                childId,
+                null,
+                "Growth Alert",
+                `The height of your child (${growth.height} cm) deviates significantly from the expected value (${standardHeight} cm).`,
+                "growth_alert",
+                "patient"
+              );
+
+              // إشعار للدكتور (مش مفعل افتراضيًا)
+              /*
+              const latestAppointment = await Appointment.findOne({ childId, status: "Accepted" })
+                .sort({ date: -1 })
+                .select("doctorId");
+              if (latestAppointment && latestAppointment.doctorId) {
+                await sendNotification(
+                  null,
+                  childId,
+                  latestAppointment.doctorId,
+                  "Growth Alert for Patient",
+                  `A growth record for a patient shows significant height deviation (Height: ${growth.height} cm, Expected: ${standardHeight} cm).`,
+                  "growth_alert",
+                  "doctor"
+                );
+              }
+              */
+            }
+          }
+        }
+      } catch (error) {
+        console.error(
+          `Error updating growth record ${growthId} for child ${childId}:`,
+          error
+        );
+        return next(
+          appError.create("Failed to update growth record", 500, "error")
+        );
+      }
+    }
+  )
+  .delete(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    async (req, res, next) => {
+      try {
+        const { childId, growthId } = req.params;
+        const userId = req.user.id;
+
+        // استدعاء دالة deleteGrowth
+        const result = await growthController.deleteGrowth(req, res, next);
+
+        // التأكد إن العملية نجحت وإن الـ response تم إرساله
+        if (res.headersSent) {
+          console.log(
+            `Sending notification for deleted growth record: ${growthId}`
+          );
+          await sendNotification(
+            userId,
+            childId,
+            null,
+            "Growth Record Deleted",
+            `A growth record has been deleted for your child.`,
+            "growth",
+            "patient"
+          );
+        }
+      } catch (error) {
+        console.error(
+          `Error deleting growth record ${growthId} for child ${childId}:`,
+          error
+        );
+        return next(
+          appError.create("Failed to delete growth record", 500, "error")
+        );
+      }
+    }
+  );
+
+module.exports = router;
+*************************
+
+
+const express = require("express");
+const { validationResult } = require("express-validator");
+const router = express.Router();
+const verifyToken = require("../middlewares/virifyToken");
+const validationschema = require("../middlewares/validationschema");
+const historyController = require("../controllers/history.controller");
+const allowedTo = require("../middlewares/allowedTo");
+const userRoles = require("../utils/userRoles");
+const upload = require("../utils/multer.config"); // استيراد Multer المركزي
+
+router.route("/filter/:childId").get(historyController.filterHistory);
+
+router
+  .route("/:childId")
+  .get(historyController.getAllHistory)
+  .post(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    (req, res, next) => {
+      req.modelName = "history"; // إضافة اسم الموديل
+      next();
+    },
+    upload.single("notesImage"), // إضافة Multer لرفع الصورة
+    validationschema.validateHistory,
+    historyController.createHistory
+  );
+
+router
+  .route("/:childId/:historyId")
+  .get(historyController.getSingleHistory)
+  .patch(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    (req, res, next) => {
+      req.modelName = "history"; // إضافة اسم الموديل
+      next();
+    },
+    upload.single("notesImage"), // إضافة Multer لرفع الصورة عند التحديث
+    validationschema.validateHistory,
+    historyController.updateHistory
+  )
+  .delete(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    historyController.deleteHistory
+  );
+
+module.exports = router;
+*************************
+
+
+const express = require("express");
+const { validationResult } = require("express-validator");
+const router = express.Router();
+const appError = require("../utils/appError");
+const medicineController = require("../controllers/medicine.controller");
+const validationschema = require("../middlewares/validationschema");
+const verifyToken = require("../middlewares/virifyToken");
+const allowedTo = require("../middlewares/allowedTo");
+const userRoles = require("../utils/userRoles");
+const { sendNotification } = require("../controllers/notifications.controller");
+
+router
+  .route("/:childId")
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    medicineController.getAllMedicines
+  )
+  .post(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    validationschema.validateMedicine,
+    async (req, res, next) => {
+      try {
+        const { childId } = req.params;
+        const userId = req.user.id;
+
+        // استدعاء دالة createMedicine
+        const result = await medicineController.createMedicine(req, res, next);
+
+        // التأكد إن العملية نجحت وإن الـ response تم إرساله
+        if (res.headersSent) {
+          const medicine = result.data; // افتراض إن createMedicine بترجع data في الـ response
+          if (medicine) {
+            console.log(
+              `Sending notification for new medicine: ${medicine.name}`
+            );
+            await sendNotification(
+              userId,
+              childId,
+              null,
+              "New Medicine Added",
+              `A new medicine "${medicine.name}" has been added for your child.`,
+              "medicine",
+              "patient"
+            );
+          }
+        }
+      } catch (error) {
+        console.error(`Error creating medicine for child ${childId}:`, error);
+        return next(appError.create("Failed to create medicine", 500, "error"));
+      }
+    }
+  );
+
+router
+  .route("/:childId/:medicineId")
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    medicineController.getSingleMedicine
+  )
+  .patch(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    validationschema.validateMedicine,
+    async (req, res, next) => {
+      try {
+        const { childId, medicineId } = req.params;
+        const userId = req.user.id;
+
+        // استدعاء دالة updateMedicine
+        const result = await medicineController.updateMedicine(req, res, next);
+
+        // التأكد إن العملية نجحت وإن الـ response تم إرساله
+        if (res.headersSent) {
+          const medicine = result.data; // افتراض إن updateMedicine بترجع data في الـ response
+          if (medicine) {
+            console.log(
+              `Sending notification for updated medicine: ${medicine.name}`
+            );
+            await sendNotification(
+              userId,
+              childId,
+              null,
+              "Medicine Updated",
+              `The medicine "${medicine.name}" has been updated for your child.`,
+              "medicine",
+              "patient"
+            );
+          }
+        }
+      } catch (error) {
+        console.error(
+          `Error updating medicine ${medicineId} for child ${childId}:`,
+          error
+        );
+        return next(appError.create("Failed to update medicine", 500, "error"));
+      }
+    }
+  )
+  .delete(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    async (req, res, next) => {
+      try {
+        const { childId, medicineId } = req.params;
+        const userId = req.user.id;
+
+        // استدعاء دالة deleteMedicine
+        const result = await medicineController.deleteMedicine(req, res, next);
+
+        // التأكد إن العملية نجحت وإن الـ response تم إرساله
+        if (res.headersSent) {
+          console.log(
+            `Sending notification for deleted medicine: ${medicineId}`
+          );
+          await sendNotification(
+            userId,
+            childId,
+            null,
+            "Medicine Deleted",
+            `The medicine has been deleted for your child.`,
+            "medicine",
+            "patient"
+          );
+        }
+      } catch (error) {
+        console.error(
+          `Error deleting medicine ${medicineId} for child ${childId}:`,
+          error
+        );
+        return next(appError.create("Failed to delete medicine", 500, "error"));
+      }
+    }
+  );
+
+module.exports = router;
+****************************
+
+
+const express = require("express");
+const { validationResult } = require("express-validator");
+const router = express.Router();
+const memoryController = require("../controllers/memory.controller");
+const validationschema = require("../middlewares/validationschema");
+const verifyToken = require("../middlewares/virifyToken");
+const allowedTo = require("../middlewares/allowedTo");
+const userRoles = require("../utils/userRoles");
+const checkOwnership = require("../middlewares/Ownership");
+const upload = require("../utils/multer.config"); // استيراد Multer المركزي
+
+router
+  .route("/:childId")
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+    memoryController.getAllMemories
+  )
+  .post(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.PATIENT),
+    (req, res, next) => {
+      req.modelName = "memory"; // إضافة اسم الموديل
+      next();
+    },
+    upload.single("image"), // إضافة Multer لرفع الصورة
+    validationschema.validateMemory,
+    memoryController.createMemory
+  );
+
+router
+  .route("/:childId/:memoryId")
+  .patch(
+    verifyToken,
+    checkOwnership,
+    (req, res, next) => {
+      req.modelName = "memory"; // إضافة اسم الموديل
+      next();
+    },
+    upload.single("image"), // إضافة Multer لرفع الصورة عند التحديث
+    validationschema.validateMemory,
+    memoryController.updateMemory
+  )
+  .delete(verifyToken, checkOwnership, memoryController.deleteMemory);
+
+router
+  .route("/favorites/:childId")
+  .get(verifyToken, checkOwnership, memoryController.getFavoriteMemories);
+
+router
+  .route("/favorites/:childId/:memoryId")
+  .patch(verifyToken, checkOwnership, memoryController.toggleFavoriteMemory);
+
+module.exports = router;
+************************
+const express = require("express");
+const router = express.Router();
+const verifyToken = require("../middlewares/virifyToken");
+const allowedTo = require("../middlewares/allowedTo");
+const userRoles = require("../utils/userRoles");
+const notificationsController = require("../controllers/notifications.controller");
+const User = require("../models/user.model");
+const Doctor = require("../models/doctor.model");
+const { sendPushNotification } = require("../config/firebase-config");
+
+router.get(
+  "/user/:childId",
+  verifyToken,
+  allowedTo(userRoles.PATIENT),
+  notificationsController.getUserNotifications
+);
+
+router.get(
+  "/doctor",
+  verifyToken,
+  allowedTo(userRoles.DOCTOR),
+  notificationsController.getDoctorNotifications
+);
+
+router.patch(
+  "/:notificationId/read",
+  verifyToken,
+  allowedTo(userRoles.PATIENT, userRoles.DOCTOR),
+  notificationsController.markAsRead
+);
+
+// نقطة نهاية لإرسال إشعارات الـ Bracelet
+router.post(
+  "/bracelet",
+  verifyToken,
+  allowedTo(userRoles.PATIENT),
+  async (req, res, next) => {
+    const { childId, title, body } = req.body;
+    const userId = req.user.id;
+
+    if (!childId || !title || !body) {
+      return res.status(400).json({
+        status: "fail",
+        message: "childId, title, and body are required",
+      });
+    }
+
+    try {
+      await notificationsController.sendNotification(
+        userId,
+        childId,
+        null,
+        title,
+        body,
+        "bracelet",
+        "patient"
+      );
+
+      res.status(201).json({
+        status: "success",
+        message: "Bracelet notification sent successfully",
+      });
+    } catch (error) {
+      console.error("Error sending bracelet notification:", error);
+      res.status(500).json({
+        status: "error",
+        message: "Failed to send bracelet notification",
+      });
+    }
+  }
+);
+
+// نقطة نهاية لإرسال إشعارات عامة (للأدمن فقط)
+router.post(
+  "/send-general",
+  verifyToken,
+  allowedTo(userRoles.ADMIN),
+  async (req, res, next) => {
+    const { title, body, target } = req.body;
+
+    if (!title || !body || !target) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Title, body, and target are required",
+      });
+    }
+
+    try {
+      let fcmTokens = [];
+      let notifications = [];
+
+      if (target === "patient" || target === "all") {
+        const users = await User.find().select("fcmToken _id");
+        fcmTokens.push(
+          ...users.map((user) => user.fcmToken).filter((token) => token)
+        );
+        notifications.push(
+          ...users.map((user) => ({
+            userId: user._id,
+            title,
+            body,
+            type: "general",
+            target: "patient",
+            isRead: false,
+          }))
+        );
+      }
+
+      if (target === "doctor" || target === "all") {
+        const doctors = await Doctor.find().select("fcmToken _id");
+        fcmTokens.push(
+          ...doctors.map((doctor) => doctor.fcmToken).filter((token) => token)
+        );
+        notifications.push(
+          ...doctors.map((doctor) => ({
+            doctorId: doctor._id,
+            title,
+            body,
+            type: "general",
+            target: "doctor",
+            isRead: false,
+          }))
+        );
+      }
+
+      if (fcmTokens.length === 0) {
+        return res.status(404).json({
+          status: "fail",
+          message: "No recipients found with FCM tokens",
+        });
+      }
+
+      for (const notification of notifications) {
+        await notificationsController.sendNotification(
+          notification.userId || null,
+          null,
+          notification.doctorId || null,
+          notification.title,
+          notification.body,
+          notification.type,
+          notification.target
+        );
+      }
+
+      res.status(200).json({
+        status: "success",
+        message: "General notification sent successfully",
+      });
+    } catch (error) {
+      console.error("Error sending general notification:", error);
+      res.status(500).json({
+        status: "error",
+        message: "Failed to send general notification",
+      });
+    }
+  }
+);
+
+module.exports = router;
+
+***************************************
+
+const express = require("express");
+const usersController = require("../controllers/users.controller");
+const verifyToken = require("../middlewares/virifyToken");
+const allowedTo = require("../middlewares/allowedTo");
+const userRoles = require("../utils/userRoles");
+const { validateRegister, validateLogin } = require("../middlewares/validationschema");
+const upload = require("../utils/multer.config"); // استيراد Multer المركزي
+
+const router = express.Router();
+
+router
+  .route("/")
+  .get(verifyToken, allowedTo(userRoles.ADMIN), usersController.getAllUsers);
+
+router
+  .route("/register")
+  .post(
+    (req, res, next) => {
+      req.modelName = "user"; // إضافة اسم الموديل
+      next();
+    },
+    upload.single("avatar"), // استخدام Multer المركزي
+    validateRegister,
+    usersController.registerUser
+  );
+
+router.route("/login").post(validateLogin, usersController.loginUser);
+
+router
+  .route("/profile")
+  .get(
+    verifyToken,
+    allowedTo(userRoles.PATIENT),
+    usersController.getUserProfile
+  )
+  .patch(
+    verifyToken,
+    allowedTo(userRoles.PATIENT),
+    (req, res, next) => {
+      req.modelName = "user"; // إضافة اسم الموديل
+      next();
+    },
+    upload.single("avatar"), // إضافة Multer لرفع الصورة عند التحديث
+    usersController.updateUserProfile
+  )
+  .delete(
+    verifyToken,
+    allowedTo(userRoles.PATIENT),
+    usersController.deleteUserProfile
+  );
+
+router.post(
+  "/logout",
+  verifyToken,
+  allowedTo(userRoles.PATIENT),
+  usersController.logoutUser
+);
+
+router.post(
+  "/save-fcm-token",
+  verifyToken,
+  allowedTo(userRoles.PATIENT),
+  usersController.saveFcmToken
+);
+
+module.exports = router;
+********************
+
+
+const express = require("express");
+const router = express.Router();
+const vaccinationController = require("../controllers/vaccination.controller");
+const verifyToken = require("../middlewares/virifyToken");
+const allowedTo = require("../middlewares/allowedTo");
+const userRoles = require("../utils/userRoles");
+const upload = require("../utils/multer.config"); // استيراد Multer المركزي
+
+router
+  .route("/")
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN),
+    vaccinationController.getAllVaccinations
+  )
+  .post(verifyToken, allowedTo(userRoles.ADMIN), async (req, res, next) => {
+    try {
+      const adminId = req.user.id;
+      const result =
+        await vaccinationController.createVaccinationForAllChildren(
+          req,
+          res,
+          next
+        );
+      if (res.headersSent) {
+        const vaccination = result.data;
+        if (vaccination) {
+          console.log(
+            `Sending notifications for new vaccination: ${req.body.disease}`
+          );
+          const {
+            sendNotification,
+          } = require("../controllers/notifications.controller");
+          const User = require("../models/user.model");
+          const Child = require("../models/child.model");
+          await sendNotification(
+            adminId,
+            null,
+            null,
+            "New Vaccination Added",
+            `A new vaccination "${req.body.disease}" has been added for all children.`,
+            "vaccination",
+            "patient"
+          );
+          const users = await User.find({ role: userRoles.PATIENT }).select(
+            "_id"
+          );
+          const children = await Child.find({
+            parentId: { $in: users.map((user) => user._id) },
+          }).select("_id parentId");
+          for (const child of children) {
+            await sendNotification(
+              child.parentId,
+              child._id,
+              null,
+              "New Vaccination Available",
+              `A new vaccination "${req.body.disease}" is now required for your child.`,
+              "vaccination",
+              "patient"
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error creating vaccination for all children:", error);
+      return next(
+        appError.create("Failed to create vaccination", 500, "error")
+      );
+    }
+  });
+
+router
+  .route("/:vaccinationId")
+  .delete(verifyToken, allowedTo(userRoles.ADMIN), async (req, res, next) => {
+    try {
+      const adminId = req.user.id;
+      const result =
+        await vaccinationController.deleteVaccinationForAllChildren(
+          req,
+          res,
+          next
+        );
+      if (res.headersSent) {
+        console.log(
+          `Sending notification for deleted vaccination: ${req.params.vaccinationId}`
+        );
+        const {
+          sendNotification,
+        } = require("../controllers/notifications.controller");
+        await sendNotification(
+          adminId,
+          null,
+          null,
+          "Vaccination Deleted",
+          `The vaccination has been deleted for all children.`,
+          "vaccination",
+          "patient"
+        );
+      }
+    } catch (error) {
+      console.error(
+        `Error deleting vaccination ${req.params.vaccinationId}:`,
+        error
+      );
+      return next(
+        appError.create("Failed to delete vaccination", 500, "error")
+      );
+    }
+  });
+
+router
+  .route("/:childId")
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    vaccinationController.getVaccinationsByChildId
+  );
+
+router
+  .route("/:childId/:vaccinationId")
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    vaccinationController.getUserVaccination
+  )
+  .patch(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    (req, res, next) => {
+      req.modelName = "vaccination"; // إضافة اسم الموديل
+      next();
+    },
+    upload.single("image"), // إضافة Multer لرفع الصورة عند التحديث
+    async (req, res, next) => {
+      try {
+        const { childId, vaccinationId } = req.params;
+        const userId = req.user.id;
+        const result = await vaccinationController.updateUserVaccination(
+          req,
+          res,
+          next
+        );
+        if (res.headersSent) {
+          const vaccination = result.data;
+          if (vaccination) {
+            console.log(
+              `Sending notification for updated vaccination: ${vaccinationId}`
+            );
+            const {
+              sendNotification,
+            } = require("../controllers/notifications.controller");
+            await sendNotification(
+              userId,
+              childId,
+              null,
+              "Vaccination Updated",
+              `The vaccination "${vaccination.vaccineInfoId.disease}" has been updated for your child.`,
+              "vaccination",
+              "patient"
+            );
+          }
+        }
+      } catch (error) {
+        console.error(
+          `Error updating vaccination ${vaccinationId} for child ${childId}:`,
+          error
+        );
+        return next(
+          appError.create("Failed to update vaccination", 500, "error")
+        );
+      }
+    }
+  )
+  .delete(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    async (req, res, next) => {
+      try {
+        const { childId, vaccinationId } = req.params;
+        const userId = req.user.id;
+        const result = await vaccinationController.deleteUserVaccination(
+          req,
+          res,
+          next
+        );
+        if (res.headersSent) {
+          console.log(
+            `Sending notification for deleted vaccination: ${vaccinationId}`
+          );
+          const {
+            sendNotification,
+          } = require("../controllers/notifications.controller");
+          await sendNotification(
+            userId,
+            childId,
+            null,
+            "Vaccination Deleted",
+            `The vaccination has been deleted for your child.`,
+            "vaccination",
+            "patient"
+          );
+        }
+      } catch (error) {
+        console.error(
+          `Error deleting vaccination ${vaccinationId} for child ${childId}:`,
+          error
+        );
+        return next(
+          appError.create("Failed to delete vaccination", 500, "error")
+        );
+      }
+    }
+  );
+
+module.exports = router;
+*********************************
+
+const asyncWrapper = require("../middlewares/asyncWrapper");
+const Notification = require("../models/notification.model");
+const User = require("../models/user.model");
+const Doctor = require("../models/doctor.model");
+const Child = require("../models/child.model");
+const httpStatusText = require("../utils/httpStatusText");
+const appError = require("../utils/appError");
+const { sendPushNotification } = require("../config/firebase-config");
+
+// الدالة الداخلية بدون asyncWrapper
+const sendNotificationCore = async (
+  userId,
+  childId,
+  doctorId,
+  title,
+  body,
+  type,
+  target
+) => {
+  let fcmToken = null;
+  let recipient = null;
+
+  if (target === "patient" && userId) {
+    recipient = await User.findById(userId).select("fcmToken");
+    fcmToken = recipient?.fcmToken;
+  } else if (target === "doctor" && doctorId) {
+    recipient = await Doctor.findById(doctorId).select("fcmToken");
+    fcmToken = recipient?.fcmToken;
+  }
+
+  const notificationData = {
+    userId: userId || null,
+    childId: childId || null,
+    doctorId: doctorId || null,
+    title,
+    body,
+    type,
+    target,
+    isRead: false,
+    status: "pending",
+  };
+
+  const notification = new Notification(notificationData);
+  await notification.save();
+
+  if (!fcmToken) {
+    console.warn(
+      `No FCM token found for ${target} (ID: ${userId || doctorId})`
+    );
+    notification.status = "failed";
+    await notification.save();
+    return;
+  }
+
+  try {
+    await sendPushNotification(fcmToken, title, body, {
+      type,
+      childId: childId?.toString() || "",
+    });
+    notification.status = "sent";
+    await notification.save();
+    console.log(
+      `Notification sent to ${target} (ID: ${userId || doctorId}): ${title}`
+    );
+  } catch (error) {
+    notification.status = "failed";
+    await notification.save();
+    console.error(
+      `Failed to send notification to ${target} (ID: ${userId || doctorId}):`,
+      error
+    );
+    throw error;
+  }
+};
+
+// الدالة الملفوفة للـ routes
+const sendNotification = asyncWrapper(sendNotificationCore);
+
+const getUserNotifications = asyncWrapper(async (req, res, next) => {
+  const { childId } = req.params;
+  const userId = req.user.id;
+
+  const child = await Child.findOne({ _id: childId, parentId: userId });
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or unauthorized",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const notifications = await Notification.find({ userId, childId }).sort({
+    createdAt: -1,
+  });
+  res.status(200).json({ status: httpStatusText.SUCCESS, data: notifications });
+});
+
+const getDoctorNotifications = asyncWrapper(async (req, res, next) => {
+  const doctorId = req.user.id;
+
+  const notifications = await Notification.find({ doctorId }).sort({
+    createdAt: -1,
+  });
+  res.status(200).json({ status: httpStatusText.SUCCESS, data: notifications });
+});
+
+const markAsRead = asyncWrapper(async (req, res, next) => {
+  const { notificationId } = req.params;
+
+  const notification = await Notification.findById(notificationId);
+  if (!notification) {
+    return next(
+      appError.create("Notification not found", 404, httpStatusText.FAIL)
+    );
+  }
+
+  if (
+    (notification.userId && notification.userId.toString() !== req.user.id) ||
+    (notification.doctorId && notification.doctorId.toString() !== req.user.id)
+  ) {
+    return next(
+      appError.create(
+        "Unauthorized to mark this notification as read",
+        403,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  notification.isRead = true;
+  await notification.save();
+
+  res.status(200).json({
+    status: httpStatusText.SUCCESS,
+    message: "Notification marked as read",
+  });
+});
+
+module.exports = {
+  getUserNotifications,
+  getDoctorNotifications,
+  markAsRead,
+  sendNotification,
+  sendNotificationCore, // تصدير الدالة الجديدة
+};
+************************************
+const cron = require("node-cron");
+const moment = require("moment");
+const Medicine = require("../models/medicine.model");
+const UserVaccination = require("../models/UserVaccination.model");
+const Growth = require("../models/growth.model");
+const Appointment = require("../models/appointment.model");
+const Child = require("../models/child.model");
+const Notification = require("../models/notification.model");
+const {
+  sendNotificationCore,
+} = require("../controllers/notifications.controller");
+
+const scheduleNotifications = () => {
+  // إشعارات الأدوية: التحقق كل دقيقة
+  cron.schedule("* * * * *", async () => {
+    try {
+      const now = moment();
+      const currentDay = now.format("dddd");
+      const currentTime = now.format("h:mm A");
+      const currentDate = now.startOf("day").toDate();
+
+      console.log(
+        `Checking medicine notifications at ${currentTime} on ${currentDay}`
+      );
+
+      const medicines = await Medicine.find({
+        days: currentDay,
+      }).populate("childId");
+
+      if (medicines.length === 0) {
+        console.log("No medicines found for this day.");
+        return;
+      }
+
+      const currentMoment = moment(now.format("h:mm A"), "h:mm A");
+
+      for (const medicine of medicines) {
+        // التحقق من وجود userId و childId
+        if (!medicine.userId) {
+          console.error(`Medicine with ID ${medicine._id} has missing userId`);
+          continue;
+        }
+        if (!medicine.childId) {
+          console.error(
+            `Medicine with ID ${medicine._id} has invalid or missing childId: ${medicine.childId}`
+          );
+          continue;
+        }
+
+        const userId = medicine.userId;
+        const childId = medicine.childId._id;
+        const childName = medicine.childId.name;
+
+        for (const time of medicine.times) {
+          // تحويل الوقت من تنسيق ISO 8601 إلى h:mm A
+          let medicineTime;
+          try {
+            // محاولة تحويل الوقت من ISO 8601
+            medicineTime = moment(time, "YYYY-MM-DDTHH:mm:ss.SSS", true);
+            if (!medicineTime.isValid()) {
+              // إذا كان التنسيق مش ISO، جرب تنسيق h:mm A
+              medicineTime = moment(time, "h:mm A", true);
+            }
+            if (!medicineTime.isValid()) {
+              console.error(
+                `Invalid time format for medicine ${medicine._id}: ${time}`
+              );
+              continue;
+            }
+            // تحويل الوقت إلى تنسيق h:mm A للمقارنة
+            medicineTime = moment(medicineTime.format("h:mm A"), "h:mm A");
+          } catch (error) {
+            console.error(
+              `Error parsing time for medicine ${medicine._id}: ${time}`,
+              error
+            );
+            continue;
+          }
+
+          const notificationKey = `${currentDate.toISOString()}-${currentDay}-${
+            medicine._id
+          }-${time}-medicine`;
+
+          // التحقق من وجود إشعار تم إرساله
+          const existingNotification = await Notification.findOne({
+            userId,
+            childId,
+            type: "medicine",
+            title: `Medicine Reminder for ${childName}`,
+            sentAt: { $gte: moment().subtract(1, "week").toDate() },
+          });
+
+          if (existingNotification) {
+            console.log(`Notification already sent for ${notificationKey}`);
+            continue;
+          }
+
+          const timeDiffMinutes = Math.abs(
+            currentMoment.diff(medicineTime, "minutes")
+          );
+
+          if (timeDiffMinutes <= 5) {
+            try {
+              await sendNotificationCore(
+                userId,
+                childId,
+                null,
+                `Medicine Reminder for ${childName}`,
+                `It's time to give ${childName} the medicine: ${medicine.name}.`,
+                "medicine",
+                "patient"
+              );
+              console.log(
+                `Medicine reminder sent successfully for ${childName} at ${currentTime}: ${medicine.name}`
+              );
+            } catch (error) {
+              console.error(
+                `Failed to send medicine reminder for ${childName}: ${medicine.name}`,
+                error
+              );
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error in medicine notification cron job:", error);
+    }
+  });
+
+  // إشعارات التطعيمات: التحقق كل دقيقة بناءً على الوقت (8:00 AM ±5 دقائق)
+  cron.schedule("* * * * *", async () => {
+    try {
+      const now = moment();
+      const currentTime = now.format("h:mm A");
+      const currentDate = now.startOf("day").toDate();
+
+      console.log(`Checking vaccination notifications at ${currentTime}`);
+
+      const currentMoment = moment(now.format("h:mm A"), "h:mm A");
+      const notificationTime = "8:00 AM";
+      const notificationMoment = moment(notificationTime, "h:mm A");
+      const timeDiffMinutes = Math.abs(
+        currentMoment.diff(notificationMoment, "minutes")
+      );
+
+      if (timeDiffMinutes > 5) {
+        return;
+      }
+
+      const vaccinations = await UserVaccination.find({
+        status: "Pending",
+      }).populate("childId vaccineInfoId");
+
+      if (vaccinations.length === 0) {
+        console.log("No pending vaccinations found.");
+        return;
+      }
+
+      for (const vaccination of vaccinations) {
+        const userId = vaccination.childId.parentId;
+        const childId = vaccination.childId._id;
+        const childName = vaccination.childId.name;
+        const vaccineDisease = vaccination.vaccineInfoId.disease;
+        const dueDate = moment(vaccination.dueDate).startOf("day").toDate();
+
+        const dueDateKey = `${currentDate.toISOString()}-${childId}-${
+          vaccination._id
+        }-vaccination-due`;
+
+        // التحقق من وجود إشعار تم إرساله لهذا التطعيم
+        const existingDueNotification = await Notification.findOne({
+          userId,
+          childId,
+          type: "vaccination",
+          title: `Vaccination Reminder for ${childName}`,
+          sentAt: { $gte: moment().subtract(1, "week").toDate() },
+        });
+
+        if (
+          moment(currentDate).isSame(dueDate, "day") &&
+          !existingDueNotification
+        ) {
+          try {
+            await sendNotificationCore(
+              userId,
+              childId,
+              null,
+              `Vaccination Reminder for ${childName}`,
+              `Today is the due date for ${childName}'s ${vaccineDisease} vaccination.`,
+              "vaccination",
+              "patient"
+            );
+            console.log(
+              `Vaccination due reminder sent for ${childName}: ${vaccineDisease}`
+            );
+          } catch (error) {
+            console.error(
+              `Failed to send vaccination due reminder for ${childName}`,
+              error
+            );
+          }
+        }
+
+        const tomorrow = moment().add(1, "day").startOf("day").toDate();
+        const reminderKey = `${currentDate.toISOString()}-${childId}-${
+          vaccination._id
+        }-vaccination-reminder`;
+
+        const existingReminderNotification = await Notification.findOne({
+          userId,
+          childId,
+          type: "vaccination",
+          title: `Vaccination Reminder for ${childName}`,
+          sentAt: { $gte: moment().subtract(1, "week").toDate() },
+        });
+
+        if (
+          moment(tomorrow).isSame(dueDate, "day") &&
+          !existingReminderNotification
+        ) {
+          try {
+            await sendNotificationCore(
+              userId,
+              childId,
+              null,
+              `Vaccination Reminder for ${childName}`,
+              `Reminder: Tomorrow is the due date for ${childName}'s ${vaccineDisease} vaccination.`,
+              "vaccination",
+              "patient"
+            );
+            console.log(
+              `Vaccination reminder sent for ${childName}: ${vaccineDisease}`
+            );
+          } catch (error) {
+            console.error(
+              `Failed to send vaccination reminder for ${childName}`,
+              error
+            );
+          }
+        }
+
+        const oneWeekAgo = moment().subtract(7, "days").startOf("day").toDate();
+        const daysLate = moment(currentDate).diff(moment(dueDate), "days");
+        if (
+          moment(currentDate).isAfter(dueDate, "day") &&
+          moment(currentDate).isBefore(moment(dueDate).add(7, "days"), "day")
+        ) {
+          const delayKey = `${currentDate.toISOString()}-${childId}-${
+            vaccination._id
+          }-vaccination-delayed`;
+
+          const existingDelayNotification = await Notification.findOne({
+            userId,
+            childId,
+            type: "vaccination",
+            title: `Delayed Vaccination for ${childName}`,
+            sentAt: { $gte: moment().subtract(1, "week").toDate() },
+          });
+
+          if (!existingDelayNotification) {
+            try {
+              await sendNotificationCore(
+                userId,
+                childId,
+                null,
+                `Delayed Vaccination for ${childName}`,
+                `${childName}'s ${vaccineDisease} vaccination is overdue by ${daysLate} day(s). Please schedule it soon.`,
+                "vaccination",
+                "patient"
+              );
+              console.log(
+                `Delayed vaccination reminder sent for ${childName}: ${vaccineDisease}`
+              );
+            } catch (error) {
+              console.error(
+                `Failed to send delayed vaccination reminder for ${childName}`,
+                error
+              );
+            }
+          }
+        }
+
+        const missedKey = `${currentDate.toISOString()}-${childId}-${
+          vaccination._id
+        }-vaccination-missed`;
+
+        const existingMissedNotification = await Notification.findOne({
+          userId,
+          childId,
+          type: "vaccination",
+          title: `Missed Vaccination for ${childName}`,
+          sentAt: { $gte: moment().subtract(1, "week").toDate() },
+        });
+
+        if (
+          moment(currentDate).isAfter(moment(dueDate).add(7, "days"), "day") &&
+          !existingMissedNotification
+        ) {
+          try {
+            vaccination.status = "Missed";
+            await vaccination.save();
+            await sendNotificationCore(
+              userId,
+              childId,
+              null,
+              `Missed Vaccination for ${childName}`,
+              `${childName}'s ${vaccineDisease} vaccination was missed. Please consult your doctor.`,
+              "vaccination",
+              "patient"
+            );
+            console.log(
+              `Missed vaccination notification sent for ${childName}: ${vaccineDisease}`
+            );
+          } catch (error) {
+            console.error(
+              `Failed to send missed vaccination notification for ${childName}`,
+              error
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error in vaccination notification cron job:", error);
+    }
+  });
+
+  // إشعارات النمو (الساعة 10:00 صباحًا)
+  cron.schedule("0 10 * * *", async () => {
+    try {
+      const today = moment().startOf("day").toDate();
+      const yesterday = moment().subtract(1, "day").startOf("day").toDate();
+
+      const existingNotification = await Notification.findOne({
+        type: "growth",
+        sentAt: { $gte: yesterday },
+      });
+
+      if (existingNotification) {
+        console.log("Growth notification already sent today");
+        return;
+      }
+
+      const growthRecords = await Growth.find({
+        date: { $gte: yesterday, $lte: today },
+      }).populate("childId");
+
+      for (const record of growthRecords) {
+        const userId = record.parentId;
+        const childId = record.childId._id;
+        const childName = record.childId.name;
+
+        await sendNotificationCore(
+          userId,
+          childId,
+          null,
+          `Growth Update for ${childName}`,
+          `A new growth record for ${childName} has been added: Height: ${record.height}, Weight: ${record.weight}.`,
+          "growth",
+          "patient"
+        );
+
+        const standardHeight = record.ageInMonths * 2 + 50;
+        const heightDeviation = Math.abs(record.height - standardHeight);
+
+        if (heightDeviation > 10) {
+          await sendNotificationCore(
+            userId,
+            childId,
+            null,
+            `Growth Alert for ${childName}`,
+            `The height of ${childName} (${record.height} cm) deviates significantly from the expected value (${standardHeight} cm) for their age.`,
+            "growth_alert",
+            "patient"
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error in growth notification cron job:", error);
+    }
+  });
+
+  // تذكير المواعيد قبل يوم (الساعة 8:00 صباحًا ±5 دقائق) للمواعيد المقبولة فقط
+  cron.schedule("* * * * *", async () => {
+    try {
+      const now = moment();
+      const currentTime = now.format("h:mm A");
+      const currentDate = now.startOf("day").toDate();
+
+      const currentMoment = moment(now.format("h:mm A"), "h:mm A");
+      const notificationTime = "8:00 AM";
+      const notificationMoment = moment(notificationTime, "h:mm A");
+      const timeDiffMinutes = Math.abs(
+        currentMoment.diff(notificationMoment, "minutes")
+      );
+
+      if (timeDiffMinutes > 5) {
+        return;
+      }
+
+      const tomorrow = moment().add(1, "day").startOf("day").toDate();
+
+      const existingNotification = await Notification.findOne({
+        type: "appointment_reminder",
+        sentAt: { $gte: moment().subtract(1, "week").toDate() },
+      });
+
+      if (existingNotification) {
+        console.log("Appointment reminder already sent today");
+        return;
+      }
+
+      const appointments = await Appointment.find({
+        date: tomorrow,
+        status: "Accepted",
+      })
+        .populate("childId")
+        .populate("doctorId", "firstName lastName")
+        .populate("userId", "firstName lastName");
+
+      for (const appointment of appointments) {
+        const userId = appointment.userId;
+        const childId = appointment.childId._id;
+        const childName = appointment.childId.name;
+        const doctorId = appointment.doctorId._id;
+
+        await sendNotificationCore(
+          userId,
+          childId,
+          doctorId,
+          `Appointment Reminder for ${childName}`,
+          `Reminder: You have an appointment for ${childName} with Dr. ${appointment.doctorId.firstName} ${appointment.doctorId.lastName} tomorrow at ${appointment.time}.`,
+          "appointment_reminder",
+          "patient"
+        );
+
+        if (doctorId) {
+          await sendNotificationCore(
+            doctorId,
+            childId,
+            userId,
+            `Appointment Reminder for ${childName}`,
+            `Reminder: You have an appointment with ${childName} tomorrow at ${appointment.time}.`,
+            "appointment_reminder",
+            "doctor"
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error in appointment reminder cron job:", error);
+    }
+  });
+
+  // تنظيف الإشعارات القديمة (كل يوم في منتصف الليل)
+  cron.schedule("0 0 * * *", async () => {
+    const oneMonthAgo = moment().subtract(1, "month").toDate();
+    await Notification.deleteMany({ createdAt: { $lt: oneMonthAgo } });
+    console.log("Old notifications deleted (older than 1 month)");
+  });
+};
+
+module.exports = scheduleNotifications;
