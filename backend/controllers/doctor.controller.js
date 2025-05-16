@@ -1,3 +1,4 @@
+
 // const asyncWrapper = require("../middlewares/asyncWrapper");
 // const Doctor = require("../models/doctor.model");
 // const User = require("../models/user.model");
@@ -11,13 +12,11 @@
 // const moment = require("moment");
 // const mongoose = require("mongoose");
 
-// // Get all doctors
 // const getAllDoctors = asyncWrapper(async (req, res) => {
 //   const doctors = await Doctor.find({}, { __v: false, password: false });
 //   res.json({ status: httpStatusText.SUCCESS, data: { doctors } });
 // });
 
-// // Get a single doctor by ID
 // const getSingleDoctor = asyncWrapper(async (req, res, next) => {
 //   const doctorId = req.params.doctorId;
 
@@ -34,7 +33,6 @@
 //   res.json({ status: httpStatusText.SUCCESS, data: { doctor } });
 // });
 
-// // Book an appointment
 // const bookAppointment = asyncWrapper(async (req, res, next) => {
 //   const { doctorId, childId } = req.params;
 //   const { date, time, visitType } = req.body;
@@ -81,7 +79,6 @@
 //     return next(appError.create("User not found", 404, httpStatusText.FAIL));
 //   }
 
-//   // التأكد من تنسيق التاريخ والوقت
 //   const appointmentDateTime = moment(
 //     `${date} ${time}`,
 //     "YYYY-MM-DD HH:mm"
@@ -123,7 +120,6 @@
 
 //   await newAppointment.save();
 
-//   // إشعار فوري لليوزر (الطفل المستخدم حاليًا)
 //   await sendNotification(
 //     userId,
 //     childId,
@@ -134,7 +130,6 @@
 //     "patient"
 //   );
 
-//   // إشعار فوري للدكتور
 //   await sendNotification(
 //     doctorId,
 //     childId,
@@ -151,7 +146,6 @@
 //   });
 // });
 
-// // Reschedule an appointment
 // const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
 //   const { appointmentId, childId } = req.params;
 //   const { date, time } = req.body;
@@ -254,7 +248,6 @@
 //   });
 // });
 
-// // Cancel an appointment
 // const cancelAppointment = asyncWrapper(async (req, res, next) => {
 //   const { appointmentId, childId } = req.params;
 //   const userId = req.user.id;
@@ -317,7 +310,6 @@
 //   });
 // });
 
-// // Toggle favorite doctor with childId in the path
 // const toggleFavoriteDoctor = asyncWrapper(async (req, res, next) => {
 //   const { childId, doctorId } = req.params;
 //   const userId = req.user.id;
@@ -383,7 +375,6 @@
 //   });
 // });
 
-// // جلب الدكاترة المفضلين مع childId في الـ Path
 // const getFavoriteDoctors = asyncWrapper(async (req, res, next) => {
 //   const { childId } = req.params;
 //   const userId = req.user.id;
@@ -517,7 +508,6 @@
 //   });
 // });
 
-// // جلب بيانات الدكتور (Profile)
 // const getDoctorProfile = asyncWrapper(async (req, res, next) => {
 //   const doctorId = req.user.id;
 
@@ -564,7 +554,6 @@
 //   });
 // });
 
-// // Update doctor profile
 // const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
 //   const doctorId = req.user.id;
 //   const {
@@ -643,10 +632,13 @@
 //     changes.push(`available times updated`);
 //     doctor.availableTimes = availableTimes;
 //   }
+//   if (req.file) {
+//     changes.push(`avatar updated`);
+//     doctor.avatar = `/uploads/${req.file.filename}`;
+//   }
 
 //   await doctor.save();
 
-//   // إشعار فوري للدكتور عند تعديل الملف الشخصي
 //   if (changes.length > 0) {
 //     await sendNotification(
 //       doctorId,
@@ -681,7 +673,6 @@
 //   });
 // });
 
-// // Delete doctor profile
 // const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
 //   const doctorId = req.user.id;
 
@@ -751,7 +742,6 @@
 //   }
 // });
 
-// // Logout doctor
 // const logoutDoctor = asyncWrapper(async (req, res, next) => {
 //   const doctorId = req.user.id;
 
@@ -790,7 +780,6 @@
 //   });
 // });
 
-// // Update doctor availability
 // const updateAvailability = asyncWrapper(async (req, res, next) => {
 //   const doctorId = req.user.id;
 //   const { availableDays, availableTimes } = req.body;
@@ -814,7 +803,6 @@
 //   doctor.availableTimes = availableTimes;
 //   await doctor.save();
 
-//   // إشعار فوري للدكتور
 //   await sendNotification(
 //     doctorId,
 //     null,
@@ -825,7 +813,6 @@
 //     "doctor"
 //   );
 
-//   // جلب جميع المواعيد المستقبلية للدكتور
 //   const now = new Date();
 //   const upcomingAppointments = await Appointment.find({
 //     doctorId,
@@ -835,9 +822,8 @@
 //     .populate("childId", "name")
 //     .populate("userId", "firstName lastName");
 
-//   // إشعار فوري لجميع اليوزرز الذين لديهم مواعيد مستقبلية
 //   for (const appointment of upcomingAppointments) {
-//     if (!appointment.userId || !appointment.childId) continue; // تخطي إذا لم يكن هناك userId أو childId
+//     if (!appointment.userId || !appointment.childId) continue;
 //     const userId = appointment.userId._id;
 //     const childId = appointment.childId._id;
 //     const childName = appointment.childId.name;
@@ -860,7 +846,6 @@
 //   });
 // });
 
-// // Get upcoming appointments
 // const getUpcomingAppointments = asyncWrapper(async (req, res, next) => {
 //   const doctorId = req.user.id;
 //   const now = new Date();
@@ -910,7 +895,6 @@
 //   });
 // });
 
-// // Get child records (فقط النمو والتاريخ الطبي)
 // const getChildRecords = asyncWrapper(async (req, res, next) => {
 //   const { childId } = req.body;
 //   const doctorId = req.user.id;
@@ -953,7 +937,6 @@
 //   });
 // });
 
-// // Update appointment status
 // const updateAppointmentStatus = asyncWrapper(async (req, res, next) => {
 //   const { appointmentId } = req.params;
 //   const { status } = req.body;
@@ -989,7 +972,6 @@
 //   appointment.status = status;
 //   await appointment.save();
 
-//   // إشعار فوري لليوزر بناءً على حالة الحجز
 //   await sendNotification(
 //     appointment.userId._id,
 //     appointment.childId._id,
@@ -1011,7 +993,6 @@
 //   });
 // });
 
-// // Get user appointments
 // const getUserAppointments = asyncWrapper(async (req, res, next) => {
 //   const { childId } = req.params;
 //   const userId = req.user.id;
@@ -1054,7 +1035,6 @@
 //   });
 // });
 
-// // Save FCM Token
 // const saveFcmToken = asyncWrapper(async (req, res, next) => {
 //   const { fcmToken } = req.body;
 //   const doctorId = req.user.id;
@@ -1131,6 +1111,7 @@
 //   saveFcmToken,
 // };
 
+
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const Doctor = require("../models/doctor.model");
 const User = require("../models/user.model");
@@ -1140,7 +1121,7 @@ const Growth = require("../models/growth.model");
 const History = require("../models/history.model");
 const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
-const { sendNotification } = require("./notifications.controller");
+const { sendNotificationCore } = require("./notifications.controller");
 const moment = require("moment");
 const mongoose = require("mongoose");
 
@@ -1252,25 +1233,29 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
 
   await newAppointment.save();
 
-  await sendNotification(
-    userId,
-    childId,
-    doctorId,
-    "Appointment Booked",
-    `You booked an appointment with Dr. ${doctor.firstName} ${doctor.lastName} on ${date} at ${time} (${visitType}).`,
-    "appointment",
-    "patient"
-  );
-
-  await sendNotification(
-    doctorId,
-    childId,
-    userId,
-    "New Appointment Booked",
-    `${child.name} booked an appointment with you on ${date} at ${time} (${visitType}).`,
-    "appointment",
-    "doctor"
-  );
+  try {
+    await sendNotificationCore(
+      userId,
+      childId,
+      doctorId,
+      "Appointment Booked",
+      `You booked an appointment with Dr. ${doctor.firstName} ${doctor.lastName} on ${date} at ${time} (${visitType}).`,
+      "appointment",
+      "patient"
+    );
+    await sendNotificationCore(
+      doctorId,
+      childId,
+      userId,
+      "New Appointment Booked",
+      `${child.name} booked an appointment with you on ${date} at ${time} (${visitType}).`,
+      "appointment",
+      "doctor"
+    );
+    console.log(`Notifications sent for booked appointment: ${newAppointment._id}`);
+  } catch (error) {
+    console.error(`Failed to send notifications for booked appointment: ${newAppointment._id}`, error);
+  }
 
   res.status(201).json({
     status: httpStatusText.SUCCESS,
@@ -1354,25 +1339,29 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
   appointment.time = time;
   await appointment.save();
 
-  await sendNotification(
-    userId,
-    childId,
-    appointment.doctorId._id,
-    "Appointment Rescheduled",
-    `With Dr. ${appointment.doctorId.firstName} to ${date} at ${time}.`,
-    "appointment",
-    "patient"
-  );
-
-  await sendNotification(
-    appointment.doctorId._id,
-    childId,
-    userId,
-    "Appointment Rescheduled",
-    `${child.name} to ${date} at ${time}.`,
-    "appointment",
-    "doctor"
-  );
+  try {
+    await sendNotificationCore(
+      userId,
+      childId,
+      appointment.doctorId._id,
+      "Appointment Rescheduled",
+      `With Dr. ${appointment.doctorId.firstName} to ${date} at ${time}.`,
+      "appointment",
+      "patient"
+    );
+    await sendNotificationCore(
+      appointment.doctorId._id,
+      childId,
+      userId,
+      "Appointment Rescheduled",
+      `${child.name} to ${date} at ${time}.`,
+      "appointment",
+      "doctor"
+    );
+    console.log(`Notifications sent for rescheduled appointment: ${appointment._id}`);
+  } catch (error) {
+    console.error(`Failed to send notifications for rescheduled appointment: ${appointment._id}`, error);
+  }
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -1416,25 +1405,29 @@ const cancelAppointment = asyncWrapper(async (req, res, next) => {
 
   await Appointment.deleteOne({ _id: appointmentId });
 
-  await sendNotification(
-    userId,
-    childId,
-    appointment.doctorId._id,
-    "Appointment Cancelled",
-    `With Dr. ${appointment.doctorId.firstName} on ${appointment.date}.`,
-    "appointment",
-    "patient"
-  );
-
-  await sendNotification(
-    appointment.doctorId._id,
-    childId,
-    userId,
-    "Appointment Cancelled",
-    `${child.name} on ${appointment.date}.`,
-    "appointment",
-    "doctor"
-  );
+  try {
+    await sendNotificationCore(
+      userId,
+      childId,
+      appointment.doctorId._id,
+      "Appointment Cancelled",
+      `With Dr. ${appointment.doctorId.firstName} on ${appointment.date}.`,
+      "appointment",
+      "patient"
+    );
+    await sendNotificationCore(
+      appointment.doctorId._id,
+      childId,
+      userId,
+      "Appointment Cancelled",
+      `${child.name} on ${appointment.date}.`,
+      "appointment",
+      "doctor"
+    );
+    console.log(`Notifications sent for cancelled appointment: ${appointment._id}`);
+  } catch (error) {
+    console.error(`Failed to send notifications for cancelled appointment: ${appointment._id}`, error);
+  }
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -1491,15 +1484,20 @@ const toggleFavoriteDoctor = asyncWrapper(async (req, res, next) => {
 
   await child.save();
 
-  await sendNotification(
-    userId,
-    childId,
-    doctorId,
-    notificationTitle,
-    notificationMessage,
-    "favorite",
-    "patient"
-  );
+  try {
+    await sendNotificationCore(
+      userId,
+      childId,
+      doctorId,
+      notificationTitle,
+      notificationMessage,
+      "favorite",
+      "patient"
+    );
+    console.log(`Notification sent for favorite doctor toggle: ${doctor.firstName}`);
+  } catch (error) {
+    console.error(`Failed to send notification for favorite doctor toggle: ${doctor.firstName}`, error);
+  }
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -1772,15 +1770,20 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
   await doctor.save();
 
   if (changes.length > 0) {
-    await sendNotification(
-      doctorId,
-      null,
-      null,
-      "Profile Updated",
-      `Updated: ${changes.join(", ")}`,
-      "profile",
-      "doctor"
-    );
+    try {
+      await sendNotificationCore(
+        doctorId,
+        null,
+        null,
+        "Profile Updated",
+        `Updated: ${changes.join(", ")}`,
+        "profile",
+        "doctor"
+      );
+      console.log(`Notification sent for updated doctor profile: ${doctor.firstName}`);
+    } catch (error) {
+      console.error(`Failed to send notification for updated doctor profile: ${doctor.firstName}`, error);
+    }
   }
 
   res.json({
@@ -1794,12 +1797,12 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
       address: doctor.address,
       email: doctor.email,
       role: doctor.role,
+      avatar: doctor.avatar,
       specialise: doctor.specialise,
       about: doctor.about,
       rate: doctor.rate,
       availableDays: doctor.availableDays,
       availableTimes: doctor.availableTimes,
-      avatar: doctor.avatar,
       created_at: doctor.created_at,
     },
   });
@@ -1846,15 +1849,20 @@ const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
 
     await session.commitTransaction();
 
-    await sendNotification(
-      doctorId,
-      null,
-      null,
-      "Account Deleted",
-      "Your account has been deleted.",
-      "profile",
-      "doctor"
-    );
+    try {
+      await sendNotificationCore(
+        doctorId,
+        null,
+        null,
+        "Account Deleted",
+        "Your account has been deleted.",
+        "profile",
+        "doctor"
+      );
+      console.log(`Notification sent for deleted doctor profile: ${doctor.firstName}`);
+    } catch (error) {
+      console.error(`Failed to send notification for deleted doctor profile: ${doctor.firstName}`, error);
+    }
 
     res.json({
       status: httpStatusText.SUCCESS,
@@ -1896,15 +1904,20 @@ const logoutDoctor = asyncWrapper(async (req, res, next) => {
   doctor.fcmToken = null;
   await doctor.save();
 
-  await sendNotification(
-    doctorId,
-    null,
-    null,
-    "Logged Out",
-    "You have logged out.",
-    "general",
-    "doctor"
-  );
+  try {
+    await sendNotificationCore(
+      doctorId,
+      null,
+      null,
+      "Logged Out",
+      "You have logged out.",
+      "general",
+      "doctor"
+    );
+    console.log(`Notification sent for doctor logout: ${doctor.firstName}`);
+  } catch (error) {
+    console.error(`Failed to send notification for doctor logout: ${doctor.firstName}`, error);
+  }
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -1935,15 +1948,19 @@ const updateAvailability = asyncWrapper(async (req, res, next) => {
   doctor.availableTimes = availableTimes;
   await doctor.save();
 
-  await sendNotification(
-    doctorId,
-    null,
-    null,
-    "Availability Updated",
-    "Your availability has been updated.",
-    "doctor",
-    "doctor"
-  );
+  try {
+    await sendNotificationCore(
+      doctorId,
+      null,
+      null,
+      "Availability Updated",
+      "Your availability has been updated.",
+      "doctor",
+      "doctor"
+    );
+  } catch (error) {
+    console.error(`Failed to send notification for availability update: ${doctor.firstName}`, error);
+  }
 
   const now = new Date();
   const upcomingAppointments = await Appointment.find({
@@ -1960,15 +1977,20 @@ const updateAvailability = asyncWrapper(async (req, res, next) => {
     const childId = appointment.childId._id;
     const childName = appointment.childId.name;
 
-    await sendNotification(
-      userId,
-      childId,
-      doctorId,
-      "Doctor Availability Updated",
-      `Dr. ${doctor.firstName} ${doctor.lastName} updated their availability. Please check your upcoming appointment for ${childName} on ${appointment.date} at ${appointment.time}.`,
-      "appointment",
-      "patient"
-    );
+    try {
+      await sendNotificationCore(
+        userId,
+        childId,
+        doctorId,
+        "Doctor Availability Updated",
+        `Dr. ${doctor.firstName} ${doctor.lastName} updated their availability. Please check your upcoming appointment for ${childName} on ${appointment.date} at ${appointment.time}.`,
+        "appointment",
+        "patient"
+      );
+      console.log(`Notification sent for availability update to patient: ${childName}`);
+    } catch (error) {
+      console.error(`Failed to send availability update notification to patient: ${childName}`, error);
+    }
   }
 
   res.json({
@@ -2104,19 +2126,24 @@ const updateAppointmentStatus = asyncWrapper(async (req, res, next) => {
   appointment.status = status;
   await appointment.save();
 
-  await sendNotification(
-    appointment.userId._id,
-    appointment.childId._id,
-    doctorId,
-    "Appointment Status Updated",
-    `Dr. ${appointment.doctorId.firstName} ${
-      appointment.doctorId.lastName
-    } has ${status.toLowerCase()} your appointment for ${
-      appointment.childId.name
-    } on ${appointment.date} at ${appointment.time}.`,
-    "appointment",
-    "patient"
-  );
+  try {
+    await sendNotificationCore(
+      appointment.userId._id,
+      appointment.childId._id,
+      doctorId,
+      "Appointment Status Updated",
+      `Dr. ${appointment.doctorId.firstName} ${
+        appointment.doctorId.lastName
+      } has ${status.toLowerCase()} your appointment for ${
+        appointment.childId.name
+      } on ${appointment.date} at ${appointment.time}.`,
+      "appointment",
+      "patient"
+    );
+    console.log(`Notification sent for updated appointment status: ${appointment._id}`);
+  } catch (error) {
+    console.error(`Failed to send notification for updated appointment status: ${appointment._id}`, error);
+  }
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -2207,15 +2234,20 @@ const saveFcmToken = asyncWrapper(async (req, res, next) => {
   doctor.fcmToken = fcmToken;
   await doctor.save();
 
-  await sendNotification(
-    doctorId,
-    null,
-    null,
-    "FCM Token Updated",
-    "Notification settings updated.",
-    "profile",
-    "doctor"
-  );
+  try {
+    await sendNotificationCore(
+      doctorId,
+      null,
+      null,
+      "FCM Token Updated",
+      "Notification settings updated.",
+      "profile",
+      "doctor"
+    );
+    console.log(`Notification sent for FCM token update: ${doctor.firstName}`);
+  } catch (error) {
+    console.error(`Failed to send notification for FCM token update: ${doctor.firstName}`, error);
+  }
 
   res.status(200).json({
     status: httpStatusText.SUCCESS,

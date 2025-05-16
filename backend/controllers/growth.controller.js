@@ -1,17 +1,19 @@
+
 // const Growth = require("../models/growth.model");
 // const Child = require("../models/child.model");
 // const asyncWrapper = require("../middlewares/asyncWrapper");
 // const httpStatusText = require("../utils/httpStatusText");
 // const appError = require("../utils/appError");
+// const { sendNotification } = require("../controllers/notifications.controller");
 
 // // ✅ Create a new growth record for a specific child
 // const createGrowth = asyncWrapper(async (req, res, next) => {
-//   const { childId } = req.params; // Extract childId from URL params
-//   const userId = req.user.id; // Get userId from JWT (after authentication)
+//   const { childId } = req.params;
+//   const userId = req.user.id;
+//   const userRole = req.user.role;
 //   const { weight, height, headCircumference, date, time, notes, notesImage } =
 //     req.body;
 
-//   // Check for required fields
 //   if (!weight || !height || !headCircumference || !date || !time) {
 //     return next(
 //       appError.create(
@@ -22,8 +24,11 @@
 //     );
 //   }
 
-//   // Verify that the child belongs to the authenticated user
-//   const child = await Child.findOne({ _id: childId, parentId: userId });
+//   let childQuery = { _id: childId };
+//   if (userRole === "PATIENT") {
+//     childQuery.parentId = userId;
+//   }
+//   const child = await Child.findOne(childQuery);
 //   if (!child) {
 //     return next(
 //       appError.create(
@@ -35,7 +40,7 @@
 //   }
 
 //   const newGrowth = new Growth({
-//     parentId: userId,
+//     parentId: userRole === "PATIENT" ? userId : child.parentId,
 //     childId,
 //     weight,
 //     height,
@@ -47,6 +52,18 @@
 //   });
 
 //   await newGrowth.save();
+
+//   // إرسال إشعار مختصر
+//   await sendNotification(
+//     child.parentId,
+//     childId,
+//     null,
+//     "Growth Added",
+//     `${child.name}: Growth record added.`,
+//     "growth",
+//     "patient" // تغيير من "user" إلى "patient"
+//   );
+
 //   res.status(201).json({
 //     status: httpStatusText.SUCCESS,
 //     data: {
@@ -72,9 +89,13 @@
 // const getAllGrowth = asyncWrapper(async (req, res, next) => {
 //   const { childId } = req.params;
 //   const userId = req.user.id;
+//   const userRole = req.user.role;
 
-//   // Verify that the child belongs to the authenticated user
-//   const child = await Child.findOne({ _id: childId, parentId: userId });
+//   let childQuery = { _id: childId };
+//   if (userRole === "PATIENT") {
+//     childQuery.parentId = userId;
+//   }
+//   const child = await Child.findOne(childQuery);
 //   if (!child) {
 //     return next(
 //       appError.create(
@@ -85,8 +106,8 @@
 //     );
 //   }
 
-//   const growthRecords = await Growth.find({ childId, parentId: userId })
-//     .sort({ createdAt: -1 }) // Sort from newest to oldest
+//   const growthRecords = await Growth.find({ childId })
+//     .sort({ createdAt: -1 })
 //     .select(
 //       "_id weight height headCircumference date time notes notesImage ageInMonths createdAt"
 //     );
@@ -122,9 +143,13 @@
 // const getSingleGrowth = asyncWrapper(async (req, res, next) => {
 //   const { childId, growthId } = req.params;
 //   const userId = req.user.id;
+//   const userRole = req.user.role;
 
-//   // Verify that the child belongs to the authenticated user
-//   const child = await Child.findOne({ _id: childId, parentId: userId });
+//   let childQuery = { _id: childId };
+//   if (userRole === "PATIENT") {
+//     childQuery.parentId = userId;
+//   }
+//   const child = await Child.findOne(childQuery);
 //   if (!child) {
 //     return next(
 //       appError.create(
@@ -135,11 +160,7 @@
 //     );
 //   }
 
-//   const growthRecord = await Growth.findOne({
-//     _id: growthId,
-//     childId,
-//     parentId: userId,
-//   }).select(
+//   const growthRecord = await Growth.findOne({ _id: growthId, childId }).select(
 //     "_id weight height headCircumference date time notes notesImage ageInMonths createdAt"
 //   );
 
@@ -153,7 +174,7 @@
 //     status: httpStatusText.SUCCESS,
 //     data: {
 //       _id: growthRecord._id,
-//       weight: weightRecord.weight,
+//       weight: growthRecord.weight,
 //       height: growthRecord.height,
 //       headCircumference: growthRecord.headCircumference,
 //       date: growthRecord.date,
@@ -170,11 +191,15 @@
 // const updateGrowth = asyncWrapper(async (req, res, next) => {
 //   const { childId, growthId } = req.params;
 //   const userId = req.user.id;
+//   const userRole = req.user.role;
 //   const { weight, height, headCircumference, date, time, notes, notesImage } =
 //     req.body;
 
-//   // Verify that the child belongs to the authenticated user
-//   const child = await Child.findOne({ _id: childId, parentId: userId });
+//   let childQuery = { _id: childId };
+//   if (userRole === "PATIENT") {
+//     childQuery.parentId = userId;
+//   }
+//   const child = await Child.findOne(childQuery);
 //   if (!child) {
 //     return next(
 //       appError.create(
@@ -186,7 +211,7 @@
 //   }
 
 //   const updatedGrowth = await Growth.findOneAndUpdate(
-//     { _id: growthId, childId, parentId: userId },
+//     { _id: growthId, childId },
 //     { weight, height, headCircumference, date, time, notes, notesImage },
 //     { new: true, runValidators: true }
 //   ).select(
@@ -198,6 +223,17 @@
 //       appError.create("Growth record not found", 404, httpStatusText.FAIL)
 //     );
 //   }
+
+//   // إرسال إشعار مختصر
+//   await sendNotification(
+//     child.parentId,
+//     childId,
+//     null,
+//     "Growth Updated",
+//     `${child.name}: Growth record updated.`,
+//     "growth",
+//     "patient" // تغيير من "user" إلى "patient"
+//   );
 
 //   res.json({
 //     status: httpStatusText.SUCCESS,
@@ -220,9 +256,13 @@
 // const deleteGrowth = asyncWrapper(async (req, res, next) => {
 //   const { childId, growthId } = req.params;
 //   const userId = req.user.id;
+//   const userRole = req.user.role;
 
-//   // Verify that the child belongs to the authenticated user
-//   const child = await Child.findOne({ _id: childId, parentId: userId });
+//   let childQuery = { _id: childId };
+//   if (userRole === "PATIENT") {
+//     childQuery.parentId = userId;
+//   }
+//   const child = await Child.findOne(childQuery);
 //   if (!child) {
 //     return next(
 //       appError.create(
@@ -236,7 +276,6 @@
 //   const deletedGrowth = await Growth.findOneAndDelete({
 //     _id: growthId,
 //     childId,
-//     parentId: userId,
 //   });
 
 //   if (!deletedGrowth) {
@@ -244,6 +283,17 @@
 //       appError.create("Growth record not found", 404, httpStatusText.FAIL)
 //     );
 //   }
+
+//   // إرسال إشعار مختصر
+//   await sendNotification(
+//     child.parentId,
+//     childId,
+//     null,
+//     "Growth Removed",
+//     `${child.name}: Growth record removed.`,
+//     "growth",
+//     "patient" // تغيير من "user" إلى "patient"
+//   );
 
 //   res.json({
 //     status: httpStatusText.SUCCESS,
@@ -255,9 +305,13 @@
 // const getLastGrowthRecord = asyncWrapper(async (req, res, next) => {
 //   const { childId } = req.params;
 //   const userId = req.user.id;
+//   const userRole = req.user.role;
 
-//   // Verify that the child belongs to the authenticated user
-//   const child = await Child.findOne({ _id: childId, parentId: userId });
+//   let childQuery = { _id: childId };
+//   if (userRole === "PATIENT") {
+//     childQuery.parentId = userId;
+//   }
+//   const child = await Child.findOne(childQuery);
 //   if (!child) {
 //     return next(
 //       appError.create(
@@ -268,8 +322,8 @@
 //     );
 //   }
 
-//   const lastGrowthRecord = await Growth.findOne({ childId, parentId: userId })
-//     .sort({ createdAt: -1 }) // Sort by createdAt in descending order (latest first)
+//   const lastGrowthRecord = await Growth.findOne({ childId })
+//     .sort({ createdAt: -1 })
 //     .select(
 //       "_id weight height headCircumference date time notes notesImage ageInMonths createdAt"
 //     );
@@ -283,8 +337,6 @@
 //       )
 //     );
 //   }
-
-//   console.log("Last growth record:", lastGrowthRecord); // Debugging log
 
 //   res.json({
 //     status: httpStatusText.SUCCESS,
@@ -307,9 +359,13 @@
 // const getLastGrowthChange = asyncWrapper(async (req, res, next) => {
 //   const { childId } = req.params;
 //   const userId = req.user.id;
+//   const userRole = req.user.role;
 
-//   // Verify that the child belongs to the authenticated user
-//   const child = await Child.findOne({ _id: childId, parentId: userId });
+//   let childQuery = { _id: childId };
+//   if (userRole === "PATIENT") {
+//     childQuery.parentId = userId;
+//   }
+//   const child = await Child.findOne(childQuery);
 //   if (!child) {
 //     return next(
 //       appError.create(
@@ -320,14 +376,12 @@
 //     );
 //   }
 
-//   // Get all growth records sorted by createdAt
-//   const growthRecords = await Growth.find({ childId, parentId: userId })
-//     .sort({ createdAt: -1 }) // Sort by createdAt in descending order
+//   const growthRecords = await Growth.find({ childId })
+//     .sort({ createdAt: -1 })
 //     .select(
 //       "_id weight height headCircumference date time ageInMonths createdAt"
 //     );
 
-//   // Case 1: No growth records, use birth data as current and zeros as previous
 //   if (!growthRecords.length) {
 //     const birthData = {
 //       weight: child.weightAtBirth,
@@ -343,7 +397,7 @@
 //       weight: 0,
 //       height: 0,
 //       headCircumference: 0,
-//       date: child.birthDate, // Use birth date for consistency
+//       date: child.birthDate,
 //       time: "00:00",
 //       ageInMonths: 0,
 //       createdAt: child.createdAt,
@@ -355,10 +409,8 @@
 //       headCircumferenceChange:
 //         birthData.headCircumference - zeroData.headCircumference,
 //       ageInMonthsDifference: birthData.ageInMonths - zeroData.ageInMonths,
-//       timeIntervalDays: 0, // No time interval since it's the same date
+//       timeIntervalDays: 0,
 //     };
-
-//     console.log("No growth records, using birth data:", birthData); // Debugging log
 
 //     return res.json({
 //       status: httpStatusText.SUCCESS,
@@ -370,7 +422,6 @@
 //     });
 //   }
 
-//   // Case 2: One growth record, compare with birth data
 //   if (growthRecords.length === 1) {
 //     const latest = growthRecords[0];
 //     const birthData = {
@@ -395,11 +446,6 @@
 //       ),
 //     };
 
-//     console.log("One growth record, comparing with birth data:", {
-//       latest,
-//       birthData,
-//     }); // Debugging log
-
 //     return res.json({
 //       status: httpStatusText.SUCCESS,
 //       data: {
@@ -419,7 +465,6 @@
 //     });
 //   }
 
-//   // Case 3: Two or more growth records, compare the last two
 //   const [latest, previous] = growthRecords;
 //   const changes = {
 //     weightChange: latest.weight - previous.weight,
@@ -431,8 +476,6 @@
 //       (new Date(latest.date) - new Date(previous.date)) / (1000 * 60 * 60 * 24)
 //     ),
 //   };
-
-//   console.log("Two or more growth records, comparing:", { latest, previous }); // Debugging log
 
 //   res.json({
 //     status: httpStatusText.SUCCESS,
@@ -472,14 +515,14 @@
 //   getLastGrowthChange,
 // };
 
+
 const Growth = require("../models/growth.model");
 const Child = require("../models/child.model");
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
-const { sendNotification } = require("../controllers/notifications.controller");
+const { sendNotificationCore } = require("../controllers/notifications.controller");
 
-// ✅ Create a new growth record for a specific child
 const createGrowth = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
   const userId = req.user.id;
@@ -526,16 +569,20 @@ const createGrowth = asyncWrapper(async (req, res, next) => {
 
   await newGrowth.save();
 
-  // إرسال إشعار مختصر
-  await sendNotification(
-    child.parentId,
-    childId,
-    null,
-    "Growth Added",
-    `${child.name}: Growth record added.`,
-    "growth",
-    "patient" // تغيير من "user" إلى "patient"
-  );
+  try {
+    await sendNotificationCore(
+      child.parentId,
+      childId,
+      null,
+      "Growth Added",
+      `${child.name}: Growth record added.`,
+      "growth",
+      "patient"
+    );
+    console.log(`Notification sent for new growth record: ${child.name}`);
+  } catch (error) {
+    console.error(`Failed to send notification for new growth record: ${child.name}`, error);
+  }
 
   res.status(201).json({
     status: httpStatusText.SUCCESS,
@@ -558,7 +605,6 @@ const createGrowth = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Get all growth records for a specific child
 const getAllGrowth = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
   const userId = req.user.id;
@@ -612,7 +658,6 @@ const getAllGrowth = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Get a single growth record for a specific child
 const getSingleGrowth = asyncWrapper(async (req, res, next) => {
   const { childId, growthId } = req.params;
   const userId = req.user.id;
@@ -660,7 +705,6 @@ const getSingleGrowth = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Update a growth record
 const updateGrowth = asyncWrapper(async (req, res, next) => {
   const { childId, growthId } = req.params;
   const userId = req.user.id;
@@ -697,16 +741,20 @@ const updateGrowth = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // إرسال إشعار مختصر
-  await sendNotification(
-    child.parentId,
-    childId,
-    null,
-    "Growth Updated",
-    `${child.name}: Growth record updated.`,
-    "growth",
-    "patient" // تغيير من "user" إلى "patient"
-  );
+  try {
+    await sendNotificationCore(
+      child.parentId,
+      childId,
+      null,
+      "Growth Updated",
+      `${child.name}: Growth record updated.`,
+      "growth",
+      "patient"
+    );
+    console.log(`Notification sent for updated growth record: ${child.name}`);
+  } catch (error) {
+    console.error(`Failed to send notification for updated growth record: ${child.name}`, error);
+  }
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -725,7 +773,6 @@ const updateGrowth = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Delete a growth record
 const deleteGrowth = asyncWrapper(async (req, res, next) => {
   const { childId, growthId } = req.params;
   const userId = req.user.id;
@@ -757,16 +804,20 @@ const deleteGrowth = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // إرسال إشعار مختصر
-  await sendNotification(
-    child.parentId,
-    childId,
-    null,
-    "Growth Removed",
-    `${child.name}: Growth record removed.`,
-    "growth",
-    "patient" // تغيير من "user" إلى "patient"
-  );
+  try {
+    await sendNotificationCore(
+      child.parentId,
+      childId,
+      null,
+      "Growth Removed",
+      `${child.name}: Growth record removed.`,
+      "growth",
+      "patient"
+    );
+    console.log(`Notification sent for deleted growth record: ${child.name}`);
+  } catch (error) {
+    console.error(`Failed to send notification for deleted growth record: ${child.name}`, error);
+  }
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -774,7 +825,6 @@ const deleteGrowth = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Get the last growth record for a specific child
 const getLastGrowthRecord = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
   const userId = req.user.id;
@@ -828,7 +878,6 @@ const getLastGrowthRecord = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// ✅ Get the change between the last two growth records for a specific child
 const getLastGrowthChange = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
   const userId = req.user.id;

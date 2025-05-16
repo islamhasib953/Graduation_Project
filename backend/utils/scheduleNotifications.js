@@ -8,8 +8,6 @@
 // const Notification = require("../models/notification.model");
 // const { sendNotification } = require("../controllers/notifications.controller");
 
-// const sentNotifications = new Set();
-
 // const scheduleNotifications = () => {
 //   // إشعارات الأدوية: التحقق كل دقيقة
 //   cron.schedule("* * * * *", async () => {
@@ -35,21 +33,50 @@
 //       const currentMoment = moment(now.format("h:mm A"), "h:mm A");
 
 //       for (const medicine of medicines) {
+//         // التحقق من وجود userId و childId
+//         if (!medicine.userId) {
+//           console.error(`Medicine with ID ${medicine._id} has missing userId`);
+//           continue;
+//         }
+//         if (!medicine.childId) {
+//           console.error(
+//             `Medicine with ID ${medicine._id} has invalid or missing childId: ${medicine.childId}`
+//           );
+//           continue;
+//         }
+
 //         const userId = medicine.userId;
 //         const childId = medicine.childId._id;
 //         const childName = medicine.childId.name;
 
 //         for (const time of medicine.times) {
+//           // التحقق من صلاحية تنسيق الوقت
+//           const medicineTime = moment(time, "h:mm A", true);
+//           if (!medicineTime.isValid()) {
+//             console.error(
+//               `Invalid time format for medicine ${medicine._id}: ${time}`
+//             );
+//             continue;
+//           }
+
 //           const notificationKey = `${currentDate.toISOString()}-${currentDay}-${
 //             medicine._id
 //           }-${time}-medicine`;
 
-//           if (sentNotifications.has(notificationKey)) {
+//           // التحقق من وجود إشعار تم إرساله
+//           const existingNotification = await Notification.findOne({
+//             userId,
+//             childId,
+//             type: "medicine",
+//             title: `Medicine Reminder for ${childName}`,
+//             sentAt: { $gte: moment().subtract(1, "week").toDate() },
+//           });
+
+//           if (existingNotification) {
 //             console.log(`Notification already sent for ${notificationKey}`);
 //             continue;
 //           }
 
-//           const medicineTime = moment(time, "h:mm A");
 //           const timeDiffMinutes = Math.abs(
 //             currentMoment.diff(medicineTime, "minutes")
 //           );
@@ -65,7 +92,6 @@
 //                 "medicine",
 //                 "patient"
 //               );
-//               sentNotifications.add(notificationKey);
 //               console.log(
 //                 `Medicine reminder sent successfully for ${childName} at ${currentTime}: ${medicine.name}`
 //               );
@@ -78,20 +104,11 @@
 //           }
 //         }
 //       }
-
-//       const yesterday = moment().subtract(1, "day").startOf("day").toDate();
-//       for (const key of sentNotifications) {
-//         const keyDate = new Date(key.split("-")[0]);
-//         if (keyDate < yesterday) {
-//           sentNotifications.delete(key);
-//           console.log(`Removed old notification key: ${key}`);
-//         }
-//       }
 //     } catch (error) {
 //       console.error("Error in medicine notification cron job:", error);
 //     }
 //   });
-
+  
 //   // إشعارات التطعيمات: التحقق كل دقيقة بناءً على الوقت (8:00 AM ±5 دقائق)
 //   cron.schedule("* * * * *", async () => {
 //     try {
@@ -131,9 +148,19 @@
 //         const dueDateKey = `${currentDate.toISOString()}-${childId}-${
 //           vaccination._id
 //         }-vaccination-due`;
+
+//         // التحقق من وجود إشعار تم إرساله لهذا التطعيم
+//         const existingDueNotification = await Notification.findOne({
+//           userId,
+//           childId,
+//           type: "vaccination",
+//           title: `Vaccination Reminder for ${childName}`,
+//           sentAt: { $gte: moment().subtract(1, "week").toDate() },
+//         });
+
 //         if (
 //           moment(currentDate).isSame(dueDate, "day") &&
-//           !sentNotifications.has(dueDateKey)
+//           !existingDueNotification
 //         ) {
 //           try {
 //             await sendNotification(
@@ -145,7 +172,6 @@
 //               "vaccination",
 //               "patient"
 //             );
-//             sentNotifications.add(dueDateKey);
 //             console.log(
 //               `Vaccination due reminder sent for ${childName}: ${vaccineDisease}`
 //             );
@@ -161,9 +187,18 @@
 //         const reminderKey = `${currentDate.toISOString()}-${childId}-${
 //           vaccination._id
 //         }-vaccination-reminder`;
+
+//         const existingReminderNotification = await Notification.findOne({
+//           userId,
+//           childId,
+//           type: "vaccination",
+//           title: `Vaccination Reminder for ${childName}`,
+//           sentAt: { $gte: moment().subtract(1, "week").toDate() },
+//         });
+
 //         if (
 //           moment(tomorrow).isSame(dueDate, "day") &&
-//           !sentNotifications.has(reminderKey)
+//           !existingReminderNotification
 //         ) {
 //           try {
 //             await sendNotification(
@@ -175,7 +210,6 @@
 //               "vaccination",
 //               "patient"
 //             );
-//             sentNotifications.add(reminderKey);
 //             console.log(
 //               `Vaccination reminder sent for ${childName}: ${vaccineDisease}`
 //             );
@@ -196,7 +230,16 @@
 //           const delayKey = `${currentDate.toISOString()}-${childId}-${
 //             vaccination._id
 //           }-vaccination-delayed`;
-//           if (!sentNotifications.has(delayKey)) {
+
+//           const existingDelayNotification = await Notification.findOne({
+//             userId,
+//             childId,
+//             type: "vaccination",
+//             title: `Delayed Vaccination for ${childName}`,
+//             sentAt: { $gte: moment().subtract(1, "week").toDate() },
+//           });
+
+//           if (!existingDelayNotification) {
 //             try {
 //               await sendNotification(
 //                 userId,
@@ -207,7 +250,6 @@
 //                 "vaccination",
 //                 "patient"
 //               );
-//               sentNotifications.add(delayKey);
 //               console.log(
 //                 `Delayed vaccination reminder sent for ${childName}: ${vaccineDisease}`
 //               );
@@ -223,9 +265,18 @@
 //         const missedKey = `${currentDate.toISOString()}-${childId}-${
 //           vaccination._id
 //         }-vaccination-missed`;
+
+//         const existingMissedNotification = await Notification.findOne({
+//           userId,
+//           childId,
+//           type: "vaccination",
+//           title: `Missed Vaccination for ${childName}`,
+//           sentAt: { $gte: moment().subtract(1, "week").toDate() },
+//         });
+
 //         if (
 //           moment(currentDate).isAfter(moment(dueDate).add(7, "days"), "day") &&
-//           !sentNotifications.has(missedKey)
+//           !existingMissedNotification
 //         ) {
 //           try {
 //             vaccination.status = "Missed";
@@ -239,7 +290,6 @@
 //               "vaccination",
 //               "patient"
 //             );
-//             sentNotifications.add(missedKey);
 //             console.log(
 //               `Missed vaccination notification sent for ${childName}: ${vaccineDisease}`
 //             );
@@ -249,15 +299,6 @@
 //               error
 //             );
 //           }
-//         }
-//       }
-
-//       const yesterday = moment().subtract(1, "day").startOf("day").toDate();
-//       for (const key of sentNotifications) {
-//         const keyDate = new Date(key.split("-")[0]);
-//         if (keyDate < yesterday) {
-//           sentNotifications.delete(key);
-//           console.log(`Removed old notification key: ${key}`);
 //         }
 //       }
 //     } catch (error) {
@@ -270,9 +311,14 @@
 //     try {
 //       const today = moment().startOf("day").toDate();
 //       const yesterday = moment().subtract(1, "day").startOf("day").toDate();
-//       const notificationKey = `${today.toISOString()}-growth`;
 
-//       if (sentNotifications.has(notificationKey)) {
+//       const existingNotification = await Notification.findOne({
+//         type: "growth",
+//         sentAt: { $gte: yesterday },
+//       });
+
+//       if (existingNotification) {
+//         console.log("Growth notification already sent today");
 //         return;
 //       }
 
@@ -310,10 +356,6 @@
 //           );
 //         }
 //       }
-
-//       if (growthRecords.length > 0) {
-//         sentNotifications.add(notificationKey);
-//       }
 //     } catch (error) {
 //       console.error("Error in growth notification cron job:", error);
 //     }
@@ -338,12 +380,14 @@
 //       }
 
 //       const tomorrow = moment().add(1, "day").startOf("day").toDate();
-//       const notificationKey = `${moment()
-//         .startOf("day")
-//         .toDate()
-//         .toISOString()}-appointment-reminder`;
 
-//       if (sentNotifications.has(notificationKey)) {
+//       const existingNotification = await Notification.findOne({
+//         type: "appointment_reminder",
+//         sentAt: { $gte: moment().subtract(1, "week").toDate() },
+//       });
+
+//       if (existingNotification) {
+//         console.log("Appointment reminder already sent today");
 //         return;
 //       }
 
@@ -383,19 +427,6 @@
 //           );
 //         }
 //       }
-
-//       if (appointments.length > 0) {
-//         sentNotifications.add(notificationKey);
-//       }
-
-//       const yesterday = moment().subtract(1, "day").startOf("day").toDate();
-//       for (const key of sentNotifications) {
-//         const keyDate = new Date(key.split("-")[0]);
-//         if (keyDate < yesterday) {
-//           sentNotifications.delete(key);
-//           console.log(`Removed old notification key: ${key}`);
-//         }
-//       }
 //     } catch (error) {
 //       console.error("Error in appointment reminder cron job:", error);
 //     }
@@ -411,7 +442,6 @@
 
 // module.exports = scheduleNotifications;
 
-
 const cron = require("node-cron");
 const moment = require("moment");
 const Medicine = require("../models/medicine.model");
@@ -420,7 +450,9 @@ const Growth = require("../models/growth.model");
 const Appointment = require("../models/appointment.model");
 const Child = require("../models/child.model");
 const Notification = require("../models/notification.model");
-const { sendNotification } = require("../controllers/notifications.controller");
+const {
+  sendNotificationCore,
+} = require("../controllers/notifications.controller");
 
 const scheduleNotifications = () => {
   // إشعارات الأدوية: التحقق كل دقيقة
@@ -464,11 +496,27 @@ const scheduleNotifications = () => {
         const childName = medicine.childId.name;
 
         for (const time of medicine.times) {
-          // التحقق من صلاحية تنسيق الوقت
-          const medicineTime = moment(time, "h:mm A", true);
-          if (!medicineTime.isValid()) {
+          // تحويل الوقت من تنسيق ISO 8601 إلى h:mm A
+          let medicineTime;
+          try {
+            // محاولة تحويل الوقت من ISO 8601
+            medicineTime = moment(time, "YYYY-MM-DDTHH:mm:ss.SSS", true);
+            if (!medicineTime.isValid()) {
+              // إذا كان التنسيق مش ISO، جرب تنسيق h:mm A
+              medicineTime = moment(time, "h:mm A", true);
+            }
+            if (!medicineTime.isValid()) {
+              console.error(
+                `Invalid time format for medicine ${medicine._id}: ${time}`
+              );
+              continue;
+            }
+            // تحويل الوقت إلى تنسيق h:mm A للمقارنة
+            medicineTime = moment(medicineTime.format("h:mm A"), "h:mm A");
+          } catch (error) {
             console.error(
-              `Invalid time format for medicine ${medicine._id}: ${time}`
+              `Error parsing time for medicine ${medicine._id}: ${time}`,
+              error
             );
             continue;
           }
@@ -497,7 +545,7 @@ const scheduleNotifications = () => {
 
           if (timeDiffMinutes <= 5) {
             try {
-              await sendNotification(
+              await sendNotificationCore(
                 userId,
                 childId,
                 null,
@@ -522,7 +570,7 @@ const scheduleNotifications = () => {
       console.error("Error in medicine notification cron job:", error);
     }
   });
-  
+
   // إشعارات التطعيمات: التحقق كل دقيقة بناءً على الوقت (8:00 AM ±5 دقائق)
   cron.schedule("* * * * *", async () => {
     try {
@@ -577,7 +625,7 @@ const scheduleNotifications = () => {
           !existingDueNotification
         ) {
           try {
-            await sendNotification(
+            await sendNotificationCore(
               userId,
               childId,
               null,
@@ -615,7 +663,7 @@ const scheduleNotifications = () => {
           !existingReminderNotification
         ) {
           try {
-            await sendNotification(
+            await sendNotificationCore(
               userId,
               childId,
               null,
@@ -655,7 +703,7 @@ const scheduleNotifications = () => {
 
           if (!existingDelayNotification) {
             try {
-              await sendNotification(
+              await sendNotificationCore(
                 userId,
                 childId,
                 null,
@@ -695,7 +743,7 @@ const scheduleNotifications = () => {
           try {
             vaccination.status = "Missed";
             await vaccination.save();
-            await sendNotification(
+            await sendNotificationCore(
               userId,
               childId,
               null,
@@ -745,7 +793,7 @@ const scheduleNotifications = () => {
         const childId = record.childId._id;
         const childName = record.childId.name;
 
-        await sendNotification(
+        await sendNotificationCore(
           userId,
           childId,
           null,
@@ -759,7 +807,7 @@ const scheduleNotifications = () => {
         const heightDeviation = Math.abs(record.height - standardHeight);
 
         if (heightDeviation > 10) {
-          await sendNotification(
+          await sendNotificationCore(
             userId,
             childId,
             null,
@@ -819,7 +867,7 @@ const scheduleNotifications = () => {
         const childName = appointment.childId.name;
         const doctorId = appointment.doctorId._id;
 
-        await sendNotification(
+        await sendNotificationCore(
           userId,
           childId,
           doctorId,
@@ -830,7 +878,7 @@ const scheduleNotifications = () => {
         );
 
         if (doctorId) {
-          await sendNotification(
+          await sendNotificationCore(
             doctorId,
             childId,
             userId,

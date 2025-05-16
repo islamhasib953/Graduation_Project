@@ -24,7 +24,7 @@ const ChildSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    deviceId: { type: String, required: false, unique: true },
+    // deviceId: { type: String, required: false, unique: true },
     photo: {
       type: String,
       default: "uploads/child-default.jpg",

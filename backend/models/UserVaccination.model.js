@@ -65,7 +65,6 @@ const UserVaccinationSchema = new mongoose.Schema(
 //   next();
 // });
 
-
 // UserVaccinationSchema.pre("save", async function (next) {
 //   await updateDelayDays.call(this, next);
 // });

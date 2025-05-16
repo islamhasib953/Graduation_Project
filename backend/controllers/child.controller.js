@@ -11,7 +11,6 @@
 //   const {
 //     name,
 //     gender,
-//     photo,
 //     birthDate,
 //     bloodType,
 //     heightAtBirth,
@@ -42,7 +41,9 @@
 //     );
 //   }
 
-//   const childPhoto = photo || "Uploads/child.jpg";
+//   const childPhoto = req.file
+//     ? `/uploads/${req.file.filename}`
+//     : "Uploads/child.jpg";
 
 //   const newChild = new Child({
 //     name,
@@ -75,7 +76,6 @@
 //     await UserVaccination.insertMany(vaccinationsToCreate);
 //   }
 
-//   // إرسال إشعار مختصر
 //   await sendNotification(
 //     parentId,
 //     newChild._id,
@@ -83,7 +83,7 @@
 //     "Child Added",
 //     `${newChild.name} added.`,
 //     "child",
-//     "patient" // تغيير من "user" إلى "patient"
+//     "patient"
 //   );
 
 //   res.status(201).json({
@@ -185,7 +185,6 @@
 //     heightAtBirth,
 //     weightAtBirth,
 //     headCircumferenceAtBirth,
-//     photo,
 //   } = req.body;
 
 //   const child = await Child.findById(childId);
@@ -225,14 +224,13 @@
 //     changes.push(`birth head circumference to ${headCircumferenceAtBirth}`);
 //     child.headCircumferenceAtBirth = headCircumferenceAtBirth;
 //   }
-//   if (photo && photo !== child.photo) {
+//   if (req.file) {
 //     changes.push(`photo updated`);
-//     child.photo = photo;
+//     child.photo = `/uploads/${req.file.filename}`;
 //   }
 
 //   await child.save();
 
-//   // إرسال إشعار مختصر مع التغييرات فقط
 //   if (changes.length > 0) {
 //     await sendNotification(
 //       child.parentId,
@@ -241,7 +239,7 @@
 //       "Child Updated",
 //       `${child.name} updated: ${changes.join(", ")}`,
 //       "child",
-//       "patient" // تغيير من "user" إلى "patient"
+//       "patient"
 //     );
 //   }
 
@@ -270,7 +268,6 @@
 //     );
 //   }
 
-//   // إرسال إشعار مختصر
 //   await sendNotification(
 //     userId,
 //     childId,
@@ -278,7 +275,7 @@
 //     "Child Removed",
 //     `${child.name} removed.`,
 //     "child",
-//     "patient" // تغيير من "user" إلى "patient"
+//     "patient"
 //   );
 
 //   await Child.findByIdAndDelete(childId);
@@ -298,6 +295,7 @@
 //   deleteChild,
 // };
 
+
 const Child = require("../models/child.model");
 const User = require("../models/user.model");
 const asyncWrapper = require("../middlewares/asyncWrapper");
@@ -305,7 +303,9 @@ const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
 const VaccineInfo = require("../models/vaccineInfo.model");
 const UserVaccination = require("../models/UserVaccination.model");
-const { sendNotification } = require("../controllers/notifications.controller");
+const {
+  sendNotificationCore,
+} = require("../controllers/notifications.controller");
 
 const createChild = asyncWrapper(async (req, res, next) => {
   const {
@@ -376,15 +376,23 @@ const createChild = asyncWrapper(async (req, res, next) => {
     await UserVaccination.insertMany(vaccinationsToCreate);
   }
 
-  await sendNotification(
-    parentId,
-    newChild._id,
-    null,
-    "Child Added",
-    `${newChild.name} added.`,
-    "child",
-    "patient"
-  );
+  try {
+    await sendNotificationCore(
+      parentId,
+      newChild._id,
+      null,
+      "Child Added",
+      `${newChild.name} added.`,
+      "child",
+      "patient"
+    );
+    console.log(`Notification sent for new child: ${newChild.name}`);
+  } catch (error) {
+    console.error(
+      `Failed to send notification for new child: ${newChild.name}`,
+      error
+    );
+  }
 
   res.status(201).json({
     status: httpStatusText.SUCCESS,
@@ -532,15 +540,23 @@ const updateChild = asyncWrapper(async (req, res, next) => {
   await child.save();
 
   if (changes.length > 0) {
-    await sendNotification(
-      child.parentId,
-      childId,
-      null,
-      "Child Updated",
-      `${child.name} updated: ${changes.join(", ")}`,
-      "child",
-      "patient"
-    );
+    try {
+      await sendNotificationCore(
+        child.parentId,
+        childId,
+        null,
+        "Child Updated",
+        `${child.name} updated: ${changes.join(", ")}`,
+        "child",
+        "patient"
+      );
+      console.log(`Notification sent for updated child: ${child.name}`);
+    } catch (error) {
+      console.error(
+        `Failed to send notification for updated child: ${child.name}`,
+        error
+      );
+    }
   }
 
   res.json({
@@ -568,15 +584,23 @@ const deleteChild = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  await sendNotification(
-    userId,
-    childId,
-    null,
-    "Child Removed",
-    `${child.name} removed.`,
-    "child",
-    "patient"
-  );
+  try {
+    await sendNotificationCore(
+      userId,
+      childId,
+      null,
+      "Child Removed",
+      `${child.name} removed.`,
+      "child",
+      "patient"
+    );
+    console.log(`Notification sent for deleted child: ${child.name}`);
+  } catch (error) {
+    console.error(
+      `Failed to send notification for deleted child: ${child.name}`,
+      error
+    );
+  }
 
   await Child.findByIdAndDelete(childId);
 

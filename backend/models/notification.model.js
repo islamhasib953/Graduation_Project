@@ -27,17 +27,17 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: [
-        "medicine",
-        "vaccination",
-        "growth",
-        "growth_alert",
-        "appointment_reminder",
-        "general",
-        "profile",
-        "logout",
-        "bracelet",
-      ],
+      // enum: [
+      //   "medicine",
+      //   "vaccination",
+      //   "growth",
+      //   "growth_alert",
+      //   "appointment_reminder",
+      //   "general",
+      //   "profile",
+      //   "logout",
+      //   "bracelet",
+      // ],
       required: true,
     },
     target: {

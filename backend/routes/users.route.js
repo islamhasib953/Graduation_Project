@@ -102,17 +102,16 @@ router
 
 router
   .route("/register")
-  .post(
-    (req, res, next) => {
-      req.modelName = "user"; // إضافة اسم الموديل
-      next();
-    },
-    upload.single("avatar"), // استخدام Multer المركزي
-    validateRegister,
-    usersController.registerUser
-  );
+  .post(upload.single("avatar"), validateRegister, async (req, res, next) => {
+    if (!req.file) {
+      req.body.avatar = "Uploads/profile.jpg"; // صورة افتراضية
+    }
+    await usersController.register(req, res, next);
+  });
 
-router.route("/login").post(validateLogin, usersController.loginUser);
+
+
+router.route("/login").post(validateLogin, usersController.login);
 
 router
   .route("/profile")
@@ -129,19 +128,19 @@ router
       next();
     },
     upload.single("avatar"), // إضافة Multer لرفع الصورة عند التحديث
-    usersController.updateUserProfile
+    usersController.updateProfile
   )
   .delete(
     verifyToken,
     allowedTo(userRoles.PATIENT),
-    usersController.deleteUserProfile
+    usersController.deleteProfile
   );
 
 router.post(
   "/logout",
   verifyToken,
   allowedTo(userRoles.PATIENT),
-  usersController.logoutUser
+  usersController.logout
 );
 
 router.post(
