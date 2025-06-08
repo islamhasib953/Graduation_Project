@@ -46,11 +46,11 @@
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>
-    const childId = '6814bd00d157322d7cad7661';
-    const doctorId = '67feab9a9d5743ac32a1e851';
+    const childId = '68264b4d065c062a8059c8a6';
+    const doctorId = '68264ab7065c062a8059c865';
     const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImJhYmFAZXhhbXBsZS5jb20iLCJpZCI6IjY4MTRiY2VmZDE1NzMyMmQ3Y2FkNzY1OCIsInJvbGUiOiJwYXRpZW50IiwiaWF0IjoxNzQ2OTg0OTc0LCJleHAiOjE3NDc1ODk3NzR9.AIWcXDh0KGzeLq7MyfVtftW4zGNJmAsY5zAEiu5H_4w';
 
-    const socket = io('https://sigma-3hkg.onrender.com');
+    const socket = io('http://35.173.178.21:8000');
 
     socket.on('connect', () => {
       console.log('Connected to server:', socket.id);

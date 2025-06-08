@@ -71,7 +71,7 @@ client.on("connect", () => {
 
   // قائمة بمعرفات الأطفال (childIds) - استبدلها بـ ObjectId من قاعدة البيانات
   const childIds = [
-    "67fcede04bd15f8935785122", // استبدل بـ ObjectId حقيقي
+    "68271e6816742b112f001f24", // استبدل بـ ObjectId حقيقي
   ];
 
   setInterval(() => {
