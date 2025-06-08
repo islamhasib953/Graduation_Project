@@ -1,2 +1,12 @@
+https://www.youtube.com/watch?v=CK-6zarD2Hc ===> vedio for deploy server in EC2
+*******************
+pm2 list        # لعرض كل التطبيقات المشغّلة
+pm2 logs        # لعرض اللوجات
+pm2 stop my-node-app   # لإيقاف التطبيق
+pm2 restart my-node-app  # لإعادة تشغيله
+pm2 delete my-node-app   # لحذف التطبيق من PM2
 
-واخر حاجة عندى سؤال فى كنترلورز التطعيمات لو عملت انى خدت التطعيم فى وقت معين عند طفل معين هيعدل باقى اوقات التعطيمات بانء على الوقت اللى انا حدتته صح من غير ما يعدل حاجة فى اوقات تطعيمات الاطفال الاخرى صح؟؟؟
+
+//3.93.147.187
+
+//user, doctor, vactine, memory, growth, baby
