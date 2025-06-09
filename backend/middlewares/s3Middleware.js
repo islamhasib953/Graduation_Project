@@ -1,3 +1,4 @@
+const { v4: uuidv4 } = require("uuid");
 const {
   putObject,
   getObject,
@@ -5,32 +6,100 @@ const {
 } = require("../utils/s3-operations");
 
 exports.uploadToS3 = async (req, res, next) => {
-  if (!req.file) return next();
+  console.log("uploadToS3 started - req.files:", req.files); // Log 1
+  let fileField = "avatar"; // Default
+  if (req.modelName === "child") fileField = "photo";
+  if (req.modelName === "history") fileField = "notesImage";
+  if (req.modelName === "memory") fileField = "image";
+  if (req.modelName === "UserVaccination") fileField = "image";
+  if (req.modelName === "chat") fileField = "media";
 
-  const fileName = `avatars/${req.user.id}/${Date.now()}-${
-    req.file.originalname
-  }`;
-  const { url, key } = await putObject(req.file.buffer, fileName);
-  req.s3Data = { url, key };
+  if (!req.files || !req.files[fileField]) {
+    console.log(`No ${fileField} uploaded, proceeding without S3 upload`); // Log 2
+    return next();
+  }
+
+  const file = req.files[fileField];
+  console.log(`File received (${fileField}):`, file); // Log 3
+  const tempId = uuidv4();
+  const fileName = `${req.modelName}s/${tempId}/${Date.now()}-${file.name}`;
+  try {
+    console.log("Attempting to upload to S3 with filename:", fileName); // Log 4
+    const fileData = file.data; // Buffer مباشرة من express-fileupload
+    console.log("File data length from file.data:", fileData.length); // Log 5
+    if (!Buffer.isBuffer(fileData) || fileData.length === 0) {
+      throw new Error("File data is not a valid Buffer or is empty");
+    }
+    const { url, key } = await putObject(fileData, fileName);
+    console.log("S3 Upload result - url:", url, "key:", key); // Log 6
+    if (!url || !key) {
+      throw new Error("Failed to upload media to S3");
+    }
+    req.s3Data = { url, key, tempId };
+    console.log("req.s3Data set successfully:", req.s3Data); // Log 7
+  } catch (err) {
+    console.error("S3 Upload Error:", err); // Log 8
+    return next(err);
+  }
   next();
 };
 
 exports.getFromS3 = async (req, res, next) => {
+  console.log("getFromS3 started - req.modelName:", req.modelName); // Log 9
   const modelName = req.modelName || "user";
   const model = req[modelName];
-  if (model && model.avatar) {
-    const data = await getObject(model.avatar.split("/").pop()); // استخراج Key من URL
+  const fieldName =
+    modelName === "child"
+      ? "photo"
+      : modelName === "history"
+      ? "notesImage"
+      : modelName === "memory"
+      ? "image"
+      : modelName === "UserVaccination"
+      ? "image"
+      : modelName === "chat"
+      ? "media"
+      : "avatar";
+  console.log(`Field name determined: ${fieldName}`); // Log 10
+  if (model && model[fieldName]) {
+    console.log(`Fetching from S3 - key: ${model[fieldName].split("/").pop()}`); // Log 11
+    if (typeof getObject !== "function") {
+      console.error("getObject is not a function - check import"); // Log 12
+      return next(new Error("S3 getObject function is not defined"));
+    }
+    const data = await getObject(model[fieldName].split("/").pop());
     req.s3Data = { data };
+    console.log("S3 data fetched successfully:", req.s3Data); // Log 12
+  } else {
+    console.log("No field or model data to fetch from S3"); // Log 13
   }
   next();
 };
 
 exports.deleteFromS3 = async (req, res, next) => {
+  console.log("deleteFromS3 started - req.modelName:", req.modelName); // Log 14
   const modelName = req.modelName || "user";
   const model = req[modelName];
-  if (model && model.avatar) {
-    const key = model.avatar.split("/").pop(); // استخراج Key من URL
+  const fieldName =
+    modelName === "child"
+      ? "photo"
+      : modelName === "history"
+      ? "notesImage"
+      : modelName === "memory"
+      ? "image"
+      : modelName === "UserVaccination"
+      ? "image"
+      : modelName === "chat"
+      ? "media"
+      : "avatar";
+  console.log(`Field name for deletion: ${fieldName}`); // Log 15
+  if (model && model[fieldName]) {
+    const key = model[fieldName].split("/").pop();
+    console.log(`Deleting from S3 - key: ${key}`); // Log 16
     await deleteObject(key);
+    console.log("S3 deletion completed"); // Log 17
+  } else {
+    console.log("No field or model data to delete from S3"); // Log 18
   }
   next();
 };

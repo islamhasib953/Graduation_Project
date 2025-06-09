@@ -60,7 +60,6 @@
 
 // module.exports = MQTTService;
 
-
 const mqtt = require("mqtt");
 const SensorData = require("../models/sensorData.model");
 const Child = require("../models/child.model");

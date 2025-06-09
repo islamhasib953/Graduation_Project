@@ -1,4 +1,3 @@
-
 // const Growth = require("../models/growth.model");
 // const Child = require("../models/child.model");
 // const asyncWrapper = require("../middlewares/asyncWrapper");
@@ -515,13 +514,14 @@
 //   getLastGrowthChange,
 // };
 
-
 const Growth = require("../models/growth.model");
 const Child = require("../models/child.model");
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
-const { sendNotificationCore } = require("../controllers/notifications.controller");
+const {
+  sendNotificationCore,
+} = require("../controllers/notifications.controller");
 
 const createGrowth = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
@@ -581,7 +581,10 @@ const createGrowth = asyncWrapper(async (req, res, next) => {
     );
     console.log(`Notification sent for new growth record: ${child.name}`);
   } catch (error) {
-    console.error(`Failed to send notification for new growth record: ${child.name}`, error);
+    console.error(
+      `Failed to send notification for new growth record: ${child.name}`,
+      error
+    );
   }
 
   res.status(201).json({
@@ -753,7 +756,10 @@ const updateGrowth = asyncWrapper(async (req, res, next) => {
     );
     console.log(`Notification sent for updated growth record: ${child.name}`);
   } catch (error) {
-    console.error(`Failed to send notification for updated growth record: ${child.name}`, error);
+    console.error(
+      `Failed to send notification for updated growth record: ${child.name}`,
+      error
+    );
   }
 
   res.json({
@@ -816,7 +822,10 @@ const deleteGrowth = asyncWrapper(async (req, res, next) => {
     );
     console.log(`Notification sent for deleted growth record: ${child.name}`);
   } catch (error) {
-    console.error(`Failed to send notification for deleted growth record: ${child.name}`, error);
+    console.error(
+      `Failed to send notification for deleted growth record: ${child.name}`,
+      error
+    );
   }
 
   res.json({

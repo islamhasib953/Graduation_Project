@@ -54,7 +54,6 @@
 //   console.error("MQTT Error:", err);
 // });
 
-
 const mqtt = require("mqtt");
 require("dotenv").config();
 

@@ -4,7 +4,7 @@ const verifyToken = require("../middlewares/virifyToken");
 const allowedTo = require("../middlewares/allowedTo");
 const userRoles = require("../utils/userRoles");
 const chatController = require("../controllers/chat.controller");
-const upload = require("../utils/multer.config");
+const { uploadToS3 } = require("../middlewares/s3Middleware");
 const mongoose = require("mongoose"); // استيراد mongoose
 
 // التحقق من صحة المعرفات
@@ -44,12 +44,11 @@ router.post(
   allowedTo(userRoles.PATIENT),
   validateIds,
   (req, res, next) => {
-    req.modelName = "chat";
+    req.modelName = "chat"; // إضافة اسم الموديل
     next();
   },
-  upload.single("media"),
+  uploadToS3, // رفع الوسائط (صور أو ملفات)
   chatController.uploadMedia
 );
 
 module.exports = router;
-//latest

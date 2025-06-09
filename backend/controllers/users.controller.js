@@ -226,7 +226,6 @@
 //   }
 // });
 
-
 // const getUserProfile = asyncWrapper(async (req, res, next) => {
 //   const userId = req.user.id;
 //   if (!userId) {
@@ -516,6 +515,7 @@ const {
   sendNotificationCore,
 } = require("../controllers/notifications.controller");
 const mongoose = require("mongoose");
+const { deleteObject } = require("../utils/s3-operations"); // إضافة الاستيراد هنا
 
 const getAllUsers = asyncWrapper(async (req, res) => {
   const query = req.query;
@@ -529,7 +529,9 @@ const getAllUsers = asyncWrapper(async (req, res) => {
   res.json({ status: httpStatusText.SUCCESS, data: { users } });
 });
 
+
 const register = asyncWrapper(async (req, res, next) => {
+  console.log("register started - req.body:", req.body); // Log 1
   const {
     firstName,
     lastName,
@@ -545,16 +547,42 @@ const register = asyncWrapper(async (req, res, next) => {
     availableDays,
     availableTimes,
   } = req.body;
+  console.log("Extracted fields:", {
+    firstName,
+    lastName,
+    gender,
+    phone,
+    address,
+    email,
+    password,
+    role,
+    specialise,
+    about,
+    rate,
+    availableDays,
+    availableTimes,
+  }); // Log 2
+
   const oldUser = await User.findOne({ email });
+  console.log("Check for existing user - oldUser:", oldUser); // Log 3
   const oldDoctor = await Doctor.findOne({ email });
+  console.log("Check for existing doctor - oldDoctor:", oldDoctor); // Log 4
   if (oldUser || oldDoctor) {
+    console.log("Email already exists error triggered"); // Log 5
     return next(
       appError.create("Email already exists", 400, httpStatusText.FAIL)
     );
   }
+
   const hashedPassword = await bcrypt.hash(password, 12);
+  console.log("Password hashed successfully"); // Log 6
+
   if (role === userRoles.DOCTOR) {
-    const avatar = req.s3Data ? req.s3Data.url : "uploads/doctor.jpg";
+    console.log("Processing doctor registration"); // Log 7
+    const avatar = req.s3Data
+      ? req.s3Data.url
+      : `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/uploads/doctor.jpg`;
+    console.log("Avatar determined:", avatar); // Log 8
     const newDoctor = new Doctor({
       firstName,
       lastName,
@@ -571,12 +599,15 @@ const register = asyncWrapper(async (req, res, next) => {
       availableTimes,
       avatar,
     });
+    console.log("New doctor object created:", newDoctor); // Log 9
     const token = await generateJWT(
       { email: newDoctor.email, id: newDoctor._id, role: newDoctor.role },
       "7d"
     );
+    console.log("JWT token generated:", token); // Log 10
     newDoctor.token = token;
     await newDoctor.save();
+    console.log("Doctor saved to database:", newDoctor._id); // Log 11
     const doctorData = {
       _id: newDoctor._id,
       firstName: newDoctor.firstName,
@@ -596,6 +627,7 @@ const register = asyncWrapper(async (req, res, next) => {
       token: newDoctor.token,
     };
     try {
+      console.log("Attempting to send notification for new doctor"); // Log 12
       await sendNotificationCore(
         newDoctor._id,
         null,
@@ -605,8 +637,9 @@ const register = asyncWrapper(async (req, res, next) => {
         "profile",
         "doctor"
       );
+      console.log("Notification sent for new doctor"); // Log 13
     } catch (error) {
-      console.error(`Failed to send notification for new doctor: ${error}`);
+      console.error(`Failed to send notification for new doctor: ${error}`); // Log 14
     }
     res.status(201).json({
       status: httpStatusText.SUCCESS,
@@ -614,7 +647,11 @@ const register = asyncWrapper(async (req, res, next) => {
       data: { user: doctorData },
     });
   } else {
-    const avatar = req.s3Data ? req.s3Data.url : "uploads/user-default.jpg";
+    console.log("Processing user registration"); // Log 15
+    const avatar = req.s3Data
+      ? req.s3Data.url
+      : `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/uploads/user-default.jpg`;
+    console.log("Avatar determined:", avatar); // Log 16
     const newUser = new User({
       firstName,
       lastName,
@@ -626,12 +663,15 @@ const register = asyncWrapper(async (req, res, next) => {
       role,
       avatar,
     });
+    console.log("New user object created:", newUser); // Log 17
     const token = await generateJWT(
       { email: newUser.email, id: newUser._id, role: newUser.role },
       "7d"
     );
+    console.log("JWT token generated:", token); // Log 18
     newUser.token = token;
     await newUser.save();
+    console.log("User saved to database:", newUser._id); // Log 19
     const userData = {
       _id: newUser._id,
       firstName: newUser.firstName,
@@ -647,6 +687,7 @@ const register = asyncWrapper(async (req, res, next) => {
       token: newUser.token,
     };
     try {
+      console.log("Attempting to send notification for new user"); // Log 20
       await sendNotificationCore(
         newUser._id,
         null,
@@ -656,8 +697,9 @@ const register = asyncWrapper(async (req, res, next) => {
         "profile",
         "patient"
       );
+      console.log("Notification sent for new user"); // Log 21
     } catch (error) {
-      console.error(`Failed to send notification for new user: ${error}`);
+      console.error(`Failed to send notification for new user: ${error}`); // Log 22
     }
     res.status(201).json({
       status: httpStatusText.SUCCESS,
@@ -737,6 +779,10 @@ const getUserProfile = asyncWrapper(async (req, res, next) => {
   if (!user) {
     return next(appError.create("User not found", 404, httpStatusText.FAIL));
   }
+  // استدعاء getFromS3 لجلب الصورة إذا محتاج
+  if (req.s3Data && req.s3Data.data) {
+    console.log("Image data retrieved from S3:", req.s3Data.data);
+  }
   res.json({
     status: httpStatusText.SUCCESS,
     data: {
@@ -747,7 +793,7 @@ const getUserProfile = asyncWrapper(async (req, res, next) => {
       address: user.address,
       email: user.email,
       role: user.role,
-      avatar: user.avatar,
+      avatar: user.avatar, // URL الصورة موجودة هنا
       favorite: user.favorite,
       created_at: user.created_at,
     },
@@ -785,6 +831,7 @@ const updateProfile = asyncWrapper(async (req, res, next) => {
     user.gender = gender;
   }
   if (req.s3Data && req.s3Data.url) {
+    // إضافة الصورة الجديدة
     changes.push(`avatar updated`);
     user.avatar = req.s3Data.url;
   }
@@ -840,6 +887,16 @@ const deleteProfile = asyncWrapper(async (req, res, next) => {
   try {
     await Child.deleteMany({ parentId: userId }, { session });
     await Appointment.deleteMany({ userId }, { session });
+
+    // فحص وتأكيد مسح الصورة
+    if (
+      user.avatar &&
+      user.avatar !==
+        `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/uploads/user-default.jpg`
+    ) {
+      const key = user.avatar.split("/").pop();
+      await deleteObject(key); // مسح الصورة يدويًا كتأكيد إضافي
+    }
 
     user.token = null;
     user.fcmToken = null;

@@ -339,14 +339,14 @@ const createMedicine = asyncWrapper(async (req, res, next) => {
     );
   }
 
-    const newMedicine = new Medicine({
-      userId,
-      childId,
-      name,
-      description,
-      days,
-      times,
-    });
+  const newMedicine = new Medicine({
+    userId,
+    childId,
+    name,
+    description,
+    days,
+    times,
+  });
 
   await newMedicine.save();
 
@@ -387,7 +387,6 @@ const createMedicine = asyncWrapper(async (req, res, next) => {
   });
 });
 
-
 const getAllMedicines = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
   const userId = req.user.id;
@@ -403,19 +402,19 @@ const getAllMedicines = asyncWrapper(async (req, res, next) => {
     );
   }
 
-    const medicines = await Medicine.find({ childId, userId }).select(
-      "_id name description days times createdAt"
-    );
+  const medicines = await Medicine.find({ childId, userId }).select(
+    "_id name description days times createdAt"
+  );
 
-    if (!medicines.length) {
-      return next(
-        appError.create(
-          "No medicines found for this child",
-          404,
-          httpStatusText.FAIL
-        )
-      );
-    }
+  if (!medicines.length) {
+    return next(
+      appError.create(
+        "No medicines found for this child",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -493,17 +492,17 @@ const updateMedicine = asyncWrapper(async (req, res, next) => {
     );
   }
 
-    const updatedMedicine = await Medicine.findOneAndUpdate(
-      { _id: medicineId, childId, userId },
-      { name, description, days, times },
-      { new: true, runValidators: true }
-    ).select("_id name description days times createdAt");
+  const updatedMedicine = await Medicine.findOneAndUpdate(
+    { _id: medicineId, childId, userId },
+    { name, description, days, times },
+    { new: true, runValidators: true }
+  ).select("_id name description days times createdAt");
 
-    if (!updatedMedicine) {
-      return next(
-        appError.create("Medicine not found", 404, httpStatusText.FAIL)
-      );
-    }
+  if (!updatedMedicine) {
+    return next(
+      appError.create("Medicine not found", 404, httpStatusText.FAIL)
+    );
+  }
 
   if (userId) {
     try {

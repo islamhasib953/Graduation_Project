@@ -347,6 +347,7 @@ const httpStatusText = require("../utils/httpStatusText");
 const userRoles = require("../utils/userRoles");
 const appError = require("../utils/appError");
 const Doctor = require("../models/doctor.model");
+const { deleteObject } = require("../utils/s3-operations"); // إضافة الاستيراد هنا
 
 const {
   sendNotificationCore,
@@ -355,8 +356,7 @@ const {
 const createHistory = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
   const userId = req.user?.id;
-  const { diagnosis, disease, treatment, notes, date, time } =
-    req.body;
+  const { diagnosis, disease, treatment, notes, date, time } = req.body;
 
   if (!diagnosis || !disease || !treatment || !date || !time) {
     return next(
@@ -373,9 +373,9 @@ const createHistory = asyncWrapper(async (req, res, next) => {
     return next(appError.create("Child not found", 404, httpStatusText.FAIL));
   }
 
-  const notesImage = req.file ? `/uploads/${req.file.filename}` : null;
-    let finalDoctorName = "user";
-    console.log("Initial finalDoctorName:", finalDoctorName);
+  const notesImage = req.s3Data ? req.s3Data.url : null; // استبدال req.file بـ req.s3Data
+  let finalDoctorName = "user";
+  console.log("Initial finalDoctorName:", finalDoctorName);
 
   if (userId) {
     console.log("Testing userId:", userId);
@@ -512,27 +512,26 @@ const getSingleHistory = asyncWrapper(async (req, res, next) => {
 const updateHistory = asyncWrapper(async (req, res, next) => {
   const { childId, historyId } = req.params;
   const userId = req.user?.id;
-  const { diagnosis, disease, treatment, notes, date, time } =
-    req.body;
+  const { diagnosis, disease, treatment, notes, date, time } = req.body;
 
   const child = await Child.findById(childId);
   if (!child) {
     return next(appError.create("Child not found", 404, httpStatusText.FAIL));
   }
 
-  const notesImage = req.file ? `/Uploads/${req.file.filename}` : undefined;
-    let finalDoctorName = "user";
-    console.log("Initial finalDoctorName:", finalDoctorName);
+  const notesImage = req.s3Data ? req.s3Data.url : undefined; // استبدال req.file بـ req.s3Data
+  let finalDoctorName = "user";
+  console.log("Initial finalDoctorName:", finalDoctorName);
 
-    if (userId) {
-      console.log("Testing userId:", userId);
-      const doctor = await Doctor.findById(userId);
-      console.log("Doctor:", doctor);
-      if (doctor && doctor.role === userRoles.DOCTOR) {
-        finalDoctorName = `${doctor.firstName} ${doctor.lastName}`;
-        console.log("Updated finalDoctorName:", finalDoctorName);
-      }
+  if (userId) {
+    console.log("Testing userId:", userId);
+    const doctor = await Doctor.findById(userId);
+    console.log("Doctor:", doctor);
+    if (doctor && doctor.role === userRoles.DOCTOR) {
+      finalDoctorName = `${doctor.firstName} ${doctor.lastName}`;
+      console.log("Updated finalDoctorName:", finalDoctorName);
     }
+  }
 
   const updatedHistory = await History.findOneAndUpdate(
     { _id: historyId, childId },
@@ -595,7 +594,6 @@ const updateHistory = asyncWrapper(async (req, res, next) => {
   });
 });
 
-
 const deleteHistory = asyncWrapper(async (req, res, next) => {
   const { childId, historyId } = req.params;
   const userId = req.user?.id;
@@ -614,6 +612,12 @@ const deleteHistory = asyncWrapper(async (req, res, next) => {
     return next(
       appError.create("History record not found", 404, httpStatusText.FAIL)
     );
+  }
+
+  // مسح الصورة من S3 لو موجودة
+  if (deletedHistory.notesImage) {
+    const key = deletedHistory.notesImage.split("/").pop();
+    await deleteObject(key);
   }
 
   if (userId) {

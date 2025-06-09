@@ -17,8 +17,6 @@
 //   server.close(() => process.exit(1));
 // });
 
-
-
 const mongoose = require("mongoose");
 const { app, server } = require("./app");
 

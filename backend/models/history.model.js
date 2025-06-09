@@ -52,7 +52,7 @@ const HistorySchema = new mongoose.Schema(
     },
     notesImage: {
       type: String,
-      default: null,
+      default: `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/uploads/history-default.jpg`, // تعديل الـ default
       validate: {
         validator: function (value) {
           return !value || /\.(jpg|jpeg|png|gif)$/i.test(value);
