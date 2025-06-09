@@ -1,4 +1,3 @@
-// src/components/HistoryCard.js
 import React from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -28,7 +27,14 @@ const HistoryCard = ({ record, childId }) => {
         </p>
         {record.notesImage && (
           <p>
-            <strong>Notes Image:</strong> {record.notesImage}
+            <strong>Notes Image:</strong>{" "}
+            <a
+              href={record.notesImage}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {record.notesImage}
+            </a>
           </p>
         )}
       </div>

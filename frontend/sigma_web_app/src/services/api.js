@@ -1,8 +1,8 @@
 // src/services/api.js
 import axios from "axios";
 
-const API_BASE_URL = "https://graduation-projectgmabackend.vercel.app"; // استبدل هذا بـ URL الـ API الخاص بك
-
+const API_BASE_URL = "http://35.173.178.21:8000"; // استبدل هذا بـ URL الـ API الخاص بك
+// const API_BASE_URL = "http://localhost:8000";
 // export const getHistory = async (childId) => {
 //   const response = await axios.get(`${API_BASE_URL}/api/history/${childId}`);
 //   return response.data;

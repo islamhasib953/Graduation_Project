@@ -1,17 +1,13 @@
-// src/pages/HistoryDetails.js
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getHistoryDetails } from "../services/api";
-import { ClipLoader } from "react-spinners";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable"; // Import autoTable explicitly
+import autoTable from "jspdf-autotable";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import "../styles/HistoryDetails.css";
-
-const BASE_URL = "https://graduation-projectgmabackend.vercel.app"; // Replace with your actual server BASE_URL
 
 const HistoryDetails = () => {
   const { childId, historyId } = useParams();
@@ -26,6 +22,7 @@ const HistoryDetails = () => {
         setLoading(true);
         const response = await getHistoryDetails(childId, historyId);
         console.log("API Response:", response);
+        console.log("Notes Image URL:", response.data.notesImage);
         setDetails(response.data);
         setLoading(false);
       } catch (error) {
@@ -84,24 +81,36 @@ const HistoryDetails = () => {
   const handleDownloadPDF = async () => {
     const doc = new jsPDF();
 
-    // Add Logo in the Header with Error Handling
-    const logoBase64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."; // Replace with your logo's base64 string
+    // Fetch and convert logo to base64
+    let logoBase64 = null;
     try {
-      if (logoBase64) {
-        doc.addImage(logoBase64, "PNG", 20, 10, 30, 30); // Add logo at position (20, 10), size 30x30
-      }
+      const logoResponse = await fetch(`${process.env.PUBLIC_URL}/logo.png`);
+      if (!logoResponse.ok)
+        throw new Error(`Failed to fetch logo: ${logoResponse.status}`);
+      const logoBlob = await logoResponse.blob();
+      const logoReader = new FileReader();
+      logoBase64 = await new Promise((resolve) => {
+        logoReader.onloadend = () => resolve(logoReader.result);
+        logoReader.readAsDataURL(logoBlob);
+      });
     } catch (err) {
-      console.error("Failed to load logo for PDF:", err);
-      // Continue without the logo
+      console.error("Error loading logo:", err);
     }
 
-    // Add Header
+    // Add Header with Logo
+    if (logoBase64) {
+      try {
+        doc.addImage(logoBase64, "PNG", 20, 10, 30, 30); // Logo on the left
+      } catch (err) {
+        console.error("Failed to add logo to PDF:", err);
+      }
+    }
     doc.setFontSize(20);
-    doc.setTextColor(0, 119, 182); // #0077B6 (Deep blue)
-    doc.text("Sigma | Baby Healthcare", 55, 20); // Adjusted position to be next to the logo
+    doc.setTextColor(0, 119, 182);
+    doc.text("Sigma | Baby Healthcare", 55, 25); // Text next to logo
     doc.setFontSize(14);
-    doc.setTextColor(3, 4, 94); // #03045E (Dark blue)
-    doc.text("Medical History Details", 55, 30);
+    doc.setTextColor(3, 4, 94);
+    doc.text("Medical History Details", 55, 35);
 
     // Prepare table data
     const tableData = [
@@ -110,89 +119,96 @@ const HistoryDetails = () => {
       ["Treatment", details.treatment || "N/A"],
       ["Notes", details.notes || "N/A"],
       ["Date", details.date ? formatDate(details.date) : "N/A"],
-      ["Doctor", details.doctor || "Dr. John Doe"],
+      ["Doctor", details.doctorName || "N/A"],
     ];
 
     // Add table using jspdf-autotable
     autoTable(doc, {
-      startY: 45, // Start the table directly after the header
-      head: [["Field", "Details"]], // Table header
-      body: tableData, // Table body
-      theme: "striped", // Use striped theme for alternating row colors
+      startY: 45,
+      head: [["Field", "Details"]],
+      body: tableData,
+      theme: "striped",
       styles: {
         fontSize: 12,
         cellPadding: 3,
-        textColor: [3, 4, 94], // #03045E for text
-        lineColor: [0, 119, 182], // #0077B6 for vertical lines
-        lineWidth: 0.2, // Thickness of vertical lines
-        halign: "left", // Left alignment for English text
+        textColor: [3, 4, 94],
+        lineColor: [0, 119, 182],
+        lineWidth: 0.2,
+        halign: "left",
       },
       headStyles: {
-        fillColor: [0, 119, 182], // #0077B6 for header background
-        textColor: [202, 240, 248], // #CAF0F8 for header text
+        fillColor: [0, 119, 182],
+        textColor: [202, 240, 248],
         fontSize: 13,
         lineWidth: 0.2,
-        lineColor: [0, 119, 182], // #0077B6 for borders
-        halign: "left", // Left alignment for header
+        lineColor: [0, 119, 182],
+        halign: "left",
       },
       alternateRowStyles: {
-        fillColor: [144, 224, 239], // #90E0EF for alternate rows
+        fillColor: [144, 224, 239],
       },
       bodyStyles: {
-        lineWidth: 0.1, // Thickness of horizontal lines
-        lineColor: [144, 224, 239], // #90E0EF for horizontal lines
+        lineWidth: 0.1,
+        lineColor: [144, 224, 239],
       },
       columnStyles: {
-        0: { cellWidth: 40 }, // Width of the first column (Field): 40mm
-        1: { cellWidth: 130 }, // Width of the second column (Details): 130mm
+        0: { cellWidth: 40 },
+        1: { cellWidth: 130 },
       },
       margin: { left: 20, right: 20 },
     });
 
-    // Add Notes Image (if exists)
-    const notesImage = details.notesImage || "";
-    if (notesImage) {
+    // Add Notes Images (if exist)
+    const notesImages = Array.isArray(details.notesImage)
+      ? details.notesImage
+      : [details.notesImage].filter(Boolean);
+    let finalY = doc.lastAutoTable.finalY || 45;
+
+    if (notesImages.length > 0) {
       try {
-        const imgUrl = `${BASE_URL}/${notesImage}`;
-        const response = await fetch(imgUrl);
-        const blob = await response.blob();
-        const reader = new FileReader();
-        reader.readAsDataURL(blob);
-        reader.onloadend = () => {
-          const base64data = reader.result;
-          const finalY = doc.lastAutoTable.finalY || 45; // Get the Y position after the table
+        const imageData = await Promise.all(
+          notesImages.map(async (imageUrl) => {
+            console.log("Fetching image:", imageUrl);
+            const response = await fetch(imageUrl, { mode: "cors" });
+            if (!response.ok) {
+              console.error(
+                `Failed to fetch image: ${imageUrl}, Status: ${response.status}`
+              );
+              throw new Error(`Failed to fetch image: ${imageUrl}`);
+            }
+            const blob = await response.blob();
+            const reader = new FileReader();
+            return new Promise((resolve) => {
+              reader.onloadend = () => resolve(reader.result);
+              reader.readAsDataURL(blob);
+            });
+          })
+        );
+
+        imageData.forEach((base64, index) => {
           doc.setFontSize(12);
-          doc.setTextColor(3, 4, 94); // #03045E
-          doc.text("Notes Image:", 20, finalY + 10); // Image title
-          doc.addImage(base64data, "JPEG", 20, finalY + 15, 100, 50); // Add image
-          // Add Footer
-          const pageHeight = doc.internal.pageSize.height;
-          doc.setFontSize(10);
-          doc.setTextColor(0, 119, 182); // #0077B6
-          doc.text(`Downloaded on: ${formatTimestamp()}`, 20, pageHeight - 10);
-          doc.save("medical-history.pdf");
-        };
-      } catch (err) {
-        console.error("Failed to load image for PDF:", err);
-        // Add Footer and save without the image
+          doc.setTextColor(3, 4, 94);
+          doc.text(`Notes Image ${index + 1}:`, 20, finalY + 10);
+          doc.addImage(base64, "JPEG", 20, finalY + 15, 100, 50);
+          finalY += 65;
+        });
+
         const pageHeight = doc.internal.pageSize.height;
         doc.setFontSize(10);
         doc.setTextColor(0, 119, 182);
         doc.text(`Downloaded on: ${formatTimestamp()}`, 20, pageHeight - 10);
+      } catch (err) {
+        console.error("Error loading images for PDF:", err);
+      } finally {
         doc.save("medical-history.pdf");
       }
     } else {
-      // Add Footer
       const pageHeight = doc.internal.pageSize.height;
       doc.setFontSize(10);
       doc.setTextColor(0, 119, 182);
       doc.text(`Downloaded on: ${formatTimestamp()}`, 20, pageHeight - 10);
       doc.save("medical-history.pdf");
     }
-  };
-
-  const handleEdit = () => {
-    navigate(`/history/${childId}/${historyId}/edit`);
   };
 
   if (loading) {
@@ -218,7 +234,9 @@ const HistoryDetails = () => {
   const notes = details.notes || "N/A";
   const date = details.date || "";
   const time = details.time || "N/A";
-  const notesImage = details.notesImage || "";
+  const notesImages = Array.isArray(details.notesImage)
+    ? details.notesImage
+    : [details.notesImage].filter(Boolean);
 
   return (
     <>
@@ -247,7 +265,7 @@ const HistoryDetails = () => {
             {date ? formatDate(date) : "N/A"}{" "}
             {time !== "N/A" ? `at ${time}` : ""}
           </span>
-          <span className="author">By {details.doctor || "Dr. John Doe"}</span>
+          <span className="author">By {details.doctorName || "N/A"}</span>
         </div>
 
         <div className="section-card">
@@ -270,15 +288,22 @@ const HistoryDetails = () => {
           <p>{notes}</p>
         </div>
 
-        {notesImage && (
+        {notesImages.length > 0 && (
           <div className="section-card">
-            <h3>Notes Image</h3>
-            <img
-              src={`${BASE_URL}/${notesImage}`}
-              alt="Notes Image"
-              className="notes-image"
-              onError={(e) => console.error("Failed to load image:", e)}
-            />
+            <h3>Notes Images</h3>
+            <div className="notes-images-container">
+              {notesImages.map((image, index) => (
+                <img
+                  key={index}
+                  src={image}
+                  alt={`Note ${index + 1}`}
+                  className="notes-image"
+                  onError={(e) =>
+                    console.error(`Image ${index + 1} load error:`, e)
+                  }
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>

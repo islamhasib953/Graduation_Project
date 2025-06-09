@@ -210,6 +210,7 @@ body.dark-mode .details-button:hover {
 }
 
 /* Responsive design for mobile */
+/* src/styles/MedicalHistory.css */
 @media (max-width: 768px) {
   .medical-history-container {
     padding: 15px;
@@ -221,20 +222,27 @@ body.dark-mode .details-button:hover {
 
   .table-header,
   .table-row {
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    /* Show date on mobile */
     font-size: 12px;
   }
 
-  .table-header span:nth-child(4),
   .table-header span:nth-child(5),
-  .table-row span:nth-child(4),
   .table-row span:nth-child(5) {
     display: none;
+    /* Hide Doctor on mobile */
   }
 
   .details-button {
     padding: 6px 12px;
     font-size: 12px;
+    width: 100%;
+    /* Full width on mobile */
+  }
+
+  .search-bar input {
+    font-size: 14px;
+    padding: 10px;
   }
 }
 
@@ -263,4 +271,32 @@ body.dark-mode .details-button:hover {
   100% {
     transform: scale(1);
   }
+}
+
+/* src/styles/MedicalHistory.css */
+.download-all-button {
+  padding: 10px 20px;
+  background-color: #00B4D8;
+  color: #03045E;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  transition: background-color 0.3s, transform 0.1s;
+  margin-bottom: 20px;
+}
+
+.download-all-button:hover {
+  background-color: #CAF0F8;
+  transform: scale(1.05);
+}
+
+body.dark-mode .download-all-button {
+  background-color: #00B4D8;
+  color: #03045E;
+}
+
+body.dark-mode .download-all-button:hover {
+  background-color: #90E0EF;
 }
