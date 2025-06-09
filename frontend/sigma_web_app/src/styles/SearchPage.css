@@ -1,6 +1,6 @@
 /* src/styles/SearchPage.css */
 .search-page {
-  padding: 20px;
+  padding: 15px;
   background-color: #1a1a1a;
   color: white;
   min-height: 100vh;
@@ -9,15 +9,22 @@
 .search-form {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 20px;
 }
 
 .search-form input,
 .search-form button {
-  padding: 10px;
+  padding: 8px;
+  font-size: 14px;
   border-radius: 5px;
   border: none;
+}
+
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .search-form button {
@@ -28,4 +35,9 @@
 
 .search-form button:last-child {
   background-color: #dc3545;
+}
+@media (max-width: 768px) {
+  .search-form {
+    flex-direction: column;
+  }
 }

@@ -156,11 +156,74 @@ body.dark-mode .download-button:hover {
   line-height: 1.8;
 }
 
+/* src/styles/HistoryDetails.css */
+.notes-images-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
 .notes-image {
   max-width: 100%;
+  height: auto;
   border-radius: 8px;
-  margin-top: 10px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  object-fit: cover;
+  /* Maintain aspect ratio */
+  max-height: 300px;
+  /* Limit max height for responsiveness */
+}
+
+/* Responsive adjustments */
+/* src/styles/HistoryDetails.css */
+@media (max-width: 768px) {
+  .history-details-container {
+    padding: 20px;
+  }
+
+  .page-title {
+    font-size: 28px;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .back-button,
+  .edit-button,
+  .share-button,
+  .download-button {
+    font-size: 14px;
+    padding: 8px 16px;
+    width: 100%;
+    /* Full width on mobile */
+  }
+
+  .date,
+  .author {
+    font-size: 14px;
+  }
+
+  .section-card h3 {
+    font-size: 18px;
+  }
+
+  .section-card p {
+    font-size: 16px;
+  }
+
+  .notes-images-container {
+    flex-direction: column;
+    /* Stack images vertically on mobile */
+  }
+
+  .notes-image {
+    max-height: 200px;
+    width: 100%;
+    /* Full width on mobile */
+  }
 }
 
 .loader,

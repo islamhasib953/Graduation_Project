@@ -10,3 +10,8 @@ pm2 delete my-node-app   # لحذف التطبيق من PM2
 //3.93.147.187
 
 //user, doctor, vactine, memory, growth, baby
+
+ريسبونسف
+حجم الصورة
+اسم وصورة التطبيق فوق 
+اسم الدكتور
