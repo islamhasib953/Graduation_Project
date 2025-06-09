@@ -347,6 +347,7 @@ const httpStatusText = require("../utils/httpStatusText");
 const userRoles = require("../utils/userRoles");
 const appError = require("../utils/appError");
 const Doctor = require("../models/doctor.model");
+const { deleteObject } = require("../utils/s3-operations"); // إضافة الاستيراد هنا
 
 const {
   sendNotificationCore,
@@ -372,7 +373,7 @@ const createHistory = asyncWrapper(async (req, res, next) => {
     return next(appError.create("Child not found", 404, httpStatusText.FAIL));
   }
 
-  const notesImage = req.file ? `/uploads/${req.file.filename}` : null;
+  const notesImage = req.s3Data ? req.s3Data.url : null; // استبدال req.file بـ req.s3Data
   let finalDoctorName = "user";
   console.log("Initial finalDoctorName:", finalDoctorName);
 
@@ -518,7 +519,7 @@ const updateHistory = asyncWrapper(async (req, res, next) => {
     return next(appError.create("Child not found", 404, httpStatusText.FAIL));
   }
 
-  const notesImage = req.file ? `/Uploads/${req.file.filename}` : undefined;
+  const notesImage = req.s3Data ? req.s3Data.url : undefined; // استبدال req.file بـ req.s3Data
   let finalDoctorName = "user";
   console.log("Initial finalDoctorName:", finalDoctorName);
 
@@ -611,6 +612,12 @@ const deleteHistory = asyncWrapper(async (req, res, next) => {
     return next(
       appError.create("History record not found", 404, httpStatusText.FAIL)
     );
+  }
+
+  // مسح الصورة من S3 لو موجودة
+  if (deletedHistory.notesImage) {
+    const key = deletedHistory.notesImage.split("/").pop();
+    await deleteObject(key);
   }
 
   if (userId) {

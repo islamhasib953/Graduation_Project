@@ -1122,6 +1122,7 @@ const appError = require("../utils/appError");
 const { sendNotificationCore } = require("./notifications.controller");
 const moment = require("moment");
 const mongoose = require("mongoose");
+const { deleteObject } = require("../utils/s3-operations"); // إضافة الاستيراد هنا
 
 const getAllDoctors = asyncWrapper(async (req, res) => {
   const doctors = await Doctor.find({}, { __v: false, password: false });
@@ -1780,9 +1781,10 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
     changes.push(`available times updated`);
     doctor.availableTimes = availableTimes;
   }
-  if (req.file) {
+  if (req.s3Data && req.s3Data.url) {
+    // استبدال req.file بـ req.s3Data
     changes.push(`avatar updated`);
-    doctor.avatar = `/uploads/${req.file.filename}`;
+    doctor.avatar = req.s3Data.url;
   }
 
   await doctor.save();
@@ -1857,6 +1859,11 @@ const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
 
     doctor.token = null;
     doctor.fcmToken = null;
+    if (doctor.avatar && doctor.avatar !== "uploads/doctor-default.jpg") {
+      // تحقق من الصورة الافتراضية
+      const key = doctor.avatar.split("/").pop();
+      await deleteObject(key);
+    }
     await doctor.save({ session });
 
     const deleteResult = await Doctor.deleteOne({ _id: doctorId }, { session });

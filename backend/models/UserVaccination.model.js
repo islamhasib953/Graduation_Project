@@ -45,7 +45,7 @@ const UserVaccinationSchema = new mongoose.Schema(
     },
     image: {
       type: String,
-      default: "uploads/vaccination.jpg",
+      // default: "uploads/vaccination.jpg",
       validate: {
         validator: function (value) {
           return /\.(jpg|jpeg|png|gif)$/i.test(value);

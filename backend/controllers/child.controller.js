@@ -305,6 +305,7 @@ const UserVaccination = require("../models/UserVaccination.model");
 const {
   sendNotificationCore,
 } = require("../controllers/notifications.controller");
+const { deleteObject } = require("../utils/s3-operations"); // إضافة الاستيراد هنا
 
 const createChild = asyncWrapper(async (req, res, next) => {
   const {
@@ -340,9 +341,23 @@ const createChild = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  const childPhoto = req.file
-    ? `/uploads/${req.file.filename}`
-    : "Uploads/child.jpg";
+  let childPhoto = req.s3Data
+    ? req.s3Data.url
+    : `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/uploads/child.jpg`;
+
+  // تحقق إذا الـ default URL متاح
+  if (!req.s3Data) {
+    try {
+      const response = await fetch(childPhoto);
+      if (!response.ok) {
+        childPhoto = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/uploads/child-default.jpg`; // URL بديل
+        console.warn("Default child image not accessible, using fallback URL");
+      }
+    } catch (err) {
+      childPhoto = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/uploads/child-default.jpg`;
+      console.error("Error checking default image:", err);
+    }
+  }
 
   const newChild = new Child({
     name,
@@ -531,9 +546,10 @@ const updateChild = asyncWrapper(async (req, res, next) => {
     changes.push(`birth head circumference to ${headCircumferenceAtBirth}`);
     child.headCircumferenceAtBirth = headCircumferenceAtBirth;
   }
-  if (req.file) {
+  if (req.s3Data && req.s3Data.url) {
+    // استخدام req.s3Data.url بدل req.file
     changes.push(`photo updated`);
-    child.photo = `/uploads/${req.file.filename}`;
+    child.photo = req.s3Data.url;
   }
 
   await child.save();
@@ -581,6 +597,16 @@ const deleteChild = asyncWrapper(async (req, res, next) => {
         httpStatusText.FAIL
       )
     );
+  }
+
+  // مسح الصورة من S3 لو مش default
+  if (
+    child.photo &&
+    child.photo !==
+      `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/uploads/child.jpg`
+  ) {
+    const key = child.photo.split("/").pop();
+    await deleteObject(key); // استدعاء يدوي لمسح الصورة
   }
 
   try {

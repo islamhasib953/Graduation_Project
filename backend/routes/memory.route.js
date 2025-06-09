@@ -1,49 +1,3 @@
-// const express = require("express");
-// const { validationResult } = require("express-validator");
-// const router = express.Router();
-
-// const memoryController = require("../controllers/memory.controller");
-// const validationschema = require("../middlewares/validationschema");
-// const verifyToken = require("../middlewares/virifyToken");
-// const allowedTo = require("../middlewares/allowedTo");
-// const userRoles = require("../utils/userRoles");
-// const checkOwnership = require("../middlewares/Ownership");
-
-// router
-//   .route("/:childId")
-//   .get(
-//     verifyToken,
-//     allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-//     memoryController.getAllMemories
-//   )
-//   .post(
-//     verifyToken,
-//     allowedTo(userRoles.ADMIN, userRoles.PATIENT),
-//     validationschema.validateMemory,
-//     memoryController.createMemory
-//   );
-
-// router
-//   .route("/:childId/:memoryId")
-//   // .get(verifyToken, checkOwnership, memoryController.getSingleMemory)
-//   .patch(
-//     verifyToken,
-//     checkOwnership,
-//     validationschema.validateMemory,
-//     memoryController.updateMemory
-//   )
-//   .delete(verifyToken, checkOwnership, memoryController.deleteMemory);
-
-// router
-//   .route("/favorites/:childId")
-//   .get(verifyToken, checkOwnership, memoryController.getFavoriteMemories);
-
-// router
-//   .route("/favorites/:childId/:memoryId")
-//   .patch(verifyToken, checkOwnership, memoryController.toggleFavoriteMemory);
-
-// module.exports = router;
-
 const express = require("express");
 const { validationResult } = require("express-validator");
 const router = express.Router();
@@ -53,7 +7,7 @@ const verifyToken = require("../middlewares/virifyToken");
 const allowedTo = require("../middlewares/allowedTo");
 const userRoles = require("../utils/userRoles");
 const checkOwnership = require("../middlewares/Ownership");
-const upload = require("../utils/multer.config"); // استيراد Multer المركزي
+const { uploadToS3, deleteFromS3 } = require("../middlewares/s3Middleware");
 
 router
   .route("/:childId")
@@ -69,7 +23,7 @@ router
       req.modelName = "memory"; // إضافة اسم الموديل
       next();
     },
-    upload.single("image"), // إضافة Multer لرفع الصورة
+    uploadToS3, // رفع الصورة الجديدة
     validationschema.validateMemory,
     memoryController.createMemory
   );
@@ -83,7 +37,8 @@ router
       req.modelName = "memory"; // إضافة اسم الموديل
       next();
     },
-    upload.single("image"), // إضافة Multer لرفع الصورة عند التحديث
+    deleteFromS3, // مسح الصورة القديمة
+    uploadToS3, // رفع الصورة الجديدة
     validationschema.validateMemory,
     memoryController.updateMemory
   )

@@ -1,21 +1,16 @@
 const { PutObjectCommand } = require("@aws-sdk/client-s3");
 const { s3Client } = require("../config/s3-credentials");
+const { PassThrough } = require("stream");
 
-exports.putObject = async (file, fileName) => {
+exports.putObject = async (fileData, fileName) => {
   try {
-    const contentTypes = {
-      "image/jpeg": "image/jpeg",
-      "image/png": "image/png",
-      "image/gif": "image/gif",
-    };
-    const fileType = file.mimetype || "image/jpeg"; // افتراضي إذا مفيش mimetype
-    const contentType = contentTypes[fileType] || "application/octet-stream";
-
+    const passThrough = new PassThrough();
+    passThrough.end(fileData); // تحويل Buffer لـ Stream
     const params = {
       Bucket: process.env.AWS_S3_BUCKET,
       Key: `${fileName}`,
-      Body: file,
-      ContentType: contentType,
+      Body: passThrough,
+      ContentType: fileData.mimetype || "image/png",
     };
 
     const command = new PutObjectCommand(params);
@@ -25,6 +20,7 @@ exports.putObject = async (file, fileName) => {
       return;
     }
     let url = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${params.Key}`;
+    console.log(url);
     return { url, key: params.Key };
   } catch (err) {
     console.error(err);
@@ -32,6 +28,7 @@ exports.putObject = async (file, fileName) => {
 };
 
 const { GetObjectCommand } = require("@aws-sdk/client-s3");
+
 exports.getObject = async (key) => {
   try {
     const params = {
@@ -48,6 +45,7 @@ exports.getObject = async (key) => {
 };
 
 const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
+
 exports.deleteObject = async (key) => {
   try {
     const params = {

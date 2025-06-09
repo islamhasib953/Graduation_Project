@@ -9,7 +9,7 @@ const memorySchema = new mongoose.Schema(
     },
     image: {
       type: String,
-      default: "uploads/memory-default.jpg",
+      default: `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/uploads/memory-default.jpg`, // تعديل الـ default
       validate: {
         validator: function (value) {
           return !value || /\.(jpg|jpeg|png|gif)$/i.test(value);

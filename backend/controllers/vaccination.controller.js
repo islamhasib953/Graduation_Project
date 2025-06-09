@@ -417,6 +417,7 @@ const { calculateDueDate } = require("../utils/calculateVaccinationDate");
 const {
   sendNotificationCore,
 } = require("../controllers/notifications.controller");
+const { deleteObject } = require("../utils/s3-operations"); // إضافة الاستيراد هنا
 
 // ✅ Admin creates a new vaccine and assigns it to all children
 const createVaccinationForAllChildren = asyncWrapper(async (req, res, next) => {
@@ -597,7 +598,7 @@ const getVaccinationsByChildId = asyncWrapper(async (req, res, next) => {
 // ✅ updates a vaccination record
 const updateUserVaccination = asyncWrapper(async (req, res, next) => {
   const { childId, vaccinationId } = req.params;
-  const { actualDate, status, notes, image } = req.body;
+  const { actualDate, status, notes } = req.body;
 
   if (!actualDate || !status) {
     return next(
@@ -635,7 +636,6 @@ const updateUserVaccination = asyncWrapper(async (req, res, next) => {
   dueDate.setMonth(
     dueDate.getMonth() + vaccination.vaccineInfoId.originalSchedule
   );
-  // let calcduedate = new Date(child.birthDate);
   const delayDays = Math.max(
     0,
     Math.floor(
@@ -643,7 +643,6 @@ const updateUserVaccination = asyncWrapper(async (req, res, next) => {
     )
   );
 
-  // إضافة التحقق من التاريخ
   const currentDate = new Date();
   currentDate.setHours(0, 0, 0, 0); // ضبط الوقت لـ 00:00:00 عشان مقارنة اليوم فقط
   const newActualDate = new Date(actualDate);
@@ -659,12 +658,11 @@ const updateUserVaccination = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // الجزء الموجود من قبل
   vaccination.actualDate = new Date(actualDate);
   vaccination.delayDays = delayDays;
   vaccination.status = status;
   vaccination.notes = notes;
-  vaccination.image = image || vaccination.image;
+  vaccination.image = req.s3Data ? req.s3Data.url : vaccination.image; // استبدال req.body.image بـ req.s3Data.url
   await vaccination.save();
 
   const futureVaccinations = await UserVaccination.find({
@@ -701,7 +699,6 @@ const updateUserVaccination = asyncWrapper(async (req, res, next) => {
     }
   }
 
-  // إضافة إشعار تحديث التطعيم
   try {
     const vaccineName = vaccination.vaccineInfoId?.name || "unknown";
     await sendNotificationCore(
@@ -771,7 +768,6 @@ const getUserVaccination = asyncWrapper(async (req, res, next) => {
 const deleteUserVaccination = asyncWrapper(async (req, res, next) => {
   const { vaccinationId } = req.params;
 
-  // Find the vaccination record
   const vaccination = await UserVaccination.findById(vaccinationId);
   if (!vaccination) {
     return next(
@@ -779,10 +775,14 @@ const deleteUserVaccination = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // Delete the vaccination record
+  // مسح الصورة من S3 لو موجودة
+  if (vaccination.image && vaccination.image !== "uploads/vaccination.jpg") {
+    const key = vaccination.image.split("/").pop();
+    await deleteObject(key);
+  }
+
   await UserVaccination.findByIdAndDelete(vaccinationId);
 
-  // إضافة إشعار حذف التطعيم
   const child = await Child.findById(vaccination.childId);
   try {
     await sendNotificationCore(

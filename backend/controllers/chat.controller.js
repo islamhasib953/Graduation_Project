@@ -202,6 +202,7 @@ const Child = require("../models/child.model");
 const Doctor = require("../models/doctor.model");
 const httpStatusText = require("../utils/httpStatusText");
 const appError = require("../utils/appError");
+const { deleteObject } = require("../utils/s3-operations"); // إضافة الاستيراد هنا
 
 // دالة مساعدة للتحقق من الأهلية
 const verifyChatEligibility = async (childId, doctorId, userId, role, next) => {
@@ -322,7 +323,7 @@ const uploadMedia = asyncWrapper(async (req, res, next) => {
 
   await verifyChatEligibility(childId, doctorId, userId, req.user.role, next);
 
-  const mediaUrl = req.file ? `/uploads/${req.file.filename}` : null;
+  const mediaUrl = req.s3Data ? req.s3Data.url : null; // استبدال req.file بـ req.s3Data
   if (!mediaUrl) {
     return next(
       appError.create("No media file uploaded", 400, httpStatusText.FAIL)

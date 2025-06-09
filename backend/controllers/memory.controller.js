@@ -295,6 +295,7 @@ const appError = require("../utils/appError");
 const {
   sendNotificationCore,
 } = require("../controllers/notifications.controller");
+const { deleteObject } = require("../utils/s3-operations"); // إضافة الاستيراد هنا
 
 const createMemory = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
@@ -322,7 +323,7 @@ const createMemory = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  const image = req.file ? `/Uploads/${req.file.filename}` : undefined;
+  const image = req.s3Data ? req.s3Data.url : undefined; // استبدال req.file بـ req.s3Data
 
   const newMemory = new Memory({
     childId,
@@ -465,7 +466,7 @@ const updateMemory = asyncWrapper(async (req, res, next) => {
     return next(appError.create("Memory not found", 404, httpStatusText.FAIL));
   }
 
-  const image = req.file ? `/Uploads/${req.file.filename}` : memory.image;
+  const image = req.s3Data ? req.s3Data.url : memory.image; // استبدال req.file بـ req.s3Data
 
   const updatedMemory = await Memory.findByIdAndUpdate(
     memoryId,
@@ -530,6 +531,12 @@ const deleteMemory = asyncWrapper(async (req, res, next) => {
   const memory = await Memory.findOneAndDelete({ _id: memoryId, childId });
   if (!memory) {
     return next(appError.create("Memory not found", 404, httpStatusText.FAIL));
+  }
+
+  // مسح الصورة من S3 لو موجودة
+  if (memory.image && memory.image !== "uploads/memory-default.jpg") {
+    const key = memory.image.split("/").pop();
+    await deleteObject(key);
   }
 
   try {

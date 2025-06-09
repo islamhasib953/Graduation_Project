@@ -515,6 +515,7 @@ const {
   sendNotificationCore,
 } = require("../controllers/notifications.controller");
 const mongoose = require("mongoose");
+const { deleteObject } = require("../utils/s3-operations"); // إضافة الاستيراد هنا
 
 const getAllUsers = asyncWrapper(async (req, res) => {
   const query = req.query;
@@ -527,6 +528,7 @@ const getAllUsers = asyncWrapper(async (req, res) => {
     .skip(skip);
   res.json({ status: httpStatusText.SUCCESS, data: { users } });
 });
+
 
 const register = asyncWrapper(async (req, res, next) => {
   const {
@@ -736,6 +738,10 @@ const getUserProfile = asyncWrapper(async (req, res, next) => {
   if (!user) {
     return next(appError.create("User not found", 404, httpStatusText.FAIL));
   }
+  // استدعاء getFromS3 لجلب الصورة إذا محتاج
+  if (req.s3Data && req.s3Data.data) {
+    console.log("Image data retrieved from S3:", req.s3Data.data);
+  }
   res.json({
     status: httpStatusText.SUCCESS,
     data: {
@@ -746,7 +752,7 @@ const getUserProfile = asyncWrapper(async (req, res, next) => {
       address: user.address,
       email: user.email,
       role: user.role,
-      avatar: user.avatar,
+      avatar: user.avatar, // URL الصورة موجودة هنا
       favorite: user.favorite,
       created_at: user.created_at,
     },
@@ -784,6 +790,7 @@ const updateProfile = asyncWrapper(async (req, res, next) => {
     user.gender = gender;
   }
   if (req.s3Data && req.s3Data.url) {
+    // إضافة الصورة الجديدة
     changes.push(`avatar updated`);
     user.avatar = req.s3Data.url;
   }
@@ -839,6 +846,16 @@ const deleteProfile = asyncWrapper(async (req, res, next) => {
   try {
     await Child.deleteMany({ parentId: userId }, { session });
     await Appointment.deleteMany({ userId }, { session });
+
+    // فحص وتأكيد مسح الصورة
+    if (
+      user.avatar &&
+      user.avatar !==
+        `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/uploads/user-default.jpg`
+    ) {
+      const key = user.avatar.split("/").pop();
+      await deleteObject(key); // مسح الصورة يدويًا كتأكيد إضافي
+    }
 
     user.token = null;
     user.fcmToken = null;

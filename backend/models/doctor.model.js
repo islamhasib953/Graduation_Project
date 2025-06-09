@@ -65,7 +65,7 @@ const doctorSchema = new mongoose.Schema(
     fcmToken: { type: String, default: null },
     avatar: {
       type: String,
-      default: "uploads/doctor-default.jpg",
+      default: `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/uploads/doctor-default.jpg`, // تعديل الـ default
       validate: {
         validator: function (value) {
           return !value || /\.(jpg|jpeg|png|gif)$/i.test(value);

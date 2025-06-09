@@ -24,10 +24,9 @@ const ChildSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    // deviceId: { type: String, required: false, unique: true },
     photo: {
       type: String,
-      default: "uploads/child-default.jpg",
+      default: `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/uploads/child.jpg`, // رجع الـ default
       validate: {
         validator: function (value) {
           return !value || /\.(jpg|jpeg|png|gif)$/i.test(value);
