@@ -567,8 +567,16 @@ const toggleFavoriteMemory = asyncWrapper(async (req, res, next) => {
   const { childId, memoryId } = req.params;
   const userId = req.user.id;
 
+  console.log(
+    "toggleFavoriteMemory started - childId:",
+    childId,
+    "memoryId:",
+    memoryId
+  ); // Log 1
+
   const child = await Child.findOne({ _id: childId, parentId: userId });
   if (!child) {
+    console.log("Child not found or unauthorized for user:", userId); // Log 2
     return next(
       appError.create(
         "Child not found or you are not authorized",
@@ -580,20 +588,49 @@ const toggleFavoriteMemory = asyncWrapper(async (req, res, next) => {
 
   const memory = await Memory.findOne({ _id: memoryId, childId });
   if (!memory) {
+    console.log("Memory not found for memoryId:", memoryId); // Log 3
     return next(appError.create("Memory not found", 404, httpStatusText.FAIL));
   }
 
-  memory.isFavorite = !memory.isFavorite;
-  await memory.save();
+  const newFavoriteValue = !memory.isFavorite;
+  console.log(
+    "Toggling isFavorite from",
+    memory.isFavorite,
+    "to",
+    newFavoriteValue
+  ); // Log 4
 
-  const notificationTitle = memory.isFavorite
+  // استخدام findByIdAndUpdate لضمان التغيير
+  const updatedMemory = await Memory.findByIdAndUpdate(
+    memoryId,
+    { isFavorite: newFavoriteValue },
+    { new: true, runValidators: true }
+  );
+
+  if (!updatedMemory) {
+    console.log("Failed to update memory with id:", memoryId); // Log 5
+    return next(
+      appError.create("Failed to update memory", 500, httpStatusText.FAIL)
+    );
+  }
+
+  console.log(
+    "Memory updated successfully - new isFavorite:",
+    updatedMemory.isFavorite
+  ); // Log 6
+
+  const notificationTitle = updatedMemory.isFavorite
     ? "Memory Favorited"
     : "Memory Unfavorited";
-  const notificationMessage = memory.isFavorite
-    ? `${child.name}: ${memory.description} added to favorites.`
-    : `${child.name}: ${memory.description} removed from favorites.`;
+  const notificationMessage = updatedMemory.isFavorite
+    ? `${child.name}: ${updatedMemory.description} added to favorites.`
+    : `${child.name}: ${updatedMemory.description} removed from favorites.`;
 
   try {
+    console.log(
+      "Attempting to send notification for memory:",
+      updatedMemory.description
+    ); // Log 7
     await sendNotificationCore(
       userId,
       childId,
@@ -603,24 +640,19 @@ const toggleFavoriteMemory = asyncWrapper(async (req, res, next) => {
       "memory",
       "patient"
     );
-    console.log(
-      `Notification sent for favorite memory toggle: ${memory.description}`
-    );
+    console.log("Notification sent successfully"); // Log 8
   } catch (error) {
-    console.error(
-      `Failed to send notification for favorite memory toggle: ${memory.description}`,
-      error
-    );
+    console.error("Failed to send notification:", error); // Log 9
   }
 
   res.json({
     status: httpStatusText.SUCCESS,
     message: `Memory ${
-      memory.isFavorite ? "added to" : "removed from"
+      updatedMemory.isFavorite ? "added to" : "removed from"
     } favorites`,
     data: {
-      _id: memory._id,
-      isFavorite: memory.isFavorite,
+      _id: updatedMemory._id,
+      isFavorite: updatedMemory.isFavorite,
     },
   });
 });
