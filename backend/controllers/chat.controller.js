@@ -195,7 +195,6 @@
 //   uploadMedia,
 // };
 
-
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const Chat = require("../models/chat.model");
 const Appointment = require("../models/appointment.model");

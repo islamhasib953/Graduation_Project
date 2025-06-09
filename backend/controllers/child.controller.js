@@ -295,7 +295,6 @@
 //   deleteChild,
 // };
 
-
 const Child = require("../models/child.model");
 const User = require("../models/user.model");
 const asyncWrapper = require("../middlewares/asyncWrapper");

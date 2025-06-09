@@ -76,7 +76,6 @@
 //   updateDelayDays,
 // };
 
-
 const mongoose = require("mongoose");
 
 /**
@@ -123,10 +122,9 @@ const calculateDueDate = async function (next) {
 const updateDelayDays = async function (next) {
   try {
     if (this.isModified("actualDate") && this.actualDate) {
-      const delay =
-        Math.floor(
-          (new Date(actualDate) - new Date(dueDate)) / (1000 * 60 * 60 * 24)
-        ) ;
+      const delay = Math.floor(
+        (new Date(actualDate) - new Date(dueDate)) / (1000 * 60 * 60 * 24)
+      );
 
       this.delayDays = delay > 0 ? delay : 0;
 

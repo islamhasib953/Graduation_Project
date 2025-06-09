@@ -72,7 +72,6 @@
 
 // module.exports = { sendPushNotification };
 
-
 const admin = require("firebase-admin");
 const dotenv = require("dotenv");
 const path = require("path");

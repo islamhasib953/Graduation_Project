@@ -21,8 +21,6 @@
 //     await usersController.register(req, res, next);
 //   });
 
-
-
 // router.route("/login").post(validateLogin, usersController.login);
 
 // router
@@ -63,7 +61,6 @@
 // );
 
 // module.exports = router;
-
 
 const express = require("express");
 const usersController = require("../controllers/users.controller");

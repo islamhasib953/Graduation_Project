@@ -226,7 +226,6 @@
 //   }
 // });
 
-
 // const getUserProfile = asyncWrapper(async (req, res, next) => {
 //   const userId = req.user.id;
 //   if (!userId) {

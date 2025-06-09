@@ -44,7 +44,6 @@
 
 // module.exports = router;
 
-
 const express = require("express");
 const { validationResult } = require("express-validator");
 const router = express.Router();

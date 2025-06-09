@@ -7,8 +7,6 @@
 // const childController = require("../controllers/child.controller");
 // const validationschema = require("../middlewares/validationschema");
 
-
-
 // router
 //   .route("/")
 //   // .get(verifyToken, checkOwnership, childController.getAllChildren)

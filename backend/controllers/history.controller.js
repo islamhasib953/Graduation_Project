@@ -355,8 +355,7 @@ const {
 const createHistory = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
   const userId = req.user?.id;
-  const { diagnosis, disease, treatment, notes, date, time } =
-    req.body;
+  const { diagnosis, disease, treatment, notes, date, time } = req.body;
 
   if (!diagnosis || !disease || !treatment || !date || !time) {
     return next(
@@ -374,8 +373,8 @@ const createHistory = asyncWrapper(async (req, res, next) => {
   }
 
   const notesImage = req.file ? `/uploads/${req.file.filename}` : null;
-    let finalDoctorName = "user";
-    console.log("Initial finalDoctorName:", finalDoctorName);
+  let finalDoctorName = "user";
+  console.log("Initial finalDoctorName:", finalDoctorName);
 
   if (userId) {
     console.log("Testing userId:", userId);
@@ -512,8 +511,7 @@ const getSingleHistory = asyncWrapper(async (req, res, next) => {
 const updateHistory = asyncWrapper(async (req, res, next) => {
   const { childId, historyId } = req.params;
   const userId = req.user?.id;
-  const { diagnosis, disease, treatment, notes, date, time } =
-    req.body;
+  const { diagnosis, disease, treatment, notes, date, time } = req.body;
 
   const child = await Child.findById(childId);
   if (!child) {
@@ -521,18 +519,18 @@ const updateHistory = asyncWrapper(async (req, res, next) => {
   }
 
   const notesImage = req.file ? `/Uploads/${req.file.filename}` : undefined;
-    let finalDoctorName = "user";
-    console.log("Initial finalDoctorName:", finalDoctorName);
+  let finalDoctorName = "user";
+  console.log("Initial finalDoctorName:", finalDoctorName);
 
-    if (userId) {
-      console.log("Testing userId:", userId);
-      const doctor = await Doctor.findById(userId);
-      console.log("Doctor:", doctor);
-      if (doctor && doctor.role === userRoles.DOCTOR) {
-        finalDoctorName = `${doctor.firstName} ${doctor.lastName}`;
-        console.log("Updated finalDoctorName:", finalDoctorName);
-      }
+  if (userId) {
+    console.log("Testing userId:", userId);
+    const doctor = await Doctor.findById(userId);
+    console.log("Doctor:", doctor);
+    if (doctor && doctor.role === userRoles.DOCTOR) {
+      finalDoctorName = `${doctor.firstName} ${doctor.lastName}`;
+      console.log("Updated finalDoctorName:", finalDoctorName);
     }
+  }
 
   const updatedHistory = await History.findOneAndUpdate(
     { _id: historyId, childId },
@@ -594,7 +592,6 @@ const updateHistory = asyncWrapper(async (req, res, next) => {
     },
   });
 });
-
 
 const deleteHistory = asyncWrapper(async (req, res, next) => {
   const { childId, historyId } = req.params;

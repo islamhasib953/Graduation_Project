@@ -1,4 +1,4 @@
-const userRoles = require('../utils/userRoles');
+const userRoles = require("../utils/userRoles");
 
 function checkOwnership(req, res, next) {
   if (!req.user) {

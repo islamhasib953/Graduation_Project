@@ -1,4 +1,3 @@
-
 // const asyncWrapper = require("../middlewares/asyncWrapper");
 // const Doctor = require("../models/doctor.model");
 // const User = require("../models/user.model");
@@ -1111,7 +1110,6 @@
 //   saveFcmToken,
 // };
 
-
 const asyncWrapper = require("../middlewares/asyncWrapper");
 const Doctor = require("../models/doctor.model");
 const User = require("../models/user.model");
@@ -1252,9 +1250,14 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
       "appointment",
       "doctor"
     );
-    console.log(`Notifications sent for booked appointment: ${newAppointment._id}`);
+    console.log(
+      `Notifications sent for booked appointment: ${newAppointment._id}`
+    );
   } catch (error) {
-    console.error(`Failed to send notifications for booked appointment: ${newAppointment._id}`, error);
+    console.error(
+      `Failed to send notifications for booked appointment: ${newAppointment._id}`,
+      error
+    );
   }
 
   res.status(201).json({
@@ -1358,9 +1361,14 @@ const rescheduleAppointment = asyncWrapper(async (req, res, next) => {
       "appointment",
       "doctor"
     );
-    console.log(`Notifications sent for rescheduled appointment: ${appointment._id}`);
+    console.log(
+      `Notifications sent for rescheduled appointment: ${appointment._id}`
+    );
   } catch (error) {
-    console.error(`Failed to send notifications for rescheduled appointment: ${appointment._id}`, error);
+    console.error(
+      `Failed to send notifications for rescheduled appointment: ${appointment._id}`,
+      error
+    );
   }
 
   res.json({
@@ -1424,9 +1432,14 @@ const cancelAppointment = asyncWrapper(async (req, res, next) => {
       "appointment",
       "doctor"
     );
-    console.log(`Notifications sent for cancelled appointment: ${appointment._id}`);
+    console.log(
+      `Notifications sent for cancelled appointment: ${appointment._id}`
+    );
   } catch (error) {
-    console.error(`Failed to send notifications for cancelled appointment: ${appointment._id}`, error);
+    console.error(
+      `Failed to send notifications for cancelled appointment: ${appointment._id}`,
+      error
+    );
   }
 
   res.json({
@@ -1494,9 +1507,14 @@ const toggleFavoriteDoctor = asyncWrapper(async (req, res, next) => {
       "favorite",
       "patient"
     );
-    console.log(`Notification sent for favorite doctor toggle: ${doctor.firstName}`);
+    console.log(
+      `Notification sent for favorite doctor toggle: ${doctor.firstName}`
+    );
   } catch (error) {
-    console.error(`Failed to send notification for favorite doctor toggle: ${doctor.firstName}`, error);
+    console.error(
+      `Failed to send notification for favorite doctor toggle: ${doctor.firstName}`,
+      error
+    );
   }
 
   res.json({
@@ -1780,9 +1798,14 @@ const updateDoctorProfile = asyncWrapper(async (req, res, next) => {
         "profile",
         "doctor"
       );
-      console.log(`Notification sent for updated doctor profile: ${doctor.firstName}`);
+      console.log(
+        `Notification sent for updated doctor profile: ${doctor.firstName}`
+      );
     } catch (error) {
-      console.error(`Failed to send notification for updated doctor profile: ${doctor.firstName}`, error);
+      console.error(
+        `Failed to send notification for updated doctor profile: ${doctor.firstName}`,
+        error
+      );
     }
   }
 
@@ -1859,9 +1882,14 @@ const deleteDoctorProfile = asyncWrapper(async (req, res, next) => {
         "profile",
         "doctor"
       );
-      console.log(`Notification sent for deleted doctor profile: ${doctor.firstName}`);
+      console.log(
+        `Notification sent for deleted doctor profile: ${doctor.firstName}`
+      );
     } catch (error) {
-      console.error(`Failed to send notification for deleted doctor profile: ${doctor.firstName}`, error);
+      console.error(
+        `Failed to send notification for deleted doctor profile: ${doctor.firstName}`,
+        error
+      );
     }
 
     res.json({
@@ -1916,7 +1944,10 @@ const logoutDoctor = asyncWrapper(async (req, res, next) => {
     );
     console.log(`Notification sent for doctor logout: ${doctor.firstName}`);
   } catch (error) {
-    console.error(`Failed to send notification for doctor logout: ${doctor.firstName}`, error);
+    console.error(
+      `Failed to send notification for doctor logout: ${doctor.firstName}`,
+      error
+    );
   }
 
   res.json({
@@ -1959,7 +1990,10 @@ const updateAvailability = asyncWrapper(async (req, res, next) => {
       "doctor"
     );
   } catch (error) {
-    console.error(`Failed to send notification for availability update: ${doctor.firstName}`, error);
+    console.error(
+      `Failed to send notification for availability update: ${doctor.firstName}`,
+      error
+    );
   }
 
   const now = new Date();
@@ -1987,9 +2021,14 @@ const updateAvailability = asyncWrapper(async (req, res, next) => {
         "appointment",
         "patient"
       );
-      console.log(`Notification sent for availability update to patient: ${childName}`);
+      console.log(
+        `Notification sent for availability update to patient: ${childName}`
+      );
     } catch (error) {
-      console.error(`Failed to send availability update notification to patient: ${childName}`, error);
+      console.error(
+        `Failed to send availability update notification to patient: ${childName}`,
+        error
+      );
     }
   }
 
@@ -2140,9 +2179,14 @@ const updateAppointmentStatus = asyncWrapper(async (req, res, next) => {
       "appointment",
       "patient"
     );
-    console.log(`Notification sent for updated appointment status: ${appointment._id}`);
+    console.log(
+      `Notification sent for updated appointment status: ${appointment._id}`
+    );
   } catch (error) {
-    console.error(`Failed to send notification for updated appointment status: ${appointment._id}`, error);
+    console.error(
+      `Failed to send notification for updated appointment status: ${appointment._id}`,
+      error
+    );
   }
 
   res.json({
@@ -2246,7 +2290,10 @@ const saveFcmToken = asyncWrapper(async (req, res, next) => {
     );
     console.log(`Notification sent for FCM token update: ${doctor.firstName}`);
   } catch (error) {
-    console.error(`Failed to send notification for FCM token update: ${doctor.firstName}`, error);
+    console.error(
+      `Failed to send notification for FCM token update: ${doctor.firstName}`,
+      error
+    );
   }
 
   res.status(200).json({
