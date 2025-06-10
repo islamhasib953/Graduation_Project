@@ -5,7 +5,7 @@ const allowedTo = require("../middlewares/allowedTo");
 const userRoles = require("../utils/userRoles");
 const chatController = require("../controllers/chat.controller");
 const { uploadToS3 } = require("../middlewares/s3Middleware");
-const mongoose = require("mongoose"); // استيراد mongoose
+const mongoose = require("mongoose");
 
 // التحقق من صحة المعرفات
 const validateIds = (req, res, next) => {
@@ -41,13 +41,13 @@ router.get(
 router.post(
   "/:childId/:doctorId/upload",
   verifyToken,
-  allowedTo(userRoles.PATIENT),
+  allowedTo(userRoles.PATIENT, userRoles.DOCTOR),
   validateIds,
   (req, res, next) => {
     req.modelName = "chat"; // إضافة اسم الموديل
     next();
   },
-  uploadToS3, // رفع الوسائط (صور أو ملفات)
+  uploadToS3,
   chatController.uploadMedia
 );
 

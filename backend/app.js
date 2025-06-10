@@ -9,6 +9,7 @@
 // const mongoSanitize = require("express-mongo-sanitize");
 // const xssClean = require("xss-clean");
 // const hpp = require("hpp");
+// const fileUpload = require("express-fileupload"); // أضيف هنا
 
 // const appError = require("./utils/appError");
 // const httpStatusText = require("./utils/httpStatusText");
@@ -39,15 +40,14 @@
 // const webSocketService = new WebSocketService(server);
 // const io = webSocketService.getIO();
 
-// app.use("/uploads", express.static("uploads"));
 // app.use(express.json());
 // app.use(bodyParser.json());
 // app.use(cookieParser());
-
 // app.use(cors());
 // app.use(mongoSanitize());
 // app.use(xssClean());
 // app.use(hpp());
+// app.use(fileUpload()); // أضيف هنا
 
 // const limiter = limitReq({
 //   max: 200,
@@ -101,7 +101,7 @@
 
 // module.exports = { app, server };
 
-// //latest
+
 const express = require("express");
 const http = require("http");
 const bodyParser = require("body-parser");
@@ -113,7 +113,7 @@ const limitReq = require("express-rate-limit");
 const mongoSanitize = require("express-mongo-sanitize");
 const xssClean = require("xss-clean");
 const hpp = require("hpp");
-const fileUpload = require("express-fileupload"); // أضيف هنا
+const fileUpload = require("express-fileupload");
 
 const appError = require("./utils/appError");
 const httpStatusText = require("./utils/httpStatusText");
@@ -151,7 +151,7 @@ app.use(cors());
 app.use(mongoSanitize());
 app.use(xssClean());
 app.use(hpp());
-app.use(fileUpload()); // أضيف هنا
+app.use(fileUpload());
 
 const limiter = limitReq({
   max: 200,
@@ -200,6 +200,25 @@ app.use((error, req, res, next) => {
     message: error.message,
     code: error.statusCode || 500,
     data: null,
+  });
+});
+
+io.on("connection", (socket) => {
+  socket.on("joinChat", ({ childId, doctorId }) => {
+    const room = `${childId}-${doctorId}`;
+    socket.join(room);
+    console.log(`Client ${socket.id} joined room: ${room}`);
+    socket.emit("joinChatSuccess"); // تأكيد الاتصال بالغرفة
+  });
+
+  socket.on("sendMessage", (message) => {
+    const room = `${message.childId}-${message.doctorId}`;
+    io.to(room).emit("receiveMessage", message);
+    console.log(`Message sent to room ${room}:`, message);
+  });
+
+  socket.on("disconnect", () => {
+    console.log(`A client disconnected: ${socket.id}`);
   });
 });
 
