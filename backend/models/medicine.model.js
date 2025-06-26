@@ -4,7 +4,7 @@ const medicineSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
-    required: true, // حقل إجباري عشان نربط الدواء باليوزر
+    required: true,
   },
   childId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -19,11 +19,11 @@ const medicineSchema = new mongoose.Schema({
     type: String,
   },
   days: {
-    type: [String], // أيام أخذ الدواء
+    type: [String],
     required: true,
   },
   times: {
-    type: [String], // أوقات أخذ الدواء
+    type: [String],
     required: true,
   },
   createdAt: {

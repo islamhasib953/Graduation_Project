@@ -35,7 +35,7 @@ const appointmentSchema = new mongoose.Schema(
       default: "Pending",
     },
   },
-  { timestamps: true } // إضافة timestamps عشان يضيف createdAt و updatedAt تلقائياً
+  { timestamps: true }
 );
 
 module.exports = mongoose.model("Appointment", appointmentSchema);

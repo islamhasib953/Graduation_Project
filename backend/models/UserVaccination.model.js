@@ -45,7 +45,6 @@ const UserVaccinationSchema = new mongoose.Schema(
     },
     image: {
       type: String,
-      // default: "uploads/vaccination.jpg",
       validate: {
         validator: function (value) {
           return /\.(jpg|jpeg|png|gif)$/i.test(value);
@@ -57,16 +56,5 @@ const UserVaccinationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// ✅ Attach Middlewares
-// UserVaccinationSchema.pre("validate", async function (next) {
-//   if (!this.dueDate) {
-//     await calculateDueDate.call(this, next);
-//   }
-//   next();
-// });
-
-// UserVaccinationSchema.pre("save", async function (next) {
-//   await updateDelayDays.call(this, next);
-// });
 
 module.exports = mongoose.model("UserVaccination", UserVaccinationSchema);

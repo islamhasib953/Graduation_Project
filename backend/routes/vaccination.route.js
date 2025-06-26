@@ -46,11 +46,11 @@ router
     verifyToken,
     allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
     (req, res, next) => {
-      req.modelName = "UserVaccination"; // إضافة اسم الموديل
+      req.modelName = "UserVaccination";
       next();
     },
-    deleteFromS3, // مسح الصورة القديمة
-    uploadToS3, // رفع الصورة الجديدة
+    deleteFromS3,
+    uploadToS3,
     vaccinationController.updateUserVaccination
   )
   .delete(

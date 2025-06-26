@@ -3,66 +3,66 @@ const { s3Client } = require("../config/s3-credentials");
 
 exports.putObject = async (fileData, fileName) => {
   try {
-    console.log("putObject started - fileData length:", fileData.length); // Log 1
+    console.log("putObject started - fileData length:", fileData.length);
     const params = {
       Bucket: process.env.AWS_S3_BUCKET,
       Key: `${fileName}`,
       Body: fileData,
-      ContentType: fileData.mimetype || "image/jpeg", // استخدام mimetype من الملف
+      ContentType: fileData.mimetype || "image/jpeg",
     };
-    console.log("S3 params prepared:", params); // Log 2
+    console.log("S3 params prepared:", params);
     const command = new PutObjectCommand(params);
     const data = await s3Client.send(command);
-    console.log("S3 response metadata:", data.$metadata); // Log 3
+    console.log("S3 response metadata:", data.$metadata);
     if (data.$metadata.httpStatusCode !== 200) {
-      console.log("S3 upload failed - status not 200"); // Log 4
+      console.log("S3 upload failed - status not 200");
       return;
     }
     let url = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${params.Key}`;
-    console.log("S3 upload successful - URL:", url); // Log 5
+    console.log("S3 upload successful - URL:", url);
     return { url, key: params.Key };
   } catch (err) {
-    console.error("putObject Error:", err); // Log 6
+    console.error("putObject Error:", err);
   }
 };
 
 const { GetObjectCommand } = require("@aws-sdk/client-s3");
 exports.getObject = async (key) => {
   try {
-    console.log("getObject started - key:", key); // Log 7
+    console.log("getObject started - key:", key);
     const params = {
       Bucket: process.env.AWS_S3_BUCKET,
       Key: key,
     };
-    console.log("S3 get params:", params); // Log 8
+    console.log("S3 get params:", params);
     const command = new GetObjectCommand(params);
     const data = await s3Client.send(command);
-    console.log("S3 get response:", data); // Log 9
+    console.log("S3 get response:", data);
     return data;
   } catch (err) {
-    console.error("getObject Error:", err); // Log 10
+    console.error("getObject Error:", err);
   }
 };
 
 const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
 exports.deleteObject = async (key) => {
   try {
-    console.log("deleteObject started - key:", key); // Log 11
+    console.log("deleteObject started - key:", key);
     const params = {
       Bucket: process.env.AWS_S3_BUCKET,
       Key: key,
     };
-    console.log("S3 delete params:", params); // Log 12
+    console.log("S3 delete params:", params);
     const command = new DeleteObjectCommand(params);
     const data = await s3Client.send(command);
-    console.log("S3 delete response:", data.$metadata); // Log 13
+    console.log("S3 delete response:", data.$metadata);
     if (data.$metadata.httpStatusCode !== 204) {
-      console.log("S3 delete failed - status not 204"); // Log 14
+      console.log("S3 delete failed - status not 204");
       return { status: 400, data };
     }
-    console.log("S3 delete successful"); // Log 15
+    console.log("S3 delete successful");
     return { status: 204 };
   } catch (err) {
-    console.error("deleteObject Error:", err); // Log 16
+    console.error("deleteObject Error:", err);
   }
 };

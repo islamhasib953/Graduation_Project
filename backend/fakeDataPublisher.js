@@ -70,29 +70,30 @@ client.on("connect", () => {
 
   // قائمة بمعرفات الأطفال (childIds) - استبدلها بـ ObjectId من قاعدة البيانات
   const childIds = [
-    "68271e6816742b112f001f24", // استبدل بـ ObjectId حقيقي
+    // "68271e6816742b112f001f24", // استبدل بـ ObjectId حقيقي
+    "685326112c28c7e0cf89ea64",
   ];
 
   setInterval(() => {
     childIds.forEach((childId) => {
-      const fakeData = {
-        childId: childId,
-        temperature: (Math.random() * (37.2 - 36.1) + 36.1).toFixed(2), // 36.1-37.2 °C
-        bpm: Math.floor(Math.random() * (95 - 60) + 60), // 60-95 bpm (لطفل 6 سنين)
-        spo2: Math.floor(Math.random() * (100 - 95) + 95), // 95-100%
-        ir: Math.floor(Math.random() * (22 - 14) + 14), // 14-22 breaths/min (لطفل 6 سنين)
-        latitude: (Math.random() * (30.1 - 30.0) + 30.0).toFixed(6), // منطقة جغرافية
-        longitude: (Math.random() * (31.3 - 31.2) + 31.2).toFixed(6),
-        gyroX: (Math.random() * 0.5 - 0.25).toFixed(2), // حركة خفيفة
-        gyroY: (Math.random() * 0.5 - 0.25).toFixed(2),
-        gyroZ: (Math.random() * 0.5 - 0.25).toFixed(2),
-        accX: (Math.random() * 0.5 - 0.25).toFixed(2), // تسارع خفيف
-        accY: (Math.random() * 0.5 - 0.25).toFixed(2),
-        accZ: (Math.random() * 0.5 - 0.25).toFixed(2),
-        red: Math.floor(Math.random() * 100), // قيمة عشوائية لـ red
-        status: "active", // حالة افتراضية
-        timestamp: Date.now(),
-      };
+const fakeData = {
+  childId: childId,
+  temperature: Math.random() * (37.2 - 36.1) + 36.1,
+  bpm: Math.floor(Math.random() * (95 - 60) + 60),
+  spo2: Math.floor(Math.random() * (100 - 95) + 95),
+  ir: Math.floor(Math.random() * (22 - 14) + 14),
+  latitude: Math.random() * (30.1 - 30.0) + 30.0,
+  longitude: Math.random() * (31.3 - 31.2) + 31.2,
+  gyroX: Math.random() * (300 - 50) + 50, // 50-300
+  gyroY: Math.random() * (300 - 50) + 50,
+  gyroZ: Math.random() * (300 - 50) + 50,
+  accX: Math.random() * (1.0 - 0.1) + 0.1, // 0.1-1.0
+  accY: Math.random() * (1.0 - 0.1) + 0.1,
+  accZ: Math.random() * (1.0 - 0.1) + 0.1,
+  red: Math.floor(Math.random() * 100),
+  status: "active",
+  timestamp: Date.now(),
+};
 
       client.publish(
         process.env.MQTT_TOPIC,
@@ -109,7 +110,7 @@ client.on("connect", () => {
         }
       );
     });
-  }, 1000); // إرسال كل 5 ثوانٍ
+  }, 10000); // إرسال كل 5 ثوانٍ
 });
 
 client.on("error", (err) => {

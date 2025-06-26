@@ -7,7 +7,6 @@ const chatController = require("../controllers/chat.controller");
 const { uploadToS3 } = require("../middlewares/s3Middleware");
 const mongoose = require("mongoose");
 
-// التحقق من صحة المعرفات
 const validateIds = (req, res, next) => {
   const { childId, doctorId } = req.params;
   if (
@@ -44,7 +43,7 @@ router.post(
   allowedTo(userRoles.PATIENT, userRoles.DOCTOR),
   validateIds,
   (req, res, next) => {
-    req.modelName = "chat"; // إضافة اسم الموديل
+    req.modelName = "chat";
     next();
   },
   uploadToS3,

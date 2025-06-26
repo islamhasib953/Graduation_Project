@@ -21,7 +21,6 @@ const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
 });
 
-// Helper function to calculate age in years
 const calculateAge = (birthDate) => {
   const today = new Date();
   const birth = new Date(birthDate);
@@ -30,7 +29,6 @@ const calculateAge = (birthDate) => {
   return ageInYears;
 };
 
-// Helper function to validate sensor readings based on age
 const validateReading = (reading, type, age) => {
   if (reading === null || reading === undefined || reading < 0) return false;
   if (type === "bpm") {
@@ -52,7 +50,6 @@ const validateReading = (reading, type, age) => {
   return true;
 };
 
-// Helper function to calculate average of valid readings
 const calculateAverage = (readings) => {
   const validReadings = readings.filter(
     (r) => r !== null && r !== undefined && r >= 0
@@ -61,7 +58,6 @@ const calculateAverage = (readings) => {
   return validReadings.reduce((sum, r) => sum + r, 0) / validReadings.length;
 };
 
-// Function to validate and store sensor data
 const validateAndStoreSensorData = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
   const userId = req.user.id;
@@ -107,7 +103,6 @@ const validateAndStoreSensorData = asyncWrapper(async (req, res, next) => {
   let hasInvalidReadings = false;
   let allInvalid = true;
 
-  // التحقق من BPM
   const bpmReadings = sensorData.map((data) => data.bpm);
   const validBpmReadings = bpmReadings.filter((bpm) =>
     validateReading(bpm, "bpm", age)
@@ -116,7 +111,6 @@ const validateAndStoreSensorData = asyncWrapper(async (req, res, next) => {
   if (validBpmReadings.length === 0) hasInvalidReadings = true;
   if (validBpmReadings.length > 0) allInvalid = false;
 
-  // التحقق من SpO2
   const spo2Readings = sensorData.map((data) => data.spo2);
   const validSpo2Readings = spo2Readings.filter((spo2) =>
     validateReading(spo2, "spo2", age)
@@ -125,7 +119,6 @@ const validateAndStoreSensorData = asyncWrapper(async (req, res, next) => {
   if (validSpo2Readings.length === 0) hasInvalidReadings = true;
   if (validSpo2Readings.length > 0) allInvalid = false;
 
-  // التحقق من IR
   const irReadings = sensorData.map((data) => data.ir);
   const validIrReadings = irReadings.filter((ir) =>
     validateReading(ir, "ir", age)
@@ -134,7 +127,6 @@ const validateAndStoreSensorData = asyncWrapper(async (req, res, next) => {
   if (validIrReadings.length === 0) hasInvalidReadings = true;
   if (validIrReadings.length > 0) allInvalid = false;
 
-  // التحقق من Red
   const redReadings = sensorData.map((data) => data.red);
   const validRedReadings = redReadings.filter((red) =>
     validateReading(red, "red", age)
@@ -143,7 +135,6 @@ const validateAndStoreSensorData = asyncWrapper(async (req, res, next) => {
   if (validRedReadings.length === 0) hasInvalidReadings = true;
   if (validRedReadings.length > 0) allInvalid = false;
 
-  // التحقق من Temperature
   const tempReadings = sensorData.map((data) => data.temperature);
   const validTempReadings = tempReadings.filter((temp) =>
     validateReading(temp, "temperature", age)
@@ -153,7 +144,6 @@ const validateAndStoreSensorData = asyncWrapper(async (req, res, next) => {
     hasInvalidReadings = true;
   if (validTempReadings.length > 0) allInvalid = false;
 
-  // الحقول بدون تحقق
   const noValidationFields = [
     "accX",
     "accY",
@@ -172,10 +162,8 @@ const validateAndStoreSensorData = asyncWrapper(async (req, res, next) => {
       readings.length > 0 ? calculateAverage(readings) : null;
   });
 
-  // أحدث قيمة لـ status
   validatedRecord.status = sensorData[0].status || "Unknown";
 
-  // تحديد حالة التحقق
   if (allInvalid) validatedRecord.validationStatus = "Invalid";
   else if (hasInvalidReadings)
     validatedRecord.validationStatus = "PartiallyValidated";
@@ -184,12 +172,10 @@ const validateAndStoreSensorData = asyncWrapper(async (req, res, next) => {
   const validatedData = new ValidatedSensorData(validatedRecord);
   await validatedData.save();
 
-  // التحقق من وجود عملاء متصلين
   if (io.engine.clientsCount > 0) {
     io.emit("validatedSensorData", validatedData);
   }
 
-  // حساب Baby Activity
   try {
     const activityData = calculateActivity(validatedData, age);
     if (activityData.activityStage === "Insufficient Data") {
@@ -211,7 +197,6 @@ const validateAndStoreSensorData = asyncWrapper(async (req, res, next) => {
     );
   }
 
-  // حساب Sleep Quality
   try {
     const sleepData = calculateSleepQuality(validatedData, age);
     if (sleepData.sleepStage === "Insufficient Data") {
@@ -243,7 +228,6 @@ const validateAndStoreSensorData = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// Start validation every 30 seconds for active children
 const startContinuousValidation = (io) => {
   setInterval(async () => {
     try {
@@ -286,7 +270,6 @@ const startContinuousValidation = (io) => {
           let hasInvalidReadings = false;
           let allInvalid = true;
 
-          // التحقق من BPM
           const bpmReadings = sensorData.map((data) => data.bpm);
           const validBpmReadings = bpmReadings.filter((bpm) =>
             validateReading(bpm, "bpm", age)
@@ -295,7 +278,6 @@ const startContinuousValidation = (io) => {
           if (validBpmReadings.length === 0) hasInvalidReadings = true;
           if (validBpmReadings.length > 0) allInvalid = false;
 
-          // التحقق من SpO2
           const spo2Readings = sensorData.map((data) => data.spo2);
           const validSpo2Readings = spo2Readings.filter((spo2) =>
             validateReading(spo2, "spo2", age)
@@ -304,7 +286,6 @@ const startContinuousValidation = (io) => {
           if (validSpo2Readings.length === 0) hasInvalidReadings = true;
           if (validSpo2Readings.length > 0) allInvalid = false;
 
-          // التحقق من IR
           const irReadings = sensorData.map((data) => data.ir);
           const validIrReadings = irReadings.filter((ir) =>
             validateReading(ir, "ir", age)
@@ -313,7 +294,6 @@ const startContinuousValidation = (io) => {
           if (validIrReadings.length === 0) hasInvalidReadings = true;
           if (validIrReadings.length > 0) allInvalid = false;
 
-          // التحقق من Red
           const redReadings = sensorData.map((data) => data.red);
           const validRedReadings = redReadings.filter((red) =>
             validateReading(red, "red", age)
@@ -322,7 +302,6 @@ const startContinuousValidation = (io) => {
           if (validRedReadings.length === 0) hasInvalidReadings = true;
           if (validRedReadings.length > 0) allInvalid = false;
 
-          // التحقق من Temperature
           const tempReadings = sensorData.map((data) => data.temperature);
           const validTempReadings = tempReadings.filter((temp) =>
             validateReading(temp, "temperature", age)
@@ -335,7 +314,6 @@ const startContinuousValidation = (io) => {
             hasInvalidReadings = true;
           if (validTempReadings.length > 0) allInvalid = false;
 
-          // الحقول بدون تحقق
           const noValidationFields = [
             "accX",
             "accY",
@@ -354,10 +332,8 @@ const startContinuousValidation = (io) => {
               readings.length > 0 ? calculateAverage(readings) : null;
           });
 
-          // أحدث قيمة لـ status
           validatedRecord.status = sensorData[0].status || "Unknown";
 
-          // تحديد حالة التحقق
           if (allInvalid) validatedRecord.validationStatus = "Invalid";
           else if (hasInvalidReadings)
             validatedRecord.validationStatus = "PartiallyValidated";
@@ -366,12 +342,10 @@ const startContinuousValidation = (io) => {
           const validatedData = new ValidatedSensorData(validatedRecord);
           await validatedData.save();
 
-          // التحقق من وجود عملاء متصلين
           if (io.engine.clientsCount > 0) {
             io.emit("validatedSensorData", validatedData);
           }
 
-          // حساب Baby Activity
           try {
             const activityData = calculateActivity(validatedData, age);
             if (activityData.activityStage === "Insufficient Data") {
@@ -398,7 +372,6 @@ const startContinuousValidation = (io) => {
             );
           }
 
-          // حساب Sleep Quality
           try {
             const sleepData = calculateSleepQuality(validatedData, age);
             if (sleepData.sleepStage === "Insufficient Data") {
@@ -438,7 +411,6 @@ const startContinuousValidation = (io) => {
   }, 11000);
 };
 
-// API to get all sensor data
 const getAllSensorData = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
   const userId = req.user.id;
@@ -458,15 +430,15 @@ const getAllSensorData = asyncWrapper(async (req, res, next) => {
     .sort({ createdAt: -1 })
     .limit(50);
 
-  if (!sensorData.length) {
-    return next(
-      appError.create(
-        "No validated sensor data found for this child",
-        404,
-        httpStatusText.FAIL
-      )
-    );
-  }
+  // if (!sensorData.length) {
+  //   return next(
+  //     appError.create(
+  //       "No validated sensor data found for this child",
+  //       404,
+  //       httpStatusText.FAIL
+  //     )
+  //   );
+  // }
 
   res.json({
     status: httpStatusText.SUCCESS,
@@ -474,7 +446,6 @@ const getAllSensorData = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// API to get a single sensor data record
 const getSingleSensorData = asyncWrapper(async (req, res, next) => {
   const { childId, sensorDataId } = req.params;
   const userId = req.user.id;
@@ -511,7 +482,6 @@ const getSingleSensorData = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// API to get Baby Activity records for the last 24 hours
 const getActivitiesForLastDay = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
   const userId = req.user.id;
@@ -539,7 +509,6 @@ const getActivitiesForLastDay = asyncWrapper(async (req, res, next) => {
   });
 });
 
-// API to get Sleep Quality records for the last 24 hours
 const getSleepQualitiesForLastDay = asyncWrapper(async (req, res, next) => {
   const { childId } = req.params;
   const userId = req.user.id;

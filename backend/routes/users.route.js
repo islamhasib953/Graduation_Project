@@ -21,7 +21,7 @@ router
 
 router.route("/register").post(
   (req, res, next) => {
-    req.modelName = "user"; // تعريف modelName لـ User
+    req.modelName = "user";
     next();
   },
   uploadToS3,
@@ -50,7 +50,7 @@ router
     verifyToken,
     allowedTo(userRoles.PATIENT),
     (req, res, next) => {
-      req.modelName = "user"; // تأكيد modelName لـ User
+      req.modelName = "user";
       next();
     },
     uploadToS3,
