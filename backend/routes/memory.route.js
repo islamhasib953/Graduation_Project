@@ -20,10 +20,10 @@ router
     verifyToken,
     allowedTo(userRoles.ADMIN, userRoles.PATIENT),
     (req, res, next) => {
-      req.modelName = "memory"; // إضافة اسم الموديل
+      req.modelName = "memory";
       next();
     },
-    uploadToS3, // رفع الصورة الجديدة
+    uploadToS3,
     validationschema.validateMemory,
     memoryController.createMemory
   );
@@ -34,11 +34,11 @@ router
     verifyToken,
     checkOwnership,
     (req, res, next) => {
-      req.modelName = "memory"; // إضافة اسم الموديل
+      req.modelName = "memory";
       next();
     },
-    deleteFromS3, // مسح الصورة القديمة
-    uploadToS3, // رفع الصورة الجديدة
+    deleteFromS3,
+    uploadToS3,
     validationschema.validateMemory,
     memoryController.updateMemory
   )

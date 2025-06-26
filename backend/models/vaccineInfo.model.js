@@ -3,12 +3,12 @@ const mongoose = require("mongoose");
 const vaccineInfoSchema = new mongoose.Schema(
   {
     ageVaccine: {
-      type: String, // مثل: 2-3 سنوات
+      type: String,
       required: [true, "Age vaccine is required"],
       trim: true,
     },
     originalSchedule: {
-      type: Number, // عدد الأشهر بعد الولادة
+      type: Number,
       required: [true, "Original schedule (in months) is required"],
     },
     doseName: {
@@ -22,12 +22,12 @@ const vaccineInfoSchema = new mongoose.Schema(
       trim: true,
     },
     dosageAmount: {
-      type: String, // مثل: 0.5ml
+      type: String,
       required: [true, "Dosage amount is required"],
       trim: true,
     },
     administrationMethod: {
-      type: String, // مثل: حقنة، فموي
+      type: String,
       required: [true, "Administration method is required"],
     },
     description: {

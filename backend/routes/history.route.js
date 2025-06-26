@@ -17,10 +17,10 @@ router
     verifyToken,
     allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
     (req, res, next) => {
-      req.modelName = "history"; // إضافة اسم الموديل
+      req.modelName = "history";
       next();
     },
-    uploadToS3, // رفع الصورة الجديدة
+    uploadToS3,
     validationschema.validateHistory,
     historyController.createHistory
   );
@@ -32,11 +32,11 @@ router
     verifyToken,
     allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
     (req, res, next) => {
-      req.modelName = "history"; // إضافة اسم الموديل
+      req.modelName = "history";
       next();
     },
-    deleteFromS3, // مسح الصورة القديمة
-    uploadToS3, // رفع الصورة الجديدة
+    deleteFromS3,
+    uploadToS3,
     validationschema.validateHistory,
     historyController.updateHistory
   )

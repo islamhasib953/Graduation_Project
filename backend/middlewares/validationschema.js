@@ -108,14 +108,12 @@ const validateRegister = [
     .isLength({ min: 6 })
     .withMessage("Password must be at least 6 characters long."),
 
-  // التعديل هنا: استبدلنا role بـ accountType
   body("accountType")
     .notEmpty()
     .withMessage("Account type is required")
     .isIn([userRoles.PATIENT, userRoles.DOCTOR])
     .withMessage("Account type must be PATIENT or DOCTOR"),
 
-  // إضافة تحقق للحقول الخاصة بالدكتور لو الـ accountType هو DOCTOR
   body("specialise")
     .if(body("accountType").equals(userRoles.DOCTOR))
     .notEmpty()

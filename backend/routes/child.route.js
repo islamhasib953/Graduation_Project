@@ -17,7 +17,7 @@ router
     verifyToken,
     checkOwnership,
     (req, res, next) => {
-      req.modelName = "child"; // تأكيد modelName لـ Child
+      req.modelName = "child";
       next();
     },
     uploadToS3,
@@ -38,7 +38,7 @@ router
     verifyToken,
     checkOwnership,
     (req, res, next) => {
-      req.modelName = "child"; // تأكيد modelName لـ Child
+      req.modelName = "child";
       next();
     },
     uploadToS3,

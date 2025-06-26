@@ -21,11 +21,11 @@ router
     verifyToken,
     allowedTo(userRoles.ADMIN, userRoles.DOCTOR),
     (req, res, next) => {
-      req.modelName = "doctor"; // إضافة اسم الموديل
+      req.modelName = "doctor";
       next();
     },
-    deleteFromS3, // مسح الصورة القديمة
-    uploadToS3, // رفع الصورة الجديدة
+    deleteFromS3,
+    uploadToS3,
     doctorController.updateDoctorProfile
   )
   .delete(

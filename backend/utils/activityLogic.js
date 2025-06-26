@@ -16,7 +16,6 @@ const calculateActivity = (data, childAge) => {
   const ir = data.ir || 0;
   const red = data.red || 0;
 
-  // تعديل النطاقات حسب العمر
   let bpmRanges = {
     Resting: [60, 90],
     "Light Activity": [90, 110],

@@ -30,7 +30,6 @@ class WebSocketService {
           const Chat = require("../models/chat.model");
 
           try {
-            // التحقق من وجود موعد مقبول
             const acceptedAppointment = await Appointment.findOne({
               childId,
               doctorId,

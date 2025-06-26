@@ -46,7 +46,7 @@ const GrowthSchema = new mongoose.Schema(
       min: [0, "Age in months must be positive"],
     },
   },
-  { timestamps: true } // Ensure createdAt and updatedAt are added automatically
+  { timestamps: true }
 );
 
 GrowthSchema.pre("save", async function (next) {

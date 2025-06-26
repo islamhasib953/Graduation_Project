@@ -32,6 +32,12 @@
     .message.doctor {
       color: green;
     }
+
+    .date-separator {
+      text-align: center;
+      color: #888;
+      margin: 10px 0;
+    }
   </style>
 </head>
 
@@ -46,37 +52,45 @@
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>
-    const childId = '68264b4d065c062a8059c8a6';
-    const doctorId = '68264ab7065c062a8059c865';
-    const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImhoaGhAZ21haWwuY29tIiwiaWQiOiI2N2ZlYWI5YTlkNTc0M2FjMzJhMWU4NTEiLCJyb2xlIjoiZG9jdG9yIiwiaWF0IjoxNzQ2OTg1MDk0LCJleHAiOjE3NDc1ODk4OTR9.n0Ou1lsr54OPbaYyLDWrnpR7HIlZ-5NP75OgY_kiB-c';
+    const childId = '684834faa49cac647dfbd4f8';
+    const doctorId = '68483483a49cac647dfbd4d7';
+    const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImRvb29AZ21haWwuY29tIiwiaWQiOiI2ODQ4MzQ4M2E0OWNhYzY0N2RmYmQ0ZDciLCJyb2xlIjoiZG9jdG9yIiwiaWF0IjoxNzQ5NTYyODU3LCJleHAiOjE3NTAxNjc2NTd9.RHujOX-85EZBH74e-RMxj3JBN5Qzh-4_da9Ghj8Rhzo';
 
     const socket = io('http://35.173.178.21:8000');
 
     socket.on('connect', () => {
       console.log('Connected to server:', socket.id);
+      socket.emit('joinChat', { childId, doctorId });
     });
 
     socket.on('connect_error', (error) => {
       console.error('Connection error:', error.message);
     });
 
-    socket.emit('joinChat', { childId, doctorId });
+    socket.on('joinChatSuccess', () => {
+      console.log('Successfully joined chat room');
+    });
 
-    fetch(`https://sigma-3hkg.onrender.com/api/chats/${childId}/${doctorId}/history`, {
+    fetch(`http://35.173.178.21:8000/api/chats/${childId}/${doctorId}/history`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => res.json())
       .then(data => {
-        if (data.status === 'SUCCESS') {
+        if (data.status === 'SUCCESS' && data.data && Array.isArray(data.data.messages)) {
           const messages = data.data.messages;
-          messages.forEach(msg => displayMessage(msg));
+          if (messages.length > 0) {
+            messages.forEach(msg => displayMessage(msg));
+          } else {
+            console.log('No messages found in history');
+          }
         } else {
-          console.error('Failed to load chat history:', data.message);
+          console.error('Failed to load chat history:', data.message || 'Invalid data structure');
         }
       })
       .catch(err => console.error('Error fetching chat history:', err));
 
     socket.on('receiveMessage', (message) => {
+      console.log('Received message:', message);
       displayMessage(message);
     });
 
@@ -89,7 +103,32 @@
       const chatBox = document.getElementById('chatBox');
       const messageDiv = document.createElement('div');
       messageDiv.classList.add('message', message.sender);
-      messageDiv.textContent = `${message.sender}: ${message.content || ''} ${message.media ? '(Media: ' + message.media + ')' : ''} (${new Date(message.timestamp).toLocaleString()})`;
+
+      const lastMessage = chatBox.lastChild;
+      const currentDate = new Date(message.timestamp).toLocaleDateString();
+      if (!lastMessage || new Date(lastMessage.dataset.timestamp).toLocaleDateString() !== currentDate) {
+        const dateDiv = document.createElement('div');
+        dateDiv.classList.add('date-separator');
+        dateDiv.textContent = currentDate;
+        chatBox.appendChild(dateDiv);
+      }
+
+      if (message.media) {
+        const mediaElement = document.createElement(message.media.match(/\.(pdf|doc|docx)$/i) ? 'a' : 'img');
+        if (mediaElement.tagName === 'img') {
+          mediaElement.src = message.media;
+          mediaElement.style.maxWidth = '200px';
+          mediaElement.onload = () => console.log('Image loaded:', message.media);
+        } else {
+          mediaElement.href = message.media;
+          mediaElement.textContent = 'Download File';
+          mediaElement.target = '_blank';
+        }
+        messageDiv.appendChild(mediaElement);
+      } else if (message.content) {
+        messageDiv.textContent = `${message.sender}: ${message.content}`;
+      }
+      messageDiv.dataset.timestamp = message.timestamp;
       chatBox.appendChild(messageDiv);
       chatBox.scrollTop = chatBox.scrollHeight;
     }
@@ -100,6 +139,7 @@
       if (content) {
         const message = { childId, doctorId, sender: 'doctor', content, media: null };
         socket.emit('sendMessage', message);
+        displayMessage(message); // عرض الرسالة فورًا
         messageInput.value = '';
       }
     });
@@ -108,7 +148,6 @@
       if (e.key === 'Enter') document.getElementById('sendButton').click();
     });
 
-    // معالجة رفع الملفات
     document.getElementById('uploadButton').addEventListener('click', () => {
       const mediaInput = document.getElementById('mediaInput');
       const file = mediaInput.files[0];
@@ -116,25 +155,24 @@
         const formData = new FormData();
         formData.append('media', file);
 
-        fetch(`https://sigma-3hkg.onrender.com/api/chats/${childId}/${doctorId}/upload`, {
+        fetch(`http://35.173.178.21:8000/api/chats/${childId}/${doctorId}/upload`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` },
           body: formData
         })
           .then(res => res.json())
           .then(data => {
-            if (data.status === 'SUCCESS') {
-              console.log('Media uploaded:', data.data.mediaUrl);
+            if (data.status === 'SUCCESS' && data.data && data.data.mediaUrl) {
               const message = {
                 sender: 'doctor',
                 media: data.data.mediaUrl,
                 timestamp: new Date()
               };
-              displayMessage(message); // عرض الملف المرفوع في الشات
+              displayMessage(message);
               socket.emit('sendMessage', { childId, doctorId, sender: 'doctor', media: data.data.mediaUrl, content: null });
             } else {
-              console.error('Failed to upload media:', data.message);
-              alert(data.message);
+              console.error('Failed to upload media:', data.message || 'No media URL');
+              alert(data.message || 'Upload failed');
             }
           })
           .catch(err => console.error('Error uploading media:', err));
