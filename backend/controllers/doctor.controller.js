@@ -13,8 +13,119 @@ const mongoose = require("mongoose");
 const { deleteObject } = require("../utils/s3-operations");
 
 const getAllDoctors = asyncWrapper(async (req, res) => {
+  // Fetch all doctors, excluding __v and password
   const doctors = await Doctor.find({}, { __v: false, password: false });
-  res.json({ status: httpStatusText.SUCCESS, data: { doctors } });
+
+  // Get current day and today's date
+  const currentDay = moment().format("dddd"); // "Sunday" (based on June 29, 2025)
+  const today = moment().startOf("day").format("YYYY-MM-DD"); // "2025-06-29"
+
+  // Map doctors to include all fields and availability status
+  const doctorsWithStatus = await Promise.all(
+    doctors.map(async (doctor) => {
+      // Check if doctor has available days and times
+      const hasAvailableDays =
+        doctor.availableDays && doctor.availableDays.length > 0;
+      const hasAvailableTimes =
+        doctor.availableTimes && doctor.availableTimes.length > 0;
+
+      // If no available days or times, status is Closed
+      if (!hasAvailableDays || !hasAvailableTimes) {
+        return {
+          _id: doctor._id,
+          firstName: doctor.firstName,
+          lastName: doctor.lastName,
+          gender: doctor.gender,
+          phone: doctor.phone,
+          address: doctor.address,
+          email: doctor.email,
+          role: doctor.role,
+          fcmToken: doctor.fcmToken,
+          avatar: doctor.avatar,
+          specialise: doctor.specialise,
+          about: doctor.about,
+          rate: doctor.rate,
+          availableDays: doctor.availableDays,
+          availableTimes: doctor.availableTimes,
+          token: doctor.token,
+          createdAt: doctor.createdAt,
+          updatedAt: doctor.updatedAt,
+          status: "Closed",
+        };
+      }
+
+      // Check if current day is in availableDays
+      const isDayAvailable = doctor.availableDays.includes(currentDay);
+      if (!isDayAvailable) {
+        return {
+          _id: doctor._id,
+          firstName: doctor.firstName,
+          lastName: doctor.lastName,
+          gender: doctor.gender,
+          phone: doctor.phone,
+          address: doctor.address,
+          email: doctor.email,
+          role: doctor.role,
+          fcmToken: doctor.fcmToken,
+          avatar: doctor.avatar,
+          specialise: doctor.specialise,
+          about: doctor.about,
+          rate: doctor.rate,
+          availableDays: doctor.availableDays,
+          availableTimes: doctor.availableTimes,
+          token: doctor.token,
+          createdAt: doctor.createdAt,
+          updatedAt: doctor.updatedAt,
+          status: "Closed",
+        };
+      }
+
+      // Fetch booked appointments for today
+      const bookedAppointments = await Appointment.find({
+        doctorId: doctor._id,
+        date: today,
+      }).select("time");
+
+      const bookedTimes = bookedAppointments.map(
+        (appointment) => appointment.time
+      );
+
+      // Check if there are any unbooked time slots today
+      const hasAvailableTimeToday = doctor.availableTimes.some(
+        (time) => !bookedTimes.includes(time)
+      );
+
+      // Determine status
+      const status = hasAvailableTimeToday ? "Open" : "Closed";
+
+      return {
+        _id: doctor._id,
+        firstName: doctor.firstName,
+        lastName: doctor.lastName,
+        gender: doctor.gender,
+        phone: doctor.phone,
+        address: doctor.address,
+        email: doctor.email,
+        role: doctor.role,
+        fcmToken: doctor.fcmToken,
+        avatar: doctor.avatar,
+        specialise: doctor.specialise,
+        about: doctor.about,
+        rate: doctor.rate,
+        availableDays: doctor.availableDays,
+        availableTimes: doctor.availableTimes,
+        token: doctor.token,
+        createdAt: doctor.createdAt,
+        updatedAt: doctor.updatedAt,
+        status,
+      };
+    })
+  );
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: { doctors: doctorsWithStatus },
+  });
 });
 
 const getSingleDoctor = asyncWrapper(async (req, res, next) => {
