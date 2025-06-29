@@ -120,6 +120,10 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
 
   await newAppointment.save();
 
+  const populatedAppointment = await Appointment.findById(newAppointment._id)
+    .populate("doctorId", "firstName lastName")
+    .populate("childId", "name");
+
   try {
     await sendNotificationCore(
       userId,
@@ -151,7 +155,22 @@ const bookAppointment = asyncWrapper(async (req, res, next) => {
 
   res.status(201).json({
     status: httpStatusText.SUCCESS,
-    data: { appointment: newAppointment },
+    data: {
+      appointment: {
+        _id: populatedAppointment._id,
+        userId: populatedAppointment.userId,
+        childId: populatedAppointment.childId._id,
+        childName: populatedAppointment.childId.name, // Include child's name
+        doctorId: populatedAppointment.doctorId._id,
+        doctorName: `${populatedAppointment.doctorId.firstName} ${populatedAppointment.doctorId.lastName}`, // Include doctor's name
+        date: populatedAppointment.date,
+        time: populatedAppointment.time,
+        visitType: populatedAppointment.visitType,
+        status: populatedAppointment.status,
+        createdAt: populatedAppointment.createdAt,
+        updatedAt: populatedAppointment.updatedAt,
+      },
+    },
   });
 });
 
