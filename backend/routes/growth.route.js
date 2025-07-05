@@ -7,7 +7,6 @@ const growthController = require("../controllers/growth.controller");
 const {
   sendNotificationCore,
 } = require("../controllers/notifications.controller");
-const Appointment = require("../models/appointment.model");
 const appError = require("../utils/appError");
 
 router
@@ -68,7 +67,6 @@ router
                   error
                 );
               }
-
             }
           }
         }
@@ -87,6 +85,14 @@ router
     verifyToken,
     allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
     growthController.getAllGrowth
+  );
+
+router
+  .route("/:childId/with-age")
+  .get(
+    verifyToken,
+    allowedTo(userRoles.ADMIN, userRoles.DOCTOR, userRoles.PATIENT),
+    growthController.getAllGrowthWithAge
   );
 
 router
@@ -168,7 +174,6 @@ router
                   error
                 );
               }
-
             }
           }
         }

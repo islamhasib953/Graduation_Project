@@ -13,23 +13,18 @@ const mongoose = require("mongoose");
 const { deleteObject } = require("../utils/s3-operations");
 
 const getAllDoctors = asyncWrapper(async (req, res) => {
-  // Fetch all doctors, excluding __v and password
   const doctors = await Doctor.find({}, { __v: false, password: false });
 
-  // Get current day and today's date
-  const currentDay = moment().format("dddd"); // "Sunday" (based on June 29, 2025)
-  const today = moment().startOf("day").format("YYYY-MM-DD"); // "2025-06-29"
+  const currentDay = moment().format("dddd");
+  const today = moment().startOf("day").format("YYYY-MM-DD");
 
-  // Map doctors to include all fields and availability status
   const doctorsWithStatus = await Promise.all(
     doctors.map(async (doctor) => {
-      // Check if doctor has available days and times
       const hasAvailableDays =
         doctor.availableDays && doctor.availableDays.length > 0;
       const hasAvailableTimes =
         doctor.availableTimes && doctor.availableTimes.length > 0;
 
-      // If no available days or times, status is Closed
       if (!hasAvailableDays || !hasAvailableTimes) {
         return {
           _id: doctor._id,
@@ -54,7 +49,6 @@ const getAllDoctors = asyncWrapper(async (req, res) => {
         };
       }
 
-      // Check if current day is in availableDays
       const isDayAvailable = doctor.availableDays.includes(currentDay);
       if (!isDayAvailable) {
         return {
@@ -80,7 +74,6 @@ const getAllDoctors = asyncWrapper(async (req, res) => {
         };
       }
 
-      // Fetch booked appointments for today
       const bookedAppointments = await Appointment.find({
         doctorId: doctor._id,
         date: today,
@@ -90,12 +83,9 @@ const getAllDoctors = asyncWrapper(async (req, res) => {
         (appointment) => appointment.time
       );
 
-      // Check if there are any unbooked time slots today
       const hasAvailableTimeToday = doctor.availableTimes.some(
         (time) => !bookedTimes.includes(time)
       );
-
-      // Determine status
       const status = hasAvailableTimeToday ? "Open" : "Closed";
 
       return {

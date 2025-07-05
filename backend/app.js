@@ -49,12 +49,12 @@ app.use(xssClean());
 app.use(hpp());
 app.use(fileUpload());
 
-const limiter = limitReq({
-  max: 200,
-  windowMs: 1000 * 60 * 60,
-  message: "Too many requests, try again after one hour",
-});
-app.use(limiter);
+// const limiter = limitReq({
+//   max: 200,
+//   windowMs: 1000 * 60 * 60,
+//   message: "Too many requests, try again after one hour",
+// });
+// app.use(limiter);
 
 app.use(morgan("combined"));
 

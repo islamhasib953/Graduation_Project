@@ -86,6 +86,7 @@ const createGrowth = asyncWrapper(async (req, res, next) => {
         notes: newGrowth.notes,
         notesImage: newGrowth.notesImage,
         ageInMonths: newGrowth.ageInMonths,
+        ageInDays: newGrowth.ageInDays,
         createdAt: newGrowth.createdAt,
       },
     },
@@ -115,7 +116,7 @@ const getAllGrowth = asyncWrapper(async (req, res, next) => {
   const growthRecords = await Growth.find({ childId })
     .sort({ createdAt: -1 })
     .select(
-      "_id weight height headCircumference date time notes notesImage ageInMonths createdAt"
+      "_id weight height headCircumference date time notes notesImage ageInMonths ageInDays createdAt"
     );
 
   if (!growthRecords.length) {
@@ -140,6 +141,61 @@ const getAllGrowth = asyncWrapper(async (req, res, next) => {
       notes: record.notes,
       notesImage: record.notesImage,
       ageInMonths: record.ageInMonths,
+      ageInDays: record.ageInDays,
+      createdAt: record.createdAt,
+    })),
+  });
+});
+
+const getAllGrowthWithAge = asyncWrapper(async (req, res, next) => {
+  const { childId } = req.params;
+  const userId = req.user.id;
+  const userRole = req.user.role;
+
+  let childQuery = { _id: childId };
+  if (userRole === "PATIENT") {
+    childQuery.parentId = userId;
+  }
+  const child = await Child.findOne(childQuery);
+  if (!child) {
+    return next(
+      appError.create(
+        "Child not found or you are not authorized",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  const growthRecords = await Growth.find({ childId })
+    .sort({ createdAt: -1 })
+    .select(
+      "_id weight height headCircumference date time notes notesImage ageInMonths ageInDays createdAt"
+    );
+
+  if (!growthRecords.length) {
+    return next(
+      appError.create(
+        "No growth records found for this child",
+        404,
+        httpStatusText.FAIL
+      )
+    );
+  }
+
+  res.json({
+    status: httpStatusText.SUCCESS,
+    data: growthRecords.map((record) => ({
+      _id: record._id,
+      weight: record.weight,
+      height: record.height,
+      headCircumference: record.headCircumference,
+      date: record.date,
+      time: record.time,
+      notes: record.notes,
+      notesImage: record.notesImage,
+      ageInMonths: record.ageInMonths,
+      ageInDays: record.ageInDays,
       createdAt: record.createdAt,
     })),
   });
@@ -166,7 +222,7 @@ const getSingleGrowth = asyncWrapper(async (req, res, next) => {
   }
 
   const growthRecord = await Growth.findOne({ _id: growthId, childId }).select(
-    "_id weight height headCircumference date time notes notesImage ageInMonths createdAt"
+    "_id weight height headCircumference date time notes notesImage ageInMonths ageInDays createdAt"
   );
 
   if (!growthRecord) {
@@ -187,6 +243,7 @@ const getSingleGrowth = asyncWrapper(async (req, res, next) => {
       notes: growthRecord.notes,
       notesImage: growthRecord.notesImage,
       ageInMonths: growthRecord.ageInMonths,
+      ageInDays: growthRecord.ageInDays,
       createdAt: growthRecord.createdAt,
     },
   });
@@ -219,7 +276,7 @@ const updateGrowth = asyncWrapper(async (req, res, next) => {
     { weight, height, headCircumference, date, time, notes, notesImage },
     { new: true, runValidators: true }
   ).select(
-    "_id weight height headCircumference date time notes notesImage ageInMonths createdAt"
+    "_id weight height headCircumference date time notes notesImage ageInMonths ageInDays createdAt"
   );
 
   if (!updatedGrowth) {
@@ -258,6 +315,7 @@ const updateGrowth = asyncWrapper(async (req, res, next) => {
       notes: updatedGrowth.notes,
       notesImage: updatedGrowth.notesImage,
       ageInMonths: updatedGrowth.ageInMonths,
+      ageInDays: updatedGrowth.ageInDays,
       createdAt: updatedGrowth.createdAt,
     },
   });
@@ -341,7 +399,7 @@ const getLastGrowthRecord = asyncWrapper(async (req, res, next) => {
   const lastGrowthRecord = await Growth.findOne({ childId })
     .sort({ createdAt: -1 })
     .select(
-      "_id weight height headCircumference date time notes notesImage ageInMonths createdAt"
+      "_id weight height headCircumference date time notes notesImage ageInMonths ageInDays createdAt"
     );
 
   if (!lastGrowthRecord) {
@@ -366,6 +424,7 @@ const getLastGrowthRecord = asyncWrapper(async (req, res, next) => {
       notes: lastGrowthRecord.notes,
       notesImage: lastGrowthRecord.notesImage,
       ageInMonths: lastGrowthRecord.ageInMonths,
+      ageInDays: lastGrowthRecord.ageInDays,
       createdAt: lastGrowthRecord.createdAt,
     },
   });
@@ -394,7 +453,7 @@ const getLastGrowthChange = asyncWrapper(async (req, res, next) => {
   const growthRecords = await Growth.find({ childId })
     .sort({ createdAt: -1 })
     .select(
-      "_id weight height headCircumference date time ageInMonths createdAt"
+      "_id weight height headCircumference date time ageInMonths ageInDays createdAt"
     );
 
   if (!growthRecords.length) {
@@ -405,6 +464,7 @@ const getLastGrowthChange = asyncWrapper(async (req, res, next) => {
       date: child.birthDate,
       time: "00:00",
       ageInMonths: 0,
+      ageInDays: 0,
       createdAt: child.createdAt,
     };
 
@@ -415,6 +475,7 @@ const getLastGrowthChange = asyncWrapper(async (req, res, next) => {
       date: child.birthDate,
       time: "00:00",
       ageInMonths: 0,
+      ageInDays: 0,
       createdAt: child.createdAt,
     };
 
@@ -424,6 +485,7 @@ const getLastGrowthChange = asyncWrapper(async (req, res, next) => {
       headCircumferenceChange:
         birthData.headCircumference - zeroData.headCircumference,
       ageInMonthsDifference: birthData.ageInMonths - zeroData.ageInMonths,
+      ageInDaysDifference: birthData.ageInDays - zeroData.ageInDays,
       timeIntervalDays: 0,
     };
 
@@ -446,6 +508,7 @@ const getLastGrowthChange = asyncWrapper(async (req, res, next) => {
       date: child.birthDate,
       time: "00:00",
       ageInMonths: 0,
+      ageInDays: 0,
       createdAt: child.createdAt,
     };
 
@@ -455,6 +518,7 @@ const getLastGrowthChange = asyncWrapper(async (req, res, next) => {
       headCircumferenceChange:
         latest.headCircumference - birthData.headCircumference,
       ageInMonthsDifference: latest.ageInMonths - birthData.ageInMonths,
+      ageInDaysDifference: latest.ageInDays - birthData.ageInDays,
       timeIntervalDays: Math.round(
         (new Date(latest.date) - new Date(birthData.date)) /
           (1000 * 60 * 60 * 24)
@@ -472,6 +536,7 @@ const getLastGrowthChange = asyncWrapper(async (req, res, next) => {
           date: latest.date,
           time: latest.time,
           ageInMonths: latest.ageInMonths,
+          ageInDays: latest.ageInDays,
           createdAt: latest.createdAt,
         },
         previousRecord: birthData,
@@ -487,6 +552,7 @@ const getLastGrowthChange = asyncWrapper(async (req, res, next) => {
     headCircumferenceChange:
       latest.headCircumference - previous.headCircumference,
     ageInMonthsDifference: latest.ageInMonths - previous.ageInMonths,
+    ageInDaysDifference: latest.ageInDays - previous.ageInDays,
     timeIntervalDays: Math.round(
       (new Date(latest.date) - new Date(previous.date)) / (1000 * 60 * 60 * 24)
     ),
@@ -503,6 +569,7 @@ const getLastGrowthChange = asyncWrapper(async (req, res, next) => {
         date: latest.date,
         time: latest.time,
         ageInMonths: latest.ageInMonths,
+        ageInDays: latest.ageInDays,
         createdAt: latest.createdAt,
       },
       previousRecord: {
@@ -513,6 +580,7 @@ const getLastGrowthChange = asyncWrapper(async (req, res, next) => {
         date: previous.date,
         time: previous.time,
         ageInMonths: previous.ageInMonths,
+        ageInDays: previous.ageInDays,
         createdAt: previous.createdAt,
       },
       changes,
@@ -523,6 +591,7 @@ const getLastGrowthChange = asyncWrapper(async (req, res, next) => {
 module.exports = {
   createGrowth,
   getAllGrowth,
+  getAllGrowthWithAge,
   getSingleGrowth,
   updateGrowth,
   deleteGrowth,

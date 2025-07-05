@@ -49,3 +49,13 @@ open and close for doctors screen
 والادمن يقدر يعمل كل حاجة
 السينسورات ال mqtt and websocket
 authntaction and authraiztion والباسورد
+
+اذاكر شوية فى ALX and data camp
+*****************************
+افتح بوستمان
+افتح الكود
+افتح render, EC2, S3, hivemq
+اعرف التوبك اللى بيبعت عليه mqtt 
+اعرف اى هى ال validation بتاعت السبنوسرات كلها
+اجرب الشات بوت قبل الميتنج
+***********************

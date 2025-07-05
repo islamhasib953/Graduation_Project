@@ -45,6 +45,10 @@ const GrowthSchema = new mongoose.Schema(
       type: Number,
       min: [0, "Age in months must be positive"],
     },
+    ageInDays: {
+      type: Number,
+      min: [0, "Age in days must be positive"],
+    },
   },
   { timestamps: true }
 );
@@ -54,9 +58,10 @@ GrowthSchema.pre("save", async function (next) {
   if (child) {
     const birthDate = new Date(child.birthDate);
     const recordDate = new Date(this.date);
-    this.ageInMonths = Math.floor(
-      (recordDate - birthDate) / (1000 * 60 * 60 * 24 * 30)
-    );
+    const diffTime = recordDate - birthDate;
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    this.ageInMonths = Math.floor(diffDays / 30);
+    this.ageInDays = diffDays % 30;
   }
   next();
 });
