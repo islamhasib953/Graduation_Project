@@ -1,0 +1,3232 @@
+طيب انا هبعتلك اكواد عايز تعدل فيها عرض الصور لانها مش شغالة 
+
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:intl/intl.dart';
+import 'package:segma/cubits/selected_child_cubit.dart';
+import 'package:segma/cubits/selected_doctor_cubit.dart';
+import 'package:segma/models/appointment_model.dart';
+import 'package:segma/screens/doctor_user/cancel_dialog.dart';
+import 'package:segma/screens/doctor_user/doctor_details_screen.dart';
+import 'package:segma/services/doctor_service.dart';
+import 'package:segma/services/notification_service.dart';
+import 'package:segma/utils/colors.dart';
+import 'package:segma/services/auth_service.dart';
+
+class AppointmentsScreen extends StatefulWidget {
+  const AppointmentsScreen({super.key});
+
+  @override
+  State<AppointmentsScreen> createState() => _AppointmentsScreenState();
+}
+
+class _AppointmentsScreenState extends State<AppointmentsScreen> {
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<SelectedChildCubit, String?>(
+      builder: (context, childId) {
+        if (childId == null) {
+          return const Center(child: Text('Please select a child'));
+        }
+        return FutureBuilder<Map<String, dynamic>>(
+          future: DoctorService.getUserAppointments(childId),
+          key: ValueKey(childId), // لإعادة بناء FutureBuilder عند تغيير childId
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError || !snapshot.hasData || snapshot.data!['status'] != 'success') {
+              return const Center(child: Text('Error loading appointments'));
+            }
+            // تحويل البيانات إلى قائمة
+            final List<UserAppointment> appointmentsList = (snapshot.data!['data'] as List)
+                .map((appointment) => UserAppointment.fromJson(appointment))
+                .toList();
+            if (appointmentsList.isEmpty) {
+              return const Center(child: Text('No appointments found'));
+            }
+            // تجميع المواعيد حسب الشهر
+            final Map<String, List<UserAppointment>> appointmentsData = {};
+            for (var appointment in appointmentsList) {
+              final date = DateTime.parse(appointment.date);
+              final month = DateFormat('MMMM yyyy').format(date);
+              if (!appointmentsData.containsKey(month)) {
+                appointmentsData[month] = [];
+              }
+              appointmentsData[month]!.add(appointment);
+            }
+            return ListView.builder(
+              padding: EdgeInsets.symmetric(vertical: 8.h),
+              itemCount: appointmentsData.length,
+              itemBuilder: (context, index) {
+                final month = appointmentsData.keys.elementAt(index);
+                final appointments = appointmentsData[month]!;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                      child: Text(
+                        month,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    ...appointments.map((appointment) {
+                      return AppointmentCard(
+                        appointment: appointment,
+                        onCancel: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => CancelDialog(
+                              onConfirm: () async {
+                                try {
+                                  final response = await DoctorService.cancelAppointment(childId, appointment.appointmentId);
+                                  if (response['status'] == 'success') {
+                                    final userId = await AuthService.getUserId();
+                                    await NotificationService.sendAppointmentCancellationNotification(
+                                      childId: childId,
+                                      userId: userId ?? '',
+                                      appointmentId: appointment.appointmentId,
+                                      doctorName: appointment.doctorName,
+                                      date: appointment.date,
+                                      time: appointment.time,
+                                    );
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Appointment cancelled successfully')),
+                                      );
+                                      Navigator.pop(context);
+                                      // إعادة تحميل البيانات
+                                      setState(() {});
+                                    }
+                                  } else {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text(response['message'] ?? 'Failed to cancel appointment')),
+                                      );
+                                    }
+                                  }
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error: $e')),
+                                    );
+                                  }
+                                }
+                              },
+                            ),
+                          );
+                        },
+                        onReschedule: () {
+                          if (appointment.doctorId == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Error: Doctor ID not available')),
+                            );
+                            return;
+                          }
+                          context.read<SelectedDoctorCubit>().selectDoctor(appointment.doctorId!);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => DoctorDetailsScreen(
+                                doctorId: appointment.doctorId!,
+                                appointmentId: appointment.appointmentId,
+                                previousDate: appointment.date,
+                                previousTime: appointment.time,
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    }).toList(),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class AppointmentCard extends StatelessWidget {
+  final UserAppointment appointment;
+  final VoidCallback onCancel;
+  final VoidCallback onReschedule;
+
+  const AppointmentCard({
+    super.key,
+    required this.appointment,
+    required this.onCancel,
+    required this.onReschedule,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final date = DateTime.parse(appointment.date);
+    final formattedDate = DateFormat('dd MMM, yyyy').format(date);
+    final statusColor = appointment.status == 'Accepted'
+        ? AppColors.statusUpcoming
+        : appointment.status == 'Refused'
+            ? AppColors.statusOverdue
+            : Theme.of(context).colorScheme.secondary;
+
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
+      padding: EdgeInsets.all(12.r),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(12.r),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black26,
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 24.r,
+            backgroundImage: NetworkImage(appointment.doctorAvatar),
+            onBackgroundImageError: (error, stackTrace) {},
+            child: appointment.doctorAvatar.isEmpty ? Icon(Icons.person, size: 24.r) : null,
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      appointment.doctorName,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    SizedBox(width: 8.w),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        borderRadius: BorderRadius.circular(8.r),
+                      ),
+                      child: Text(
+                        appointment.status,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 4.h),
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today, size: 16.sp, color: Theme.of(context).iconTheme.color),
+                    SizedBox(width: 4.w),
+                    Text(
+                      formattedDate,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    SizedBox(width: 8.w),
+                    Icon(Icons.access_time, size: 16.sp, color: Theme.of(context).iconTheme.color),
+                    SizedBox(width: 4.w),
+                    Text(
+                      appointment.time,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    SizedBox(width: 8.w),
+                    Icon(Icons.local_hospital, size: 16.sp, color: Theme.of(context).iconTheme.color),
+                    SizedBox(width: 4.w),
+                    Text(
+                      appointment.visitType,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Column(
+            children: [
+              ElevatedButton(
+                onPressed: appointment.status == 'Accepted' || appointment.status == 'Pending' ? onCancel : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.statusOverdue,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                ),
+                child: Text('Cancel', style: Theme.of(context).textTheme.bodySmall),
+              ),
+              SizedBox(height: 4.h),
+              ElevatedButton(
+                onPressed: appointment.status == 'Accepted' || appointment.status == 'Pending' ? onReschedule : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).primaryColor,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                ),
+                child: Text('Reschedule', style: Theme.of(context).textTheme.bodySmall),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+***********************************************
+import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:segma/utils/colors.dart';
+
+class CancelDialog extends StatefulWidget {
+  final VoidCallback onConfirm;
+
+  const CancelDialog({Key? key, required this.onConfirm}) : super(key: key);
+
+  @override
+  _CancelDialogState createState() => _CancelDialogState();
+}
+
+class _CancelDialogState extends State<CancelDialog> {
+  final TextEditingController _controller = TextEditingController();
+  bool _isConfirmEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(() {
+      setState(() {
+        _isConfirmEnabled = _controller.text.toUpperCase() == 'CANCEL';
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Cancel Appointment', style: Theme.of(context).textTheme.titleMedium),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Do you want to cancel the appointment?', style: Theme.of(context).textTheme.bodyMedium),
+          SizedBox(height: 8.h),
+          Text('Please type "CANCEL" in the box below', style: Theme.of(context).textTheme.bodySmall),
+          SizedBox(height: 8.h),
+          TextField(
+            controller: _controller,
+            decoration: InputDecoration(
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+              hintText: 'CANCEL',
+              filled: true,
+              fillColor: Theme.of(context).dividerColor,
+            ),
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Back', style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).primaryColor)),
+        ),
+        ElevatedButton(
+          onPressed: _isConfirmEnabled ? widget.onConfirm : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.statusOverdue,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+          ),
+          child: Text('Confirm', style: Theme.of(context).textTheme.bodyLarge),
+        ),
+      ],
+    );
+  }
+}
+*********************************************
+
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:segma/cubits/selected_child_cubit.dart';
+import 'package:segma/models/doctor_model.dart';
+import 'package:segma/screens/doctor_user/doctor_details_screen.dart';
+import 'package:segma/screens/chat_screen.dart';
+import 'package:segma/services/doctor_service.dart';
+import 'package:segma/utils/colors.dart';
+
+class FavoriteDoctorsScreen extends StatefulWidget {
+  const FavoriteDoctorsScreen({Key? key}) : super(key: key);
+
+  @override
+  _FavoriteDoctorsScreenState createState() => _FavoriteDoctorsScreenState();
+}
+
+class _FavoriteDoctorsScreenState extends State<FavoriteDoctorsScreen> {
+  Future<void> _toggleFavorite(String childId, String doctorId, bool isFavorite) async {
+    try {
+      final response = isFavorite
+          ? await DoctorService.removeFavorite(childId, doctorId)
+          : await DoctorService.toggleFavorite(childId, doctorId);
+      if (response['status'] == 'success') {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isFavorite ? 'Removed from Favorites' : 'Added to Favorites'),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update favorites: ${response['message']}')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Favorite Doctors', style: Theme.of(context).textTheme.titleLarge),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: BlocBuilder<SelectedChildCubit, String?>(
+        builder: (context, childId) {
+          if (childId == null) {
+            return Center(child: Text('Please select a child', style: Theme.of(context).textTheme.bodyLarge));
+          }
+          return FutureBuilder<Map<String, dynamic>>(
+            future: DoctorService.getFavoriteDoctors(childId),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError || !snapshot.hasData || snapshot.data!['status'] != 'success') {
+                return Center(
+                  child: Text(
+                    'Error loading favorite doctors: ${snapshot.error ?? snapshot.data?['message'] ?? 'Unknown error'}',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                );
+              }
+              final List<Doctor> favoriteDoctors = (snapshot.data!['data'] as List)
+                  .map((doctor) => Doctor.fromJson(doctor))
+                  .toList();
+              if (favoriteDoctors.isEmpty) {
+                return Center(child: Text('No favorite doctors found', style: Theme.of(context).textTheme.bodyLarge));
+              }
+              return GridView.builder(
+                padding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 16.w),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  childAspectRatio: 0.8,
+                ),
+                itemCount: favoriteDoctors.length,
+                itemBuilder: (context, index) {
+                  final doctor = favoriteDoctors[index];
+                  return Card(
+                    color: Theme.of(context).cardColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                    elevation: 4,
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => DoctorDetailsScreen(doctorId: doctor.id),
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(12.r),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              CircleAvatar(
+                                radius: 30.r,
+                                backgroundImage: doctor.avatar.isNotEmpty ? NetworkImage(doctor.avatar) : null,
+                                backgroundColor: Theme.of(context).colorScheme.secondary,
+                                onBackgroundImageError: (error, stackTrace) {},
+                                child: doctor.avatar.isEmpty
+                                    ? Text(
+                                        '${doctor.firstName[0]}${doctor.lastName[0]}',
+                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white),
+                                      )
+                                    : null,
+                              ),
+                              Positioned(
+                                top: 0,
+                                left: 0,
+                                child: Icon(
+                                  Icons.favorite,
+                                  color: Theme.of(context).colorScheme.error,
+                                  size: 20.sp,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 8.h),
+                          Text(
+                            '${doctor.firstName} ${doctor.lastName}',
+                            style: Theme.of(context).textTheme.titleMedium,
+                            textAlign: TextAlign.center,
+                          ),
+                          SizedBox(height: 8.h),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              ElevatedButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => DoctorDetailsScreen(doctorId: doctor.id),
+                                    ),
+                                  );
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Theme.of(context).primaryColor,
+                                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                                ),
+                                child: Text('Details', style: Theme.of(context).textTheme.bodySmall),
+                              ),
+                              SizedBox(width: 8.w),
+                              ElevatedButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => ChatScreen(childId: childId, doctorId: doctor.id),
+                                    ),
+                                  );
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Theme.of(context).primaryColor,
+                                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                                ),
+                                child: Text('Chat', style: Theme.of(context).textTheme.bodySmall),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 8.h),
+                          IconButton(
+                            icon: Icon(Icons.favorite, color: Theme.of(context).colorScheme.error),
+                            onPressed: () => _toggleFavorite(childId, doctor.id, true),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+*******************************************
+
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:intl/intl.dart';
+import 'package:segma/cubits/selected_child_cubit.dart';
+import 'package:segma/cubits/selected_doctor_cubit.dart';
+import 'package:segma/models/doctor_model.dart';
+import 'package:segma/models/appointment_model.dart';
+import 'package:segma/screens/doctor_user/cancel_dialog.dart';
+import 'package:segma/screens/doctor_user/doctor_details_screen.dart';
+import 'package:segma/services/doctor_service.dart';
+
+class DoctorsAppointmentsScreen extends StatefulWidget {
+  const DoctorsAppointmentsScreen({Key? key}) : super(key: key);
+
+  @override
+  _DoctorsAppointmentsScreenState createState() => _DoctorsAppointmentsScreenState();
+}
+
+class _DoctorsAppointmentsScreenState extends State<DoctorsAppointmentsScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    print('DoctorsAppointmentsScreen: Initializing TabController');
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    print('DoctorsAppointmentsScreen: Disposing TabController');
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    print('DoctorsAppointmentsScreen: Building UI');
+    return BlocBuilder<SelectedChildCubit, String?>(
+      builder: (context, childId) {
+        print('DoctorsAppointmentsScreen: SelectedChildCubit state - childId: $childId');
+        if (childId == null) {
+          return Scaffold(
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            body: Center(
+              child: Text(
+                'Please select a child',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 16.sp,
+                    ),
+              ),
+            ),
+          );
+        }
+        return Scaffold(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          appBar: AppBar(
+            backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+            title: Text(
+              'Doctors',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Theme.of(context).appBarTheme.foregroundColor,
+                  ),
+            ),
+            bottom: TabBar(
+              controller: _tabController,
+              tabs: const [
+                Tab(text: 'Top Doctors'),
+                Tab(text: 'Appointments'),
+              ],
+              indicatorColor: Theme.of(context).colorScheme.primary,
+              labelColor: Theme.of(context).colorScheme.onSurface,
+              unselectedLabelColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ),
+          body: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildDoctorsList(childId),
+              _buildAppointmentsList(childId),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDoctorsList(String childId) {
+    print('DoctorsAppointmentsScreen: Building doctors list for childId: $childId');
+    return FutureBuilder<Map<String, dynamic>>(
+      future: DoctorService.getDoctors(childId),
+      builder: (context, snapshot) {
+        print('DoctorsAppointmentsScreen: FutureBuilder state for doctors list - connectionState: ${snapshot.connectionState}');
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary));
+        }
+        if (snapshot.hasError) {
+          final error = snapshot.error.toString();
+          print('DoctorsAppointmentsScreen: Error loading doctors: $error');
+          if (error.contains('Authentication token is missing')) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Please log in to view doctors.',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 16.sp,
+                        ),
+                  ),
+                  SizedBox(height: 16.h),
+                  ElevatedButton(
+                    onPressed: () {
+                      print('DoctorsAppointmentsScreen: Navigating to login screen');
+                      Navigator.pushNamed(context, '/login');
+                    },
+                    child: Text('Log In', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 14.sp)),
+                  ),
+                ],
+              ),
+            );
+          }
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Error loading doctors: $error',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 14.sp,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 16.h),
+                ElevatedButton(
+                  onPressed: () {
+                    print('DoctorsAppointmentsScreen: Retry button pressed for doctors list');
+                    setState(() {});
+                  },
+                  child: Text('Retry', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 14.sp)),
+                ),
+              ],
+            ),
+          );
+        }
+        if (!snapshot.hasData) {
+          print('DoctorsAppointmentsScreen: No data returned for doctors list');
+          return Center(
+            child: Text(
+              'No data available',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 16.sp,
+                  ),
+            ),
+          );
+        }
+        final response = snapshot.data!;
+        if (response['status'] != 'success') {
+          print('DoctorsAppointmentsScreen: Failed to load doctors - Response: $response');
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  response['message'] ?? 'No doctors found',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 14.sp,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 16.h),
+                ElevatedButton(
+                  onPressed: () {
+                    print('DoctorsAppointmentsScreen: Retry button pressed for doctors list');
+                    setState(() {});
+                  },
+                  child: Text('Retry', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 14.sp)),
+                ),
+              ],
+            ),
+          );
+        }
+        // Check if 'data' is a List, handle if it's a Map or different structure
+        final dynamic data = response['data'];
+        List<Doctor> doctors = [];
+        if (data is List) {
+          doctors = data.map((doctor) => Doctor.fromJson(doctor)).toList();
+        } else if (data is Map) {
+          // Assuming the API might return a Map with a 'doctors' key or similar
+          final List<dynamic>? doctorList = data['doctors'] ?? data['data'];
+          if (doctorList != null && doctorList is List) {
+            doctors = doctorList.map((doctor) => Doctor.fromJson(doctor)).toList();
+          }
+        }
+        print('DoctorsAppointmentsScreen: Loaded ${doctors.length} doctors');
+        if (doctors.isEmpty) {
+          return Center(
+            child: Text(
+              'No doctors found',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 16.sp,
+                  ),
+            ),
+          );
+        }
+        return ListView.builder(
+          padding: EdgeInsets.all(16.w),
+          itemCount: doctors.length,
+          itemBuilder: (context, index) {
+            final doctor = doctors[index];
+            return Builder(
+              builder: (BuildContext context) {
+                print('DoctorsAppointmentsScreen: Building DoctorCard for doctor: ${doctor.firstName} ${doctor.lastName}');
+                return _DoctorCard(
+                  name: '${doctor.firstName} ${doctor.lastName}',
+                  specialty: doctor.specialise,
+                  distance: doctor.address,
+                  rating: doctor.rate,
+                  isOpen: doctor.status == 'Open',
+                  onTap: () {
+                    print('DoctorsAppointmentsScreen: Tapped on doctor: ${doctor.id} - ${doctor.firstName} ${doctor.lastName}');
+                    print('DoctorsAppointmentsScreen: Doctor details - Specialty: ${doctor.specialise}, Address: ${doctor.address}, Rating: ${doctor.rate}, Status: ${doctor.status}');
+                    context.read<SelectedDoctorCubit>().selectDoctor(doctor.id);
+                    print('DoctorsAppointmentsScreen: SelectedDoctorCubit updated with doctorId: ${doctor.id}');
+                    try {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => DoctorDetailsScreen(doctorId: doctor.id),
+                        ),
+                      );
+                      print('DoctorsAppointmentsScreen: Navigated to DoctorDetailsScreen for doctor: ${doctor.id}');
+                    } catch (e) {
+                      print('DoctorsAppointmentsScreen: Navigation error: $e');
+                    }
+                  },
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildAppointmentsList(String childId) {
+    print('DoctorsAppointmentsScreen: Building appointments list for childId: $childId');
+    return FutureBuilder<Map<String, dynamic>>(
+      future: DoctorService.getUserAppointments(childId),
+      builder: (context, snapshot) {
+        print('DoctorsAppointmentsScreen: FutureBuilder state for appointments list - connectionState: ${snapshot.connectionState}');
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary));
+        }
+        if (snapshot.hasError) {
+          final error = snapshot.error.toString();
+          print('DoctorsAppointmentsScreen: Error loading appointments: $error');
+          if (error.contains('Authentication token is missing')) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Please log in to view appointments.',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 16.sp,
+                        ),
+                  ),
+                  SizedBox(height: 16.h),
+                  ElevatedButton(
+                    onPressed: () {
+                      print('DoctorsAppointmentsScreen: Navigating to login screen');
+                      Navigator.pushNamed(context, '/login');
+                    },
+                    child: Text('Log In', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 14.sp)),
+                  ),
+                ],
+              ),
+            );
+          }
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Error loading appointments: $error',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 14.sp,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 16.h),
+                ElevatedButton(
+                  onPressed: () {
+                    print('DoctorsAppointmentsScreen: Retry button pressed for appointments list');
+                    setState(() {});
+                  },
+                  child: Text('Retry', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 14.sp)),
+                ),
+              ],
+            ),
+          );
+        }
+        if (!snapshot.hasData) {
+          print('DoctorsAppointmentsScreen: No data returned for appointments list');
+          return Center(
+            child: Text(
+              'No data available',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 16.sp,
+                  ),
+            ),
+          );
+        }
+        final response = snapshot.data!;
+        if (response['status'] != 'success') {
+          print('DoctorsAppointmentsScreen: Failed to load appointments - Response: $response');
+          return Center(
+            child: Text(
+              response['message'] ?? 'No appointments found',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 16.sp,
+                  ),
+            ),
+          );
+        }
+        // Check if 'data' is a List, handle if it's a Map or different structure
+        final dynamic data = response['data'];
+        List<UserAppointment> appointmentsList = [];
+        if (data is List) {
+          appointmentsList = data.map((appointment) => UserAppointment.fromJson(appointment)).toList();
+        } else if (data is Map) {
+          // Assuming the API might return a Map with an 'appointments' key or similar
+          final List<dynamic>? appointmentList = data['appointments'] ?? data['data'];
+          if (appointmentList != null && appointmentList is List) {
+            appointmentsList = appointmentList.map((appointment) => UserAppointment.fromJson(appointment)).toList();
+          }
+        }
+        print('DoctorsAppointmentsScreen: Loaded ${appointmentsList.length} appointments');
+        if (appointmentsList.isEmpty) {
+          return Center(
+            child: Text(
+              'No appointments found',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 16.sp,
+                  ),
+            ),
+          );
+        }
+        // تجميع المواعيد حسب الشهر
+        final Map<String, List<UserAppointment>> appointmentsByMonth = {};
+        for (var appointment in appointmentsList) {
+          final date = DateTime.parse(appointment.date);
+          final month = DateFormat('MMMM yyyy').format(date);
+          if (!appointmentsByMonth.containsKey(month)) {
+            appointmentsByMonth[month] = [];
+          }
+          appointmentsByMonth[month]!.add(appointment);
+        }
+        print('DoctorsAppointmentsScreen: Grouped appointments into ${appointmentsByMonth.length} months');
+        return ListView.builder(
+          padding: EdgeInsets.all(16.w),
+          itemCount: appointmentsByMonth.length,
+          itemBuilder: (context, index) {
+            final month = appointmentsByMonth.keys.elementAt(index);
+            final appointments = appointmentsByMonth[month]!;
+            print('DoctorsAppointmentsScreen: Building appointments for month: $month');
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8.h),
+                  child: Text(
+                    month,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ),
+                ...appointments.map((appointment) {
+                  return Builder(
+                    builder: (BuildContext context) {
+                      print('DoctorsAppointmentsScreen: Building AppointmentCard for appointment: ${appointment.appointmentId}');
+                      return _AppointmentCard(
+                        appointment: appointment,
+                        onCancel: () {
+                          print('DoctorsAppointmentsScreen: Tapped on cancel for appointment: ${appointment.appointmentId}');
+                          print('DoctorsAppointmentsScreen: Appointment details - Doctor: ${appointment.doctorName}, Date: ${appointment.date}, Time: ${appointment.time}, Status: ${appointment.status}');
+                          showDialog(
+                            context: context,
+                            builder: (context) => CancelDialog(
+                              onConfirm: () async {
+                                try {
+                                  print('DoctorsAppointmentsScreen: Confirming cancellation for appointment: ${appointment.appointmentId}');
+                                  await DoctorService.cancelAppointment(childId, appointment.appointmentId);
+                                  print('DoctorsAppointmentsScreen: Appointment cancelled successfully');
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: const Text('Appointment cancelled successfully'),
+                                      backgroundColor: Theme.of(context).colorScheme.secondary,
+                                    ),
+                                  );
+                                  Navigator.pop(context);
+                                  setState(() {});
+                                } catch (e) {
+                                  print('DoctorsAppointmentsScreen: Error cancelling appointment: $e');
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Error: $e'),
+                                      backgroundColor: Theme.of(context).colorScheme.error,
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                          );
+                        },
+                        onReschedule: () {
+                          print('DoctorsAppointmentsScreen: Tapped on reschedule for appointment: ${appointment.appointmentId}');
+                          print('DoctorsAppointmentsScreen: Appointment details - Doctor: ${appointment.doctorName}, Date: ${appointment.date}, Time: ${appointment.time}, Status: ${appointment.status}');
+                          context.read<SelectedDoctorCubit>().selectDoctor(appointment.doctorId);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => DoctorDetailsScreen(
+                                doctorId: appointment.doctorId,
+                                appointmentId: appointment.appointmentId,
+                                previousDate: appointment.date,
+                                previousTime: appointment.time,
+                              ),
+                            ),
+                          );
+                          print('DoctorsAppointmentsScreen: Navigated to DoctorDetailsScreen for rescheduling appointment: ${appointment.appointmentId}');
+                        },
+                      );
+                    },
+                  );
+                }).toList(),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _DoctorCard extends StatefulWidget {
+  final String name;
+  final String specialty;
+  final String distance;
+  final double rating;
+  final bool isOpen;
+  final VoidCallback onTap;
+
+  const _DoctorCard({
+    Key? key,
+    required this.name,
+    required this.specialty,
+    required this.distance,
+    required this.rating,
+    required this.isOpen,
+    required this.onTap,
+  }) : super(key: key);
+
+  @override
+  _DoctorCardState createState() => _DoctorCardState();
+}
+
+class _DoctorCardState extends State<_DoctorCard> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _scaleAnimation = Tween<double>(begin: 0.9, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  String truncateToMaxLength(String text, int maxLength) {
+    if (text.length <= maxLength) {
+      return text;
+    }
+    return '${text.substring(0, maxLength)}...';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    print('DoctorsAppointmentsScreen: Building _DoctorCard for doctor: ${widget.name}');
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: InkWell(
+          onTap: () {
+            print('DoctorsAppointmentsScreen: InkWell onTap triggered for doctor: ${widget.name}');
+            widget.onTap();
+          },
+          child: Card(
+            color: Theme.of(context).cardColor,
+            margin: EdgeInsets.symmetric(vertical: 10.h),
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.r),
+              side: BorderSide(
+                color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade700 : Colors.grey.shade300,
+                width: 1.w,
+              ),
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(16.w),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 30.r,
+                    backgroundColor: Theme.of(context).colorScheme.secondary.withOpacity(0.2),
+                    child: Icon(
+                      Icons.person,
+                      color: Theme.of(context).colorScheme.secondary,
+                      size: 30.r,
+                    ),
+                  ),
+                  SizedBox(width: 16.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          truncateToMaxLength(widget.name, 15),
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurface,
+                                fontSize: 16.sp,
+                                fontWeight: FontWeight.bold,
+                              ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: 6.h),
+                        Text(
+                          truncateToMaxLength(widget.specialty, 15),
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                fontSize: 14.sp,
+                              ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: 6.h),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on,
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                              size: 16.sp,
+                            ),
+                            SizedBox(width: 4.w),
+                            Flexible(
+                              child: Text(
+                                truncateToMaxLength(widget.distance, 15),
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                      fontSize: 14.sp,
+                                    ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            SizedBox(width: 8.w),
+                            Icon(
+                              Icons.star,
+                              color: Theme.of(context).colorScheme.secondary,
+                              size: 16.sp,
+                            ),
+                            SizedBox(width: 4.w),
+                            Text(
+                              widget.rating.toStringAsFixed(1),
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                    fontSize: 14.sp,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                    decoration: BoxDecoration(
+                      color: widget.isOpen
+                          ? Theme.of(context).colorScheme.secondary.withOpacity(0.9)
+                          : Theme.of(context).colorScheme.error.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(12.r),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 4,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      widget.isOpen ? 'Open' : 'Closed',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: widget.isOpen ? Theme.of(context).colorScheme.onSecondary : Theme.of(context).colorScheme.onError,
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AppointmentCard extends StatefulWidget {
+  final UserAppointment appointment;
+  final VoidCallback onCancel;
+  final VoidCallback onReschedule;
+
+  const _AppointmentCard({
+    Key? key,
+    required this.appointment,
+    required this.onCancel,
+        required this.onReschedule,
+  }) : super(key: key);
+
+  @override
+  _AppointmentCardState createState() => _AppointmentCardState();
+}
+
+class _AppointmentCardState extends State<_AppointmentCard> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _scaleAnimation = Tween<double>(begin: 0.9, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  String truncateToMaxLength(String text, int maxLength) {
+    if (text.length <= maxLength) {
+      return text;
+    }
+    return '${text.substring(0, maxLength)}...';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    print('DoctorsAppointmentsScreen: Building _AppointmentCard for appointment: ${widget.appointment.appointmentId}');
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: InkWell(
+          onTap: () {
+            print('DoctorsAppointmentsScreen: InkWell onTap triggered for appointment: ${widget.appointment.appointmentId}');
+            // يمكن إضافة منطق إضافي هنا إذا لزم الأمر
+          },
+          child: Card(
+            color: Theme.of(context).cardColor,
+            margin: EdgeInsets.symmetric(vertical: 10.h),
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.r),
+              side: BorderSide(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.grey.shade700
+                    : Colors.grey.shade300,
+                width: 1.w,
+              ),
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(16.w),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 30.r,
+                    backgroundColor: Theme.of(context).colorScheme.secondary.withOpacity(0.2),
+                    child: Icon(
+                      Icons.calendar_today,
+                      color: Theme.of(context).colorScheme.secondary,
+                      size: 30.r,
+                    ),
+                  ),
+                  SizedBox(width: 16.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          truncateToMaxLength(widget.appointment.doctorName, 15),
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurface,
+                                fontSize: 16.sp,
+                                fontWeight: FontWeight.bold,
+                              ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: 6.h),
+                        Text(
+                          DateFormat('EEEE, d MMM yyyy').format(DateTime.parse(widget.appointment.date)),
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                fontSize: 14.sp,
+                              ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: 6.h),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.access_time,
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                              size: 16.sp,
+                            ),
+                            SizedBox(width: 4.w),
+                            Text(
+                              widget.appointment.time,
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                    fontSize: 14.sp,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                        decoration: BoxDecoration(
+                          color: widget.appointment.status == 'Confirmed'
+                              ? Theme.of(context).colorScheme.secondary.withOpacity(0.9)
+                              : widget.appointment.status == 'Cancelled'
+                                  ? Theme.of(context).colorScheme.error.withOpacity(0.9)
+                                  : Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12.r),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black12,
+                              blurRadius: 4,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          widget.appointment.status,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: widget.appointment.status == 'Confirmed'
+                                    ? Theme.of(context).colorScheme.onSecondary
+                                    : widget.appointment.status == 'Cancelled'
+                                        ? Theme.of(context).colorScheme.onError
+                                        : Theme.of(context).colorScheme.onSurface,
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ),
+                      SizedBox(height: 8.h),
+                      if (widget.appointment.status == 'Confirmed')
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.cancel, size: 20.sp, color: Theme.of(context).colorScheme.error),
+                              onPressed: widget.onCancel,
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.edit, size: 20.sp, color: Theme.of(context).colorScheme.secondary),
+                              onPressed: widget.onReschedule,
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+*************************************
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:segma/cubits/selected_child_cubit.dart';
+import 'package:segma/cubits/selected_doctor_cubit.dart';
+import 'package:segma/models/doctor_model.dart';
+import 'package:segma/screens/doctor_user/doctors_appointments_screen.dart';
+import 'package:segma/screens/doctor_user/doctor_details_screen.dart';
+import 'package:segma/services/doctor_service.dart';
+
+class DoctorListScreen extends StatefulWidget {
+  const DoctorListScreen({Key? key}) : super(key: key);
+
+  @override
+  _DoctorListScreenState createState() => _DoctorListScreenState();
+}
+
+class _DoctorListScreenState extends State<DoctorListScreen> {
+  @override
+  Widget build(BuildContext context) {
+    print('DoctorListScreen: Building UI');
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Doctors', style: Theme.of(context).textTheme.titleLarge),
+        actions: [
+          TextButton(
+            onPressed: () {
+              print('DoctorListScreen: Tapped on Appointments button');
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const DoctorsAppointmentsScreen(),
+                ),
+              );
+              print('DoctorListScreen: Navigated to DoctorsAppointmentsScreen');
+            },
+            child: Text(
+              'Appointments',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+        ],
+      ),
+      body: BlocBuilder<SelectedChildCubit, String?>(
+        builder: (context, childId) {
+          print('DoctorListScreen: SelectedChildCubit state - childId: $childId');
+          if (childId == null) {
+            return Center(child: Text('Please select a child', style: Theme.of(context).textTheme.bodyLarge));
+          }
+          return FutureBuilder<Map<String, dynamic>>(
+            future: DoctorService.getDoctors(childId),
+            builder: (context, snapshot) {
+              print('DoctorListScreen: FutureBuilder state - connectionState: ${snapshot.connectionState}');
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError || !snapshot.hasData || snapshot.data!['status'] != 'success') {
+                print('DoctorListScreen: Error loading doctors - Error: ${snapshot.error}, Data: ${snapshot.data}');
+                return Center(child: Text('Error loading doctors', style: Theme.of(context).textTheme.bodyLarge));
+              }
+              // Check if 'data' is a List, handle if it's a Map or different structure
+              final dynamic data = snapshot.data!['data'];
+              List<Doctor> doctors = [];
+              if (data is List) {
+                doctors = data.map((doctor) => Doctor.fromJson(doctor)).toList();
+              } else if (data is Map) {
+                // Assuming the API might return a Map with a 'doctors' key or similar
+                final List<dynamic>? doctorList = data['doctors'] ?? data['data'];
+                if (doctorList != null && doctorList is List) {
+                  doctors = doctorList.map((doctor) => Doctor.fromJson(doctor)).toList();
+                }
+              }
+              print('DoctorListScreen: Loaded ${doctors.length} doctors');
+              if (doctors.isEmpty) {
+                return Center(child: Text('No doctors found', style: Theme.of(context).textTheme.bodyLarge));
+              }
+              return ListView.builder(
+                padding: EdgeInsets.symmetric(vertical: 12.h),
+                itemCount: doctors.length,
+                itemBuilder: (context, index) {
+                  final doctor = doctors[index];
+                  return Builder(
+                    builder: (BuildContext context) {
+                      print('DoctorListScreen: Building DoctorCard for doctor: ${doctor.firstName} ${doctor.lastName}');
+                      return DoctorCard(
+                        doctor: doctor,
+                        onTap: () {
+                          print('DoctorListScreen: Tapped on doctor: ${doctor.id} - ${doctor.firstName} ${doctor.lastName}');
+                          print('DoctorListScreen: Doctor details - Specialty: ${doctor.specialise}, Address: ${doctor.address}, Rating: ${doctor.rate}, Status: ${doctor.status}');
+                          context.read<SelectedDoctorCubit>().selectDoctor(doctor.id);
+                          try {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => DoctorDetailsScreen(doctorId: doctor.id),
+                              ),
+                            );
+                            print('DoctorListScreen: Navigated to DoctorDetailsScreen for doctor: ${doctor.id}');
+                          } catch (e) {
+                            print('DoctorListScreen: Error navigating to DoctorDetailsScreen: $e');
+                          }
+                        },
+                        onFavoriteToggle: () => _toggleFavorite(childId, doctor.id, doctor.isFavorite),
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _toggleFavorite(String childId, String doctorId, bool isCurrentlyFavorite) async {
+    try {
+      final response = isCurrentlyFavorite
+          ? await DoctorService.removeFavorite(childId, doctorId)
+          : await DoctorService.toggleFavorite(childId, doctorId);
+      if (response['status'] == 'success') {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isCurrentlyFavorite ? 'Removed from Favorites' : 'Added to Favorites',
+            ),
+            backgroundColor: Theme.of(context).colorScheme.secondary,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Failed to update favorites'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
+  }
+}
+
+class DoctorCard extends StatefulWidget {
+  final Doctor doctor;
+  final VoidCallback onTap;
+  final VoidCallback onFavoriteToggle;
+
+  const DoctorCard({
+    Key? key,
+    required this.doctor,
+    required this.onTap,
+    required this.onFavoriteToggle,
+  }) : super(key: key);
+
+  @override
+  _DoctorCardState createState() => _DoctorCardState();
+}
+
+class _DoctorCardState extends State<DoctorCard> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _starScaleAnimation;
+  late Animation<Color?> _starColorAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _scaleAnimation = Tween<double>(begin: 0.9, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _starScaleAnimation = Tween<double>(begin: 1.0, end: 1.3).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.elasticOut),
+    );
+    _starColorAnimation = ColorTween(
+      begin: Theme.of(context).iconTheme.color,
+      end: Theme.of(context).colorScheme.error,
+    ).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  // دالة لتقطيع النص إلى 15 حرفًا كحد أقصى وإضافة "..." إذا كان أطول
+  String truncateToMaxLength(String text, int maxLength) {
+    if (text.length <= maxLength) {
+      return text;
+    }
+    return '${text.substring(0, maxLength)}...';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    print('DoctorListScreen: Building DoctorCard for doctor: ${widget.doctor.firstName} ${widget.doctor.lastName}');
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: GestureDetector(
+          onTap: () {
+            print('DoctorListScreen: GestureDetector onTap triggered for doctor: ${widget.doctor.firstName} ${widget.doctor.lastName}');
+            widget.onTap();
+          },
+          child: Card(
+            color: Theme.of(context).cardColor,
+            margin: EdgeInsets.symmetric(horizontal: 20.w, vertical: 8.h),
+            elevation: 6,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.r),
+              side: BorderSide(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.grey.shade700
+                    : Colors.grey.shade300,
+                width: 1.w,
+              ),
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(16.r),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  CircleAvatar(
+                    radius: 28.r,
+                    backgroundImage: widget.doctor.avatar.isNotEmpty ? NetworkImage(widget.doctor.avatar) : null,
+                    backgroundColor: Theme.of(context).colorScheme.secondary.withOpacity(0.2),
+                    onBackgroundImageError: (error, stackTrace) {
+                      print('DoctorListScreen: Error loading doctor avatar: $error');
+                    },
+                    child: widget.doctor.avatar.isEmpty
+                        ? Icon(
+                            Icons.person,
+                            size: 28.r,
+                            color: Theme.of(context).colorScheme.secondary,
+                          )
+                        : null,
+                  ),
+                  SizedBox(width: 16.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${widget.doctor.firstName} ${widget.doctor.lastName}',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontSize: 16.sp,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.white
+                                    : Colors.black87,
+                              ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: 6.h),
+                        Text(
+                          truncateToMaxLength(widget.doctor.specialise, 15),
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                fontSize: 14.sp,
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.white70
+                                    : Colors.black54,
+                              ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: 6.h),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on,
+                              size: 14.sp,
+                              color: Theme.of(context).iconTheme.color?.withOpacity(0.7),
+                            ),
+                            SizedBox(width: 4.w),
+                            Flexible(
+                              child: Text(
+                                truncateToMaxLength(
+                                    '${widget.doctor.address} (${widget.doctor.rate.toStringAsFixed(1)})', 15),
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      fontSize: 12.sp,
+                                      color: Theme.of(context).brightness == Brightness.dark
+                                          ? Colors.white60
+                                          : Colors.black45,
+                                    ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 8.w),
+                  GestureDetector(
+                    onTap: () {
+                      widget.onFavoriteToggle();
+                      _animationController.forward(from: 0).whenComplete(() => _animationController.reverse());
+                    },
+                    child: ScaleTransition(
+                      scale: _starScaleAnimation,
+                      child: Icon(
+                        widget.doctor.isFavorite ? Icons.star : Icons.star_border,
+                        color: widget.doctor.isFavorite
+                            ? _starColorAnimation.value
+                            : Theme.of(context).iconTheme.color,
+                        size: 26.sp,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 8.w),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                    decoration: BoxDecoration(
+                      color: widget.doctor.status == 'Open'
+                          ? Theme.of(context).colorScheme.secondary.withOpacity(0.9)
+                          : Theme.of(context).colorScheme.error.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(10.r),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 4,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      widget.doctor.status,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            fontSize: 12.sp,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+**********************************************
+
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:intl/intl.dart';
+import 'package:segma/cubits/doctor_details_cubit.dart';
+import 'package:segma/cubits/selected_child_cubit.dart';
+import 'package:segma/models/doctor_model.dart';
+import 'package:segma/services/doctor_service.dart';
+import 'package:segma/services/notification_service.dart';
+import 'package:segma/services/auth_service.dart';
+import 'package:segma/utils/colors.dart';
+
+class DoctorDetailsScreen extends StatefulWidget {
+  final String doctorId;
+  final String? appointmentId;
+  final String? previousDate;
+  final String? previousTime;
+
+  const DoctorDetailsScreen({
+    super.key,
+    required this.doctorId,
+    this.appointmentId,
+    this.previousDate,
+    this.previousTime,
+  });
+
+  @override
+  State<DoctorDetailsScreen> createState() => _DoctorDetailsScreenState();
+}
+
+class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
+    with TickerProviderStateMixin {
+  late ScrollController _dateScrollController;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
+  late AnimationController _heartAnimationController;
+  late Animation<double> _heartScaleAnimation;
+  bool _isFavorite = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _dateScrollController = ScrollController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkIfFavorite();
+    });
+
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+
+    _heartAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _heartScaleAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
+      CurvedAnimation(
+          parent: _heartAnimationController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _dateScrollController.dispose();
+    _animationController.dispose();
+    _heartAnimationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _checkIfFavorite() async {
+    final childId = context.read<SelectedChildCubit>().state;
+    if (childId == null) return;
+    try {
+      final isFavorite =
+          await DoctorService.isDoctorFavorite(childId, widget.doctorId);
+      setState(() {
+        _isFavorite = isFavorite;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error checking favorite status: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleFavorite(String childId) async {
+    try {
+      final response = _isFavorite
+          ? await DoctorService.removeFavorite(childId, widget.doctorId)
+          : await DoctorService.toggleFavorite(childId, widget.doctorId);
+      if (response['status'] == 'success') {
+        setState(() {
+          _isFavorite = !_isFavorite;
+        });
+        _heartAnimationController
+            .forward(from: 0)
+            .whenComplete(() => _heartAnimationController.reverse());
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(_isFavorite
+                    ? 'Added to favorites'
+                    : 'Removed from favorites')),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to update favorite status')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  void _showSuccessMessage() {
+    context.read<DoctorDetailsCubit>().showSuccessAnimation();
+    _animationController.forward().then((_) {
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          context.read<DoctorDetailsCubit>().resetSuccessAnimation();
+          _animationController.reset();
+          Navigator.pop(context);
+        }
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) => DoctorDetailsCubit(),
+      child: Builder(
+        builder: (context) {
+          final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+          return Scaffold(
+            backgroundColor: isDarkMode
+                ? AppColors.darkBackground
+                : AppColors.lightBackground,
+            appBar: AppBar(
+              backgroundColor: isDarkMode
+                  ? AppColors.darkNavBarBackground
+                  : AppColors.lightNavBarBackground,
+              title: Text(
+                'Doctor Details',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: isDarkMode
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightTextPrimary,
+                    ),
+              ),
+              leading: IconButton(
+                icon: Icon(
+                  Icons.arrow_back,
+                  color: isDarkMode ? AppColors.darkIcon : AppColors.lightIcon,
+                ),
+                onPressed: () => Navigator.pop(context),
+              ),
+              actions: [
+                BlocBuilder<SelectedChildCubit, String?>(
+                  builder: (context, childId) {
+                    if (childId == null) return const SizedBox.shrink();
+                    return IconButton(
+                      icon: ScaleTransition(
+                        scale: _heartScaleAnimation,
+                        child: Icon(
+                          _isFavorite ? Icons.favorite : Icons.favorite_border,
+                          color: _isFavorite
+                              ? AppColors.statusOverdue
+                              : (isDarkMode
+                                  ? AppColors.darkNavBarInactive
+                                  : AppColors.lightNavBarInactive),
+                        ),
+                      ),
+                      onPressed: () => _toggleFavorite(childId),
+                    );
+                  },
+                ),
+              ],
+            ),
+            body: Stack(
+              children: [
+                BlocBuilder<SelectedChildCubit, String?>(
+                  builder: (context, childId) {
+                    if (childId == null) {
+                      return Center(
+                        child: Text(
+                          'Please select a child',
+                          style:
+                              Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    color: isDarkMode
+                                        ? AppColors.darkTextPrimary
+                                        : AppColors.lightTextPrimary,
+                                  ),
+                        ),
+                      );
+                    }
+                    return FutureBuilder<Map<String, dynamic>>(
+                      future: DoctorService.getDoctorDetails(
+                          childId, widget.doctorId),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                              child: CircularProgressIndicator());
+                        }
+                        if (snapshot.hasError ||
+                            !snapshot.hasData ||
+                            snapshot.data!['status'] != 'success') {
+                          print(
+                              'DoctorDetailsScreen: Error or no data - Error: ${snapshot.error}, Data: ${snapshot.data}');
+                          return Center(
+                            child: Text(
+                              'Error loading doctor details: ${snapshot.error ?? snapshot.data?['message'] ?? 'Unknown error'}',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
+                                  ?.copyWith(
+                                    color: isDarkMode
+                                        ? AppColors.darkTextPrimary
+                                        : AppColors.lightTextPrimary,
+                                  ),
+                              textAlign: TextAlign.center,
+                            ),
+                          );
+                        }
+                        // التحقق من هيكلية البيانات وطباعة للتحقق
+                        final data = snapshot.data!['data'];
+                        print('DoctorDetailsScreen: Raw data: $data');
+                        final doctor = Doctor.fromJson(data);
+                        print(
+                            'DoctorDetailsScreen: Parsed doctor - Name: ${doctor.firstName} ${doctor.lastName}, Specialize: ${doctor.specialise}, Available Times: ${doctor.availableTimes}');
+
+                        final dates = List.generate(
+                            30,
+                            (index) =>
+                                DateTime.now().add(Duration(days: index)));
+                        final bookedAppointments =
+                            doctor.bookedAppointments ?? [];
+                        return BlocBuilder<DoctorDetailsCubit,
+                            DoctorDetailsState>(
+                          builder: (context, state) {
+                            return ListView(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 16.w, vertical: 20.h),
+                              children: [
+                                if (widget.appointmentId != null) ...[
+                                  Text(
+                                    'Previous Appointment: ${widget.previousDate} at ${widget.previousTime}',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: isDarkMode
+                                              ? AppColors.darkTextSecondary
+                                              : AppColors.lightTextSecondary,
+                                        ),
+                                  ),
+                                  SizedBox(height: 12.h),
+                                ],
+                                Card(
+                                  elevation: 6,
+                                  color: isDarkMode
+                                      ? AppColors.darkCardBackground
+                                      : AppColors.lightCardBackground,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(16.r)),
+                                  child: Padding(
+                                    padding: EdgeInsets.all(16.r),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 40.r,
+                                          backgroundColor:
+                                              AppColors.featureDoctor,
+                                          child: Icon(
+                                            Icons.person,
+                                            size: 40.r,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        SizedBox(width: 16.w),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment
+                                                        .spaceBetween,
+                                                children: [
+                                                  Expanded(
+                                                    child: Text(
+                                                      doctor.firstName
+                                                                  .isNotEmpty &&
+                                                              doctor.lastName
+                                                                  .isNotEmpty
+                                                          ? '${doctor.firstName} ${doctor.lastName}'
+                                                          : 'Unknown Doctor',
+                                                      style: Theme.of(context)
+                                                          .textTheme
+                                                          .titleLarge
+                                                          ?.copyWith(
+                                                            color: isDarkMode
+                                                                ? AppColors
+                                                                    .darkTextPrimary
+                                                                : AppColors
+                                                                    .lightTextPrimary,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                          ),
+                                                    ),
+                                                  ),
+                                                  GestureDetector(
+                                                    onTap: () =>
+                                                        _toggleFavorite(
+                                                            childId),
+                                                    child: ScaleTransition(
+                                                      scale:
+                                                          _heartScaleAnimation,
+                                                      child: Icon(
+                                                        _isFavorite
+                                                            ? Icons.favorite
+                                                            : Icons
+                                                                .favorite_border,
+                                                        color: _isFavorite
+                                                            ? AppColors
+                                                                .statusOverdue
+                                                            : (isDarkMode
+                                                                ? AppColors
+                                                                    .darkNavBarInactive
+                                                                : AppColors
+                                                                    .lightNavBarInactive),
+                                                        size: 24.sp,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              SizedBox(height: 6.h),
+                                              Text(
+                                                doctor.specialise.isNotEmpty
+                                                    ? doctor.specialise
+                                                    : 'No Specialty',
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodyMedium
+                                                    ?.copyWith(
+                                                      color: isDarkMode
+                                                          ? AppColors
+                                                              .darkTextSecondary
+                                                          : AppColors
+                                                              .lightTextSecondary,
+                                                    ),
+                                              ),
+                                              SizedBox(height: 6.h),
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.location_on,
+                                                    size: 14.sp,
+                                                    color: isDarkMode
+                                                        ? AppColors.darkIcon
+                                                        : AppColors.lightIcon,
+                                                  ),
+                                                  SizedBox(width: 4.w),
+                                                  Expanded(
+                                                    child: Text(
+                                                      doctor.address.isNotEmpty
+                                                          ? doctor.address
+                                                          : 'No Address',
+                                                      style: Theme.of(context)
+                                                          .textTheme
+                                                          .bodySmall
+                                                          ?.copyWith(
+                                                            color: isDarkMode
+                                                                ? AppColors
+                                                                    .darkTextSecondary
+                                                                : AppColors
+                                                                    .lightTextSecondary,
+                                                          ),
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              SizedBox(height: 6.h),
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.star,
+                                                    size: 14.sp,
+                                                    color:
+                                                        AppColors.featureGrowth,
+                                                  ),
+                                                  SizedBox(width: 4.w),
+                                                  Text(
+                                                    doctor.rate > 0
+                                                        ? doctor.rate
+                                                            .toStringAsFixed(1)
+                                                        : '0.0',
+                                                    style: Theme.of(context)
+                                                        .textTheme
+                                                        .bodySmall
+                                                        ?.copyWith(
+                                                          color: isDarkMode
+                                                              ? AppColors
+                                                                  .darkTextSecondary
+                                                              : AppColors
+                                                                  .lightTextSecondary,
+                                                        ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(height: 20.h),
+                                Text(
+                                  'About the Doctor',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(
+                                        color: isDarkMode
+                                            ? AppColors.darkTextPrimary
+                                            : AppColors.lightTextPrimary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                ),
+                                SizedBox(height: 8.h),
+                                Text(
+                                  doctor.about.isNotEmpty
+                                      ? doctor.about
+                                      : 'No Description Available',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        color: isDarkMode
+                                            ? AppColors.darkTextSecondary
+                                            : AppColors.lightTextSecondary,
+                                      ),
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                SizedBox(height: 20.h),
+                                Text(
+                                  'Select Date',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(
+                                        color: isDarkMode
+                                            ? AppColors.darkTextPrimary
+                                            : AppColors.lightTextPrimary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                ),
+                                SizedBox(height: 8.h),
+                                SizedBox(
+                                  height: 70.h,
+                                  child: ListView.builder(
+                                    controller: _dateScrollController,
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount: dates.length,
+                                    itemBuilder: (context, index) {
+                                      final date = dates[index];
+                                      final formattedDate =
+                                          DateFormat('yyyy-MM-dd').format(date);
+                                      final isSelected =
+                                          state.selectedDate == formattedDate;
+                                      return Padding(
+                                        padding: EdgeInsets.only(right: 2.w),
+                                        child: GestureDetector(
+                                          onTap: () => context
+                                              .read<DoctorDetailsCubit>()
+                                              .selectDate(formattedDate),
+                                          child: Card(
+                                            elevation: isSelected ? 6 : 2,
+                                            color: isSelected
+                                                ? (isDarkMode
+                                                    ? AppColors
+                                                        .darkButtonPrimary
+                                                    : AppColors
+                                                        .lightButtonPrimary)
+                                                : (isDarkMode
+                                                    ? AppColors
+                                                        .darkCardBackground
+                                                    : AppColors
+                                                        .lightCardBackground),
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                        12.r)),
+                                            child: Container(
+                                              width: 40.w,
+                                              child: Column(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  Text(
+                                                    DateFormat('E')
+                                                        .format(date),
+                                                    style: Theme.of(context)
+                                                        .textTheme
+                                                        .bodySmall
+                                                        ?.copyWith(
+                                                          color: isSelected
+                                                              ? Colors.white
+                                                              : (isDarkMode
+                                                                  ? AppColors
+                                                                      .darkTextSecondary
+                                                                  : AppColors
+                                                                      .lightTextSecondary),
+                                                        ),
+                                                  ),
+                                                  SizedBox(height: 4.h),
+                                                  Text(
+                                                    DateFormat('dd')
+                                                        .format(date),
+                                                    style: Theme.of(context)
+                                                        .textTheme
+                                                        .bodyMedium
+                                                        ?.copyWith(
+                                                          color: isSelected
+                                                              ? Colors.white
+                                                              : (isDarkMode
+                                                                  ? AppColors
+                                                                      .darkTextSecondary
+                                                                  : AppColors
+                                                                      .lightTextSecondary),
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                SizedBox(height: 20.h),
+                                Text(
+                                  'Select Time',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(
+                                        color: isDarkMode
+                                            ? AppColors.darkTextPrimary
+                                            : AppColors.lightTextPrimary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                ),
+                                SizedBox(height: 8.h),
+                                doctor.availableTimes.isNotEmpty
+                                    ? GridView.builder(
+                                        shrinkWrap: true,
+                                        physics:
+                                            const NeverScrollableScrollPhysics(),
+                                        gridDelegate:
+                                            const SliverGridDelegateWithFixedCrossAxisCount(
+                                          crossAxisCount: 3,
+                                          crossAxisSpacing: 8,
+                                          mainAxisSpacing: 8,
+                                          childAspectRatio: 2.5,
+                                        ),
+                                        itemCount: doctor.availableTimes.length,
+                                        itemBuilder: (context, index) {
+                                          final time =
+                                              doctor.availableTimes[index];
+                                          final isBooked =
+                                              bookedAppointments.any((appt) {
+                                            final apptDate =
+                                                DateFormat('yyyy-MM-dd').format(
+                                                    DateTime.parse(appt.date));
+                                            return apptDate ==
+                                                    state.selectedDate &&
+                                                appt.time == time;
+                                          });
+                                          final isSelected =
+                                              state.selectedTime == time;
+                                          return GestureDetector(
+                                            onTap: isBooked
+                                                ? null
+                                                : () => context
+                                                    .read<DoctorDetailsCubit>()
+                                                    .selectTime(time),
+                                            child: Card(
+                                              elevation: isSelected ? 6 : 2,
+                                              color: isBooked
+                                                  ? (isDarkMode
+                                                      ? AppColors
+                                                          .darkNavBarInactive
+                                                      : AppColors
+                                                          .lightNavBarInactive)
+                                                  : isSelected
+                                                      ? (isDarkMode
+                                                          ? AppColors
+                                                              .darkButtonPrimary
+                                                          : AppColors
+                                                              .lightButtonPrimary)
+                                                      : (isDarkMode
+                                                          ? AppColors
+                                                              .darkCardBackground
+                                                          : AppColors
+                                                              .lightCardBackground),
+                                              shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                          8.r)),
+                                              child: Stack(
+                                                alignment: Alignment.center,
+                                                children: [
+                                                  Center(
+                                                    child: Text(
+                                                      time,
+                                                      style: Theme.of(context)
+                                                          .textTheme
+                                                          .bodySmall
+                                                          ?.copyWith(
+                                                            color: isBooked ||
+                                                                    isSelected
+                                                                ? Colors.white
+                                                                : (isDarkMode
+                                                                    ? AppColors
+                                                                        .darkTextSecondary
+                                                                    : AppColors
+                                                                        .lightTextSecondary),
+                                                          ),
+                                                    ),
+                                                  ),
+                                                  if (isSelected)
+                                                    Positioned(
+                                                      right: 4.w,
+                                                      top: 4.h,
+                                                      child: Icon(
+                                                        Icons.check_circle,
+                                                        color: Colors.white,
+                                                        size: 16.sp,
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      )
+                                    : Text(
+                                        'No Available Times',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(
+                                              color: isDarkMode
+                                                  ? AppColors.darkTextSecondary
+                                                  : AppColors
+                                                      .lightTextSecondary,
+                                            ),
+                                      ),
+                                SizedBox(height: 20.h),
+                                Text(
+                                  'Visit Type',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(
+                                        color: isDarkMode
+                                            ? AppColors.darkTextPrimary
+                                            : AppColors.lightTextPrimary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                ),
+                                SizedBox(height: 8.h),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    Expanded(
+                                      child: ChoiceChip(
+                                        label: Text(
+                                          'In Clinic',
+                                          style:
+                                              Theme.of(context)
+                                                  .textTheme
+                                                  .bodyMedium
+                                                  ?.copyWith(
+                                                    color: state.visitType ==
+                                                            'On Clinic'
+                                                        ? Colors.white
+                                                        : (isDarkMode
+                                                            ? AppColors
+                                                                .darkTextSecondary
+                                                            : AppColors
+                                                                .lightTextSecondary),
+                                                  ),
+                                        ),
+                                        selected:
+                                            state.visitType == 'On Clinic',
+                                        selectedColor: isDarkMode
+                                            ? AppColors.darkButtonPrimary
+                                            : AppColors.lightButtonPrimary,
+                                        backgroundColor: isDarkMode
+                                            ? AppColors.darkCardBackground
+                                            : AppColors.lightCardBackground,
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(8.r)),
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 12.w, vertical: 8.h),
+                                        onSelected: (selected) {
+                                          if (selected)
+                                            context
+                                                .read<DoctorDetailsCubit>()
+                                                .selectVisitType('On Clinic');
+                                        },
+                                      ),
+                                    ),
+                                    SizedBox(width: 8.w),
+                                    Expanded(
+                                      child: ChoiceChip(
+                                        label: Text(
+                                          'At Home',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(
+                                                color: state.visitType ==
+                                                        'On Home'
+                                                    ? Colors.white
+                                                    : (isDarkMode
+                                                        ? AppColors
+                                                            .darkTextSecondary
+                                                        : AppColors
+                                                            .lightTextSecondary),
+                                              ),
+                                        ),
+                                        selected: state.visitType == 'On Home',
+                                        selectedColor: isDarkMode
+                                            ? AppColors.darkButtonPrimary
+                                            : AppColors.lightButtonPrimary,
+                                        backgroundColor: isDarkMode
+                                            ? AppColors.darkCardBackground
+                                            : AppColors.lightCardBackground,
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(8.r)),
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 12.w, vertical: 8.h),
+                                        onSelected: (selected) {
+                                          if (selected)
+                                            context
+                                                .read<DoctorDetailsCubit>()
+                                                .selectVisitType('On Home');
+                                        },
+                                      ),
+                                    ),
+                                    SizedBox(width: 8.w),
+                                    Expanded(
+                                      child: ChoiceChip(
+                                        label: Text(
+                                          'Video Call',
+                                          style:
+                                              Theme.of(context)
+                                                  .textTheme
+                                                  .bodyMedium
+                                                  ?.copyWith(
+                                                    color: state.visitType ==
+                                                            'Join Call'
+                                                        ? Colors.white
+                                                        : (isDarkMode
+                                                            ? AppColors
+                                                                .darkTextSecondary
+                                                            : AppColors
+                                                                .lightTextSecondary),
+                                                  ),
+                                        ),
+                                        selected:
+                                            state.visitType == 'Join Call',
+                                        selectedColor: isDarkMode
+                                            ? AppColors.darkButtonPrimary
+                                            : AppColors.lightButtonPrimary,
+                                        backgroundColor: isDarkMode
+                                            ? AppColors.darkCardBackground
+                                            : AppColors.lightCardBackground,
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(8.r)),
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 12.w, vertical: 8.h),
+                                        onSelected: (selected) {
+                                          if (selected)
+                                            context
+                                                .read<DoctorDetailsCubit>()
+                                                .selectVisitType('Join Call');
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 20.h),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    onPressed: state.selectedDate == null ||
+                                            state.selectedTime == null
+                                        ? null
+                                        : () async {
+                                            final data = {
+                                              'date': state.selectedDate,
+                                              'time': state.selectedTime,
+                                              'visitType': state.visitType,
+                                            };
+                                            try {
+                                              if (widget.appointmentId !=
+                                                  null) {
+                                                final response =
+                                                    await DoctorService
+                                                        .rescheduleAppointment(
+                                                  childId,
+                                                  widget.appointmentId!,
+                                                  data,
+                                                );
+                                                if (response['status'] ==
+                                                    'success') {
+                                                  final userId =
+                                                      await AuthService
+                                                          .getUserId();
+                                                  await NotificationService
+                                                      .sendAppointmentNotification(
+                                                    childId: childId,
+                                                    doctorId: widget.doctorId,
+                                                    appointmentId:
+                                                        widget.appointmentId!,
+                                                    userId: userId ?? '',
+                                                    date: state.selectedDate!,
+                                                    time: state.selectedTime!,
+                                                    doctorName:
+                                                        '${doctor.firstName} ${doctor.lastName}',
+                                                    isReschedule: true,
+                                                  );
+                                                  _showSuccessMessage();
+                                                } else {
+                                                  String errorMessage =
+                                                      response['message'] ??
+                                                          'Failed to reschedule';
+                                                  if (errorMessage.contains(
+                                                      'already booked')) {
+                                                    errorMessage =
+                                                        'This date and time are already booked. Please choose another slot.';
+                                                  }
+                                                  if (context.mounted) {
+                                                    ScaffoldMessenger.of(
+                                                            context)
+                                                        .showSnackBar(
+                                                      SnackBar(
+                                                          content: Text(
+                                                              errorMessage)),
+                                                    );
+                                                  }
+                                                }
+                                              } else {
+                                                final response =
+                                                    await DoctorService
+                                                        .bookAppointment(
+                                                  childId,
+                                                  widget.doctorId,
+                                                  data,
+                                                );
+                                                if (response['status'] ==
+                                                    'success') {
+                                                  final userId =
+                                                      await AuthService
+                                                          .getUserId();
+                                                  await NotificationService
+                                                      .sendAppointmentNotification(
+                                                    childId: childId,
+                                                    doctorId: widget.doctorId,
+                                                    appointmentId: response[
+                                                                'data']
+                                                            ['appointmentId'] ??
+                                                        '',
+                                                    userId: userId ?? '',
+                                                    date: state.selectedDate!,
+                                                    time: state.selectedTime!,
+                                                    doctorName:
+                                                        '${doctor.firstName} ${doctor.lastName}',
+                                                    isReschedule: false,
+                                                  );
+                                                  _showSuccessMessage();
+                                                } else {
+                                                  String errorMessage =
+                                                      response['message'] ??
+                                                          'Failed to book';
+                                                  if (errorMessage.contains(
+                                                      'already booked')) {
+                                                    errorMessage =
+                                                        'This date and time are already booked. Please choose another slot.';
+                                                  }
+                                                  if (context.mounted) {
+                                                    ScaffoldMessenger.of(
+                                                            context)
+                                                        .showSnackBar(
+                                                      SnackBar(
+                                                          content: Text(
+                                                              errorMessage)),
+                                                    );
+                                                  }
+                                                }
+                                              }
+                                            } catch (e) {
+                                              if (context.mounted) {
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  SnackBar(
+                                                      content:
+                                                          Text('Error: $e')),
+                                                );
+                                              }
+                                            }
+                                          },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: isDarkMode
+                                          ? AppColors.darkButtonPrimary
+                                          : AppColors.lightButtonPrimary,
+                                      foregroundColor: Colors.white,
+                                      padding: EdgeInsets.symmetric(
+                                          vertical: 12.h, horizontal: 24.w),
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12.r)),
+                                      elevation: 4,
+                                    ),
+                                    child: Text(
+                                      widget.appointmentId != null
+                                          ? 'Reschedule Appointment'
+                                          : 'Book Appointment',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge
+                                          ?.copyWith(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(height: 40.h),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
+                BlocBuilder<DoctorDetailsCubit, DoctorDetailsState>(
+                  builder: (context, state) {
+                    if (state.showSuccessAnimation) {
+                      return Container(
+                        color: Colors.black54,
+                        child: Center(
+                          child: FadeTransition(
+                            opacity: _fadeAnimation,
+                            child: ScaleTransition(
+                              scale: _scaleAnimation,
+                              child: Card(
+                                elevation: 10,
+                                color: isDarkMode
+                                    ? AppColors.darkCardBackground
+                                    : AppColors.lightCardBackground,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16.r)),
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(
+                                      vertical: 16.h, horizontal: 24.w),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.check_circle,
+                                        color: isDarkMode
+                                            ? AppColors.darkButtonPrimary
+                                            : AppColors.lightButtonPrimary,
+                                        size: 28.sp,
+                                      ),
+                                      SizedBox(width: 12.w),
+                                      Text(
+                                        'تم الحجز بنجاح',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              color: isDarkMode
+                                                  ? AppColors.darkTextPrimary
+                                                  : AppColors.lightTextPrimary,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+***********************************************************************
+الكود اللى هبعته دلوقتى بيعرض الصور بشكل كويس اتعلم منه بيعرضها ازاى واعمل زيه فى عرض الصور
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:intl/intl.dart';
+import 'package:segma/models/appointment_model.dart';
+import 'package:segma/models/doctor_model.dart';
+import 'package:segma/screens/doctor/DoctorSettingsScreen.dart';
+import 'package:segma/screens/doctor/doctor_availability_screen.dart';
+import 'package:segma/screens/doctor/history_doctor.dart';
+import 'package:segma/screens/notifications_screen.dart';
+import 'package:segma/services/doctor_service.dart';
+
+class DoctorHomeScreen extends StatefulWidget {
+  const DoctorHomeScreen({Key? key}) : super(key: key);
+
+  @override
+  _DoctorHomeScreenState createState() => _DoctorHomeScreenState();
+}
+
+class _DoctorHomeScreenState extends State<DoctorHomeScreen> {
+  late Future<Map<String, dynamic>> _doctorProfileFuture;
+  late Future<Map<String, dynamic>> _upcomingAppointmentsFuture;
+  int _selectedIndex = 2; // Home كافتراضي
+
+  final List<Widget> _screens = [
+    const AllHistoryScreen(),
+    const DoctorAvailabilityScreen(),
+    const HomeScreenContent(),
+    const NotificationsScreen(isDoctor: true),
+    const SettingsScreen(),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _doctorProfileFuture = DoctorService.getDoctorProfile();
+    _upcomingAppointmentsFuture = DoctorService.getDoctorUpcomingAppointments();
+  }
+
+  void _refreshData() {
+    setState(() {
+      _doctorProfileFuture = DoctorService.getDoctorProfile();
+      _upcomingAppointmentsFuture = DoctorService.getDoctorUpcomingAppointments();
+    });
+  }
+
+  void _onNavBarTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    print('DoctorHomeScreen: Building with selectedIndex: $_selectedIndex');
+    return Scaffold(
+      appBar: _selectedIndex == 2
+          ? AppBar(
+              title: Text(
+                'Doctor Home',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Theme.of(context).primaryColor,
+                    ),
+              ),
+              backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+              elevation: 0,
+            )
+          : null,
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _screens,
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onNavBarTapped,
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: Theme.of(context).primaryColor,
+        unselectedItemColor: Theme.of(context).textTheme.bodyMedium?.color,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
+          BottomNavigationBarItem(icon: Icon(Icons.schedule), label: 'Schedule'),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'Notification'),
+          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
+        ],
+      ),
+    );
+  }
+}
+class HomeScreenContent extends StatefulWidget {
+  const HomeScreenContent({Key? key}) : super(key: key);
+
+  @override
+  _HomeScreenContentState createState() => _HomeScreenContentState();
+}
+
+class _HomeScreenContentState extends State<HomeScreenContent> {
+  late Future<Map<String, dynamic>> _doctorProfileFuture;
+  late Future<Map<String, dynamic>> _upcomingAppointmentsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _doctorProfileFuture = DoctorService.getDoctorProfile();
+    _upcomingAppointmentsFuture = DoctorService.getDoctorUpcomingAppointments();
+    print('HomeScreenContent: Initialized with futures');
+  }
+
+  void _refreshData() {
+    setState(() {
+      _doctorProfileFuture = DoctorService.getDoctorProfile();
+      _upcomingAppointmentsFuture = DoctorService.getDoctorUpcomingAppointments();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    print('HomeScreenContent: Building');
+    return FutureBuilder<Map<String, dynamic>>(
+      future: Future.wait([_doctorProfileFuture, _upcomingAppointmentsFuture]).then((results) {
+        final doctorData = results[0];
+        final appointmentsData = results[1];
+        return {
+          'doctor': Doctor.fromJson(doctorData['data']), // تحويل البيانات إلى كائن Doctor
+          'appointments': appointmentsData['data'] as List, // المصفوفة المباشرة للحجوزات
+          'totalAppointments': appointmentsData['totalAppointments'] as int? ?? 0, // استخراج العدد الصحيح
+        };
+      }),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          print('HomeScreenContent: Waiting for data');
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError || !snapshot.hasData) {
+          print('HomeScreenContent: Error - ${snapshot.error}');
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Error loading data: ${snapshot.error}',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 16.h),
+                ElevatedButton(
+                  onPressed: _refreshData,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).primaryColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                  ),
+                  child: Text(
+                    'Retry',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onPrimary,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final data = snapshot.data!;
+        final doctor = data['doctor'] as Doctor;
+        final List<dynamic> appointmentsData = data['appointments'] ?? [];
+        final int totalAppointments = data['totalAppointments'] as int? ?? 0;
+        final List<DoctorAppointment> appointments = appointmentsData
+            .map((appointment) => DoctorAppointment.fromJson(appointment))
+            .toList();
+
+        print('HomeScreenContent: Data loaded - Total Appointments: $totalAppointments, Appointments Count: ${appointments.length}');
+
+        return ListView(
+          padding: EdgeInsets.all(16.w),
+          children: [
+            // Doctor Info Card
+            Card(
+              color: Theme.of(context).cardColor,
+              elevation: 4,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+              child: Padding(
+                padding: EdgeInsets.all(16.r),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 40.r,
+                      backgroundImage: NetworkImage(doctor.avatar ?? 'https://example.com/default-avatar.jpg'),
+                      onBackgroundImageError: (error, stackTrace) {
+                        print('DoctorHomeScreen: Error loading doctor avatar: $error');
+                      },
+                      child: const Icon(Icons.person),
+                    ),
+                    SizedBox(width: 16.w),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Hello, Dr. ${doctor.firstName}',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  color: Theme.of(context).primaryColor,
+                                ),
+                          ),
+                          SizedBox(height: 4.h),
+                          Text(
+                            'You have $totalAppointments appointments',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: 16.h),
+            // Appointments List
+            if (appointments.isEmpty)
+              Center(
+                child: Text(
+                  'No upcoming appointments',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+              )
+            else
+              ...appointments.map((appointment) {
+                return AppointmentCard(
+                  appointment: appointment,
+                  onStatusUpdate: _refreshData,
+                );
+              }).toList(),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class AppointmentCard extends StatelessWidget {
+  final DoctorAppointment appointment;
+  final VoidCallback onStatusUpdate;
+
+  const AppointmentCard({
+    Key? key,
+    required this.appointment,
+    required this.onStatusUpdate,
+  }) : super(key: key);
+
+  void _updateStatus(BuildContext context, String newStatus) async {
+    try {
+      print('AppointmentCard: Updating status to $newStatus for appointment ${appointment.appointmentId}');
+      final response = await DoctorService.updateAppointmentStatus(appointment.appointmentId, newStatus);
+      if (response['status'] == 'success') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              response['message'] ?? 'Status updated successfully',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+        );
+        onStatusUpdate();
+      } else {
+        throw Exception('Failed to update status: ${response['message']}');
+      }
+    } catch (e) {
+      print('AppointmentCard: Error updating status: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Error: $e',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onError,
+                ),
+          ),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    print('AppointmentCard: Building for appointment ${appointment.appointmentId}');
+    final date = DateTime.parse(appointment.date);
+    final formattedDate = DateFormat('dd MMM, yyyy').format(date);
+    String placeText = appointment.visitType == 'In-Person' ? 'Home' : appointment.visitType;
+    String address = appointment.visitType == 'In-Person' ? ', ${appointment.userAddress}' : '';
+
+    return Card(
+      color: Theme.of(context).cardColor,
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+      margin: EdgeInsets.symmetric(vertical: 8.h),
+      child: Padding(
+        padding: EdgeInsets.all(12.r),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Name: ${appointment.userName}',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      Text(
+                        'Child: ${appointment.childName}',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      SizedBox(height: 4.h),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on,
+                            size: 14.sp,
+                            color: Theme.of(context).iconTheme.color,
+                          ),
+                          SizedBox(width: 4.w),
+                          Text(
+                            '$placeText$address',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 4.h),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today,
+                            size: 14.sp,
+                            color: Theme.of(context).iconTheme.color,
+                          ),
+                          SizedBox(width: 4.w),
+                          Text(
+                            formattedDate,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          SizedBox(width: 8.w),
+                          Icon(
+                            Icons.access_time,
+                            size: 14.sp,
+                            color: Theme.of(context).iconTheme.color,
+                          ),
+                          SizedBox(width: 4.w),
+                          Text(
+                            appointment.time,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                if (appointment.status != 'Pending') // استخدمنا 'Pending' بدلاً من 'PENDING' للتوافق
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                    decoration: BoxDecoration(
+                      color: appointment.status == 'Accepted'
+                          ? Colors.green
+                          : appointment.status == 'Closed'
+                              ? Theme.of(context).colorScheme.error
+                              : Theme.of(context).disabledColor,
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                    child: Text(
+                      appointment.status,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                          ),
+                    ),
+                  ),
+              ],
+            ),
+            if (appointment.status == 'Pending') ...[
+              SizedBox(height: 8.h),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  ElevatedButton(
+                    onPressed: () => _updateStatus(context, 'Accepted'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).primaryColor,
+                      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                    ),
+                    child: Text(
+                      'Taken',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                          ),
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => _updateStatus(context, 'Closed'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                    ),
+                    child: Text(
+                      'Refused',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onError,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+********************************************************
+اهم حاجة اكتب الاكواد كلها بالانجليزى وكلمنى عربى
+وكمان اوعى تبوظ اى حاجة فى الاكواد عدل فقط فى الجزء الخاص بالصور ومش تمسح حاجة
+وبعد التعديلات ابعت الاكواد كاملة 
