@@ -1,19 +1,22 @@
 # SmartBrace(Sigma): Pediatric Healthcare Monitoring System
 
 ## Introduction
+
 SmartBrace(Sigma) is a comprehensive pediatric healthcare solution that empowers parents and doctors to monitor and manage children's health and safety in real-time. The system integrates a smart wearable bracelet, a cross-platform Flutter mobile application, and a React-based web platform to provide seamless health tracking, medical history management, and emergency response capabilities. With advanced hardware, a robust backend infrastructure, and AI-driven analytics, SmartBrace(Sigma) ensures continuous monitoring of vital signs, activity levels, and location, offering caregivers valuable insights and peace of mind.
 
 - SmartBrace(Sigma) System Overview
-<img src="images/overview.png" alt="SmartBrace(Sigma) System Overview" style="width: 700px; display: block; margin: 0 auto; border: 1px solid #ddd; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+  <img src="images/overview.png" alt="SmartBrace(Sigma) System Overview" style="width: 700px; display: block; margin: 0 auto; border: 1px solid #ddd; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 
-*This image shows the complete SmartBrace(Sigma) ecosystem, including the smart bracelet, mobile app interface (parent dashboard), and web platform.*
+_This image shows the complete SmartBrace(Sigma) ecosystem, including the smart bracelet, mobile app interface (parent dashboard), and web platform._
 
 ## Features
 
 ### Mobile Application (Flutter)
+
 The Flutter-based mobile app supports two user roles: **Parents** (Users) and **Doctors**, each with tailored functionalities.
 
 #### Parent Features
+
 - **User Registration and Authentication**: Parents can register and log in using email and password. Passwords are securely encrypted with `bcryptjs`, and authentication/authorization is managed with `jsonwebtoken` for secure access control.
 - **Multi-Child Management**: Create and manage profiles for multiple children, each linked to their unique SmartBrace(Sigma) device with health and activity data.
 - **Real-Time Health Monitoring**: Displays live data from the SmartBrace(Sigma) wearable, including:
@@ -38,11 +41,12 @@ The Flutter-based mobile app supports two user roles: **Parents** (Users) and **
 - **Theme Customization**: Switch between light and dark themes for a personalized experience.
 
 - Parent Dashboard
-<img src="images/Parent_Dashboard.jpg" alt="Parent Dashboard" style="width: 300px; height: 700px; display: block; margin: 0 auto;">
+  <img src="images/Parent_Dashboard.jpg" alt="Parent Dashboard" style="width: 300px; height: 700px; display: block; margin: 0 auto;">
 
-*This is a screenshot of the parent dashboard in the Flutter app, showing real-time health data (SpO₂, heart rate, etc.), child profile options, and growth charts.*
+_This is a screenshot of the parent dashboard in the Flutter app, showing real-time health data (SpO₂, heart rate, etc.), child profile options, and growth charts._
 
 #### Doctor Features
+
 - **Doctor Dashboard**: Displays the doctor’s profile picture, name, and number of accepted appointments.
 - **Appointment Management**: View, accept, or reject appointment requests. Rejected appointments are automatically removed.
 - **Availability Settings**: Update available appointment slots.
@@ -51,20 +55,24 @@ The Flutter-based mobile app supports two user roles: **Parents** (Users) and **
 - **Notifications**: Receive real-time updates on appointment requests and statuses.
 
 - Doctor Dashboard
-<img src="images/doctor_dashboard.jpg" alt="Parent Dashboard" style="width: 300px; height: 700px; display: block; margin: 0 auto;">
+  <img src="images/doctor_dashboard.jpg" alt="Parent Dashboard" style="width: 300px; height: 700px; display: block; margin: 0 auto;">
 
-*This is a screenshot of the doctor dashboard, highlighting appointment management, child medical data, and profile details.*
+_This is a screenshot of the doctor dashboard, highlighting appointment management, child medical data, and profile details._
 
 ### Web Platform (React)
+
 The React-based web platform is designed for emergency scenarios:
+
 - **NFC Card Integration**: Each child has an NFC card linked to their medical history. Doctors can scan it in clinics or hospitals to access critical health information for rapid treatment.
 
 - web medical history
-<img src="images/web_medical_history.jpg" alt="Web Medical History View" style="width: 700px; display: block; margin: 0 auto 15px auto; border: 1px solid #ddd; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-*This image shows the web platform displaying a child’s medical history accessed via NFC card scan.*
+  <img src="images/web_medical_history.jpg" alt="Web Medical History View" style="width: 700px; display: block; margin: 0 auto 15px auto; border: 1px solid #ddd; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+  _This image shows the web platform displaying a child’s medical history accessed via NFC card scan._
 
 ### SmartBrace(Sigma) Hardware
+
 The SmartBrace(Sigma) wearable is a compact, child-friendly device with sensors for real-time health and activity monitoring. Key components include:
+
 - **ESP32 Microcontroller**: The central unit with built-in Wi-Fi for MQTT-based data transmission.
 - **MAX30105 Sensor**: Measures heart rate and SpO₂ via I2C protocol.
 - **TMP36 Temperature Sensor**: Estimates body temperature through skin contact.
@@ -73,36 +81,39 @@ The SmartBrace(Sigma) wearable is a compact, child-friendly device with sensors 
 - **Data Transmission**: Sends sensor data to the backend via MQTT for processing and storage.
 
 - Hardware Bracelet
-<img src="images/smartbrace(Sigma)_wearable.png" alt="SmartBrace System Overview" style="width: 500px; display: block; margin: 0 auto 15px auto; border: 1px solid #ddd; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+  <img src="images/smartbrace(Sigma)_wearable.png" alt="SmartBrace System Overview" style="width: 500px; display: block; margin: 0 auto 15px auto; border: 1px solid #ddd; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 
-*This image illustrates the SmartBrace(Sigma) wearable design and sensor placement.*
+_This image illustrates the SmartBrace(Sigma) wearable design and sensor placement._
 
 ## Technology Stack
 
 ### Frontend
+
 - **Mobile App**: Flutter for cross-platform iOS and Android development, ensuring a consistent user experience.
 - **Web Platform**: React with Tailwind CSS, using JSX and modern JavaScript with Babel for a responsive and scalable interface.
 
 ### Backend
+
 - **Main Server**: Node.js with Express, hosted on AWS EC2 (Ubuntu) and managed with PM2 for process monitoring and reliability, located in the `/backend` folder.
 - **Security**:
   - Passwords are encrypted using `bcryptjs` for secure storage.
   - Authentication and authorization are handled with `jsonwebtoken` for secure user sessions.
 - **Database**: MongoDB stores system data efficiently. The database structure includes collections for user profiles, child health data, and medical history.
   <img src="images/database_structure.png" alt="Database Structure" style="width: 700px; display: block; margin: 0 auto 15px auto; border: 1px solid #ddd; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-  *This diagram shows the MongoDB database structure, including collections for user profiles, child health data, and medical history.*
+  _This diagram shows the MongoDB database structure, including collections for user profiles, child health data, and medical history._
 - **File Storage**: AWS S3 is used to store images and files, with corresponding URLs saved as strings in MongoDB.
   <img src="images/s3_file_storage.png" alt="S3 Storage Process" style="width: 700px; display: block; margin: 0 auto 15px auto; border: 1px solid #ddd; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-  *This image depicts the process of uploading files to AWS S3 and storing their URLs in the MongoDB database.*
+  _This image depicts the process of uploading files to AWS S3 and storing their URLs in the MongoDB database._
 - **Microservice**: FastAPI (Python) handles AI-driven features, implemented in `/backend/fastapi_service` and hosted on Render.
   <img src="images/render.png" alt="S3 Storage Process" style="width: 700px; display: block; margin: 0 auto 15px auto; border: 1px solid #ddd; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 - **Real-Time Data**: MQTT with HiveMQ Cloud broker uses the `sensors/data` topic for sensor-server communication.
   <img src="images/hivemq_structure.png" alt="HiveMQ Structure" style="width: 700px; display: block; margin: 0 auto 15px auto; border: 1px solid #ddd; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-  *This image illustrates the HiveMQ Cloud broker structure, including the `sensors/data` topic configuration.*
+  _This image illustrates the HiveMQ Cloud broker structure, including the `sensors/data` topic configuration._
 - **WebSocket**: Enables real-time data updates to the mobile app with latency under 5 seconds.
 - **Algorithms**: Includes backend algorithms for data validation, sleep quality analysis, and activity level computation based on MPU6050 sensor data.
 
 ### Hardware
+
 - **Microcontroller**: ESP32 for processing and Wi-Fi communication.
 - **Sensors**:
   - MAX30105 (Heart Rate & SpO₂, I2C)
@@ -112,10 +123,12 @@ The SmartBrace(Sigma) wearable is a compact, child-friendly device with sensors 
 - **Communication**: MQTT for real-time data transmission to the backend.
 
 ### AI
+
 - **Medical Chatbot**: Provides reliable responses to health-related queries.
 - **Disease Prediction**: Evaluates user responses to behavior-specific questions for three conditions (e.g., fever, asthma, allergies), delivering a yes/no prediction for each.
 
 ## Data Flow
+
 1. **Hardware to Backend**:
    - Sensors publish data to the `sensors/data` topic via MQTT using the HiveMQ Cloud broker.
    - The Node.js server, subscribed to the same topic, receives the data, validates it using backend algorithms, and stores it in MongoDB.
@@ -130,6 +143,7 @@ The SmartBrace(Sigma) wearable is a compact, child-friendly device with sensors 
 ## Installation and Setup
 
 ### Prerequisites
+
 - **Node.js**: Version 20.x
 - **Flutter**: Latest stable version
 - **React**: Node.js with npm
@@ -140,6 +154,7 @@ The SmartBrace(Sigma) wearable is a compact, child-friendly device with sensors 
 - **Arduino IDE or PlatformIO**: For ESP32 programming
 
 ### Backend Setup (Node.js)
+
 1. Clone the repository:
    ```bash
    git clone <repository-url>
@@ -200,10 +215,11 @@ The SmartBrace(Sigma) wearable is a compact, child-friendly device with sensors 
    - Set up an Ubuntu instance.
    - Install PM2: `npm install -g pm2`
    - Start the server: `pm2 start index.js`
-   <img src="images/EC2_Server.png" alt="EC2 Setup" style="width: 700px; display: block; margin: 0 auto 15px auto; border: 1px solid #ddd; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-   *This image shows the AWS EC2 setup, including the Ubuntu instance configuration and PM2 deployment for the Node.js server.*
+     <img src="images/EC2_Server.png" alt="EC2 Setup" style="width: 700px; display: block; margin: 0 auto 15px auto; border: 1px solid #ddd; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+     _This image shows the AWS EC2 setup, including the Ubuntu instance configuration and PM2 deployment for the Node.js server._
 
 ### FastAPI Microservice Setup
+
 1. Navigate to the microservice folder within the repository:
    ```bash
    cd backend/fastapi_service
@@ -217,6 +233,7 @@ The SmartBrace(Sigma) wearable is a compact, child-friendly device with sensors 
    - Push the repository to Render and configure the service with the appropriate Python version, ensuring the `/backend/fastapi_service` folder is included.
 
 ### Mobile App Setup (Flutter)
+
 1. Navigate to the Flutter app folder:
    ```bash
    cd Sigma_App
@@ -238,6 +255,7 @@ The SmartBrace(Sigma) wearable is a compact, child-friendly device with sensors 
    ```
 
 ### Web Platform Setup (React)
+
 1. Navigate to the web app folder:
    ```bash
    cd frontend/sigma_web_app
@@ -257,6 +275,7 @@ The SmartBrace(Sigma) wearable is a compact, child-friendly device with sensors 
    ```
 
 ### Hardware Setup (ESP32)
+
 1. Connect the sensors to the ESP32:
    - **MAX30105**: I2C (SDA: GPIO21, SCL: GPIO22)
    - **MPU6050**: I2C (SDA: GPIO21, SCL: GPIO22)
@@ -288,6 +307,7 @@ The SmartBrace(Sigma) wearable is a compact, child-friendly device with sensors 
 ## Usage Guidelines
 
 ### For Parents
+
 1. **Sign Up/Log In**: Register using email and password. Passwords are encrypted with `bcryptjs`, and `jsonwebtoken` ensures secure authentication.
 2. **Add Children**: Create profiles for each child, linking their SmartBrace(Sigma) device ID.
 3. **Monitor Health**: View real-time data (SpO₂, heart rate, temperature, activity, location) on the app.
@@ -298,17 +318,21 @@ The SmartBrace(Sigma) wearable is a compact, child-friendly device with sensors 
 8. **Add Memories**: Upload photos or milestones for each child.
 
 ### For Doctors
+
 1. **Sign Up/Log In**: Register as a doctor and set up your profile, secured with `bcryptjs` and `jsonwebtoken`.
 2. **Manage Appointments**: Accept or reject appointment requests and update availability.
 3. **Access Child Data**: Use a child’s ID to view medical history and growth charts.
 4. **Communicate**: Chat with parents after accepting appointments.
 
 ### For Emergency Use (Web)
+
 1. **Scan NFC Card**: In emergencies, scan the child’s NFC card to access their medical history.
 2. **View Data**: Review critical health information for accurate treatment.
 
 ## Contributing
+
 We welcome contributions to enhance SmartBrace(Sigma). To contribute:
+
 1. Fork the repository.
 2. Create a feature branch: `git checkout -b feature/your-feature`.
 3. Commit changes: `git commit -m 'Add your feature'`.
@@ -316,12 +340,16 @@ We welcome contributions to enhance SmartBrace(Sigma). To contribute:
 5. Submit a pull request.
 
 ## License
+
 This project is licensed under the MIT License. See the `LICENSE` file for details.
 
 ## Links
-- Project Video: [Project Video](https://www.espressif.com)
-- Figma file: [Figma File]()
+
+- Project Video: [Project Video](https://drive.google.com/drive/folders/1Jn1qQUtVc6qBG5No9ZdM82Yq6xanXNH6?usp=sharing)
+- Figma file: [Figma File](https://www.figma.com/design/O8No0tgUO1Xho8b0Yp0DmO/Sigma?node-id=0-1&t=4tZgv7AmBXvHnGvf-1)
+
 ## References
+
 - ESP32: [Espressif Systems](https://www.espressif.com)
 - MAX30105: [Maxim Integrated](https://www.analog.com)
 - MPU6050: [InvenSense](https://invensense.tdk.com)
